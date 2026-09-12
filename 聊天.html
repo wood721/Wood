@@ -1,0 +1,3492 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>云栖阁</title>
+<style>
+:root{
+  --bg:#fff2f6;--bg2:#ffe0ea;--main:#ff8fab;--main-dark:#e56b8c;
+  --accent:#ffc2d4;--text:#3a2530;--text-soft:#b08a98;--card:#ffffffee;
+  --shadow:0 6px 22px rgba(229,107,140,.10);--radius:20px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{
+  font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  background:linear-gradient(160deg,var(--bg),var(--bg2));
+  color:var(--text);min-height:100vh;overflow-x:hidden;transition:background .5s;
+}
+#app{max-width:520px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;padding:12px}
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;
+  background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow)}
+.topbar .left{display:flex;align-items:center;gap:8px;min-width:0}
+.topbar .name{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+.topbar .switch-btn{background:var(--accent);border:none;border-radius:12px;padding:4px 10px;font-size:13px;
+  cursor:pointer;color:var(--main-dark);font-weight:600;}
+.topbar .coin{font-size:13px;color:var(--text-soft)}
+
+.trackBar{margin-top:8px;padding:8px 12px;background:var(--card);border-radius:var(--radius);
+  box-shadow:var(--shadow);font-size:12px;color:var(--text-soft);cursor:pointer;
+  display:flex;justify-content:space-between;align-items:center;}
+.trackBar .loc{color:var(--text);font-weight:500}
+.trackBar .weather{font-size:11px;color:var(--text-soft)}
+
+.relBar{margin-top:8px;padding:6px 12px;background:var(--card);border-radius:12px;
+  box-shadow:var(--shadow);font-size:12px;color:var(--text-soft);
+  display:flex;justify-content:space-between;align-items:center;cursor:pointer;}
+.relBar .rel-name{color:var(--text);font-weight:500}
+.relBar .rel-value{color:var(--main-dark);font-weight:600}
+
+.stats{display:flex;gap:6px;margin-top:10px;font-size:11px;flex-wrap:wrap}
+.stat{flex:1;min-width:70px;background:var(--card);border-radius:12px;padding:6px 8px;box-shadow:var(--shadow)}
+.stat .label{color:var(--text-soft);display:flex;justify-content:space-between}
+.stat .bar{height:5px;background:var(--accent);border-radius:3px;margin-top:4px;overflow:hidden}
+.stat .bar>i{display:block;height:100%;background:var(--main);border-radius:3px;transition:width .5s}
+
+.stage{position:relative;margin-top:10px;border-radius:var(--radius);overflow:hidden;
+  box-shadow:var(--shadow);aspect-ratio:1/1;background:var(--bg2);flex-shrink:0;}
+.stage .bgImage{position:absolute;inset:0;background-size:cover;background-position:center;background-repeat:no-repeat}
+.stage .bgDefault{position:absolute;inset:0;background:linear-gradient(160deg,var(--bg),var(--bg2));}
+.stage .weatherFx{position:absolute;inset:0;pointer-events:none;z-index:1;opacity:.55;}
+.stage .weatherFx .drop{position:absolute;width:2px;height:14px;background:#9dc8e8;border-radius:2px;animation:fall 1s linear infinite;}
+.stage .weatherFx .flake{position:absolute;color:#fff;font-size:12px;animation:fall 4s linear infinite;}
+@keyframes fall{from{transform:translateY(-20px);opacity:0;}20%{opacity:1;}to{transform:translateY(300px);opacity:0;}}
+
+#charWrap{position:absolute;z-index:4;cursor:grab;user-select:none;touch-action:none;transition:left .5s ease, top .5s ease;will-change:left, top;}
+#charWrap.dragging{transition:none;cursor:grabbing}
+#charWrap.away{display:none;}
+#charFlip{width:100%;transition:transform .3s ease}
+#charAnim{width:100%;transition:transform .3s ease;will-change:transform}
+#charAnim.walking{animation:walkBob .5s ease-in-out 3}
+@keyframes walkBob{0%,100%{translate:0 0}50%{translate:0 -6px}}
+#charAnim img{width:100%;display:block;pointer-events:none;filter:drop-shadow(0 6px 10px rgba(0,0,0,.14));will-change:transform;backface-visibility:hidden;}
+#charAnim .placeholder{width:100%;aspect-ratio:1/1;border-radius:16px;border:2px dashed var(--accent);
+  display:flex;align-items:center;justify-content:center;color:var(--text-soft);font-size:12px;
+  text-align:center;padding:12px;background:var(--card);line-height:1.6;}
+#charAnim.sleeping{filter:drop-shadow(0 6px 10px rgba(0,0,0,.08)) brightness(.85);transition:filter .5s;}
+#charShadow{position:absolute;z-index:3;pointer-events:none;
+  background:radial-gradient(ellipse at center, rgba(200,140,160,.28), rgba(0,0,0,0) 70%);
+  border-radius:50%;transition:left .5s ease, top .5s ease;}
+#charShadow.away{display:none;}
+
+#userWrap{position:absolute;z-index:4;cursor:grab;user-select:none;touch-action:none;
+  transition:left .5s ease, top .5s ease;display:none;will-change:left, top;}
+#userWrap.dragging{transition:none;cursor:grabbing}
+#userWrap img{width:100%;display:block;pointer-events:none;filter:drop-shadow(0 5px 8px rgba(0,0,0,.12))}
+
+#petWrap{position:absolute;z-index:2;cursor:grab;user-select:none;touch-action:none;
+  width:70px;height:70px;filter:drop-shadow(0 3px 5px rgba(0,0,0,.15));
+  transition:left .5s ease, top .5s ease;display:none;align-items:center;justify-content:center;
+  font-size:38px;line-height:1;will-change:left, top;}
+#petWrap.dragging{transition:none;cursor:grabbing}
+#petWrap img{width:100%;height:100%;object-fit:contain;pointer-events:none;}
+
+.bubbles{position:absolute;inset:0;pointer-events:none;z-index:6;overflow:hidden;}
+.bubble{position:absolute;max-width:170px;padding:8px 12px;border-radius:14px;font-size:12px;
+  line-height:1.45;box-shadow:var(--shadow);animation:pop .25s ease;pointer-events:auto;
+  white-space:pre-wrap;}
+.bubble.them{background:#fff;color:var(--text);border-bottom-left-radius:4px}
+.bubble.you{background:var(--main);color:#fff;border-bottom-right-radius:4px}
+.bubble.tip{background:#fff8e0;color:#a08040;border:1px solid #ffe0a0;font-size:11px}
+.bubble.err{background:#ffe0e0;color:#a04040;border:1px solid #ffb0b0;font-size:11px;max-width:220px}
+.bubble .kaomoji{display:block;margin-top:6px;font-size:11px;opacity:.75;text-align:center;letter-spacing:1px;}
+@keyframes pop{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
+
+.inputbar{display:flex;gap:8px;margin-top:10px;align-items:center}
+.inputbar input{flex:1;border:none;outline:none;padding:12px 16px;border-radius:999px;
+  background:var(--card);color:var(--text);font-size:14px;box-shadow:var(--shadow)}
+.inputbar button{border:none;width:44px;height:44px;border-radius:50%;background:var(--main);
+  color:#fff;font-size:18px;cursor:pointer;box-shadow:var(--shadow);transition:transform .15s}
+.inputbar button:active{transform:scale(.9)}
+.quick{display:flex;gap:6px;margin-top:8px;overflow-x:auto;padding-bottom:4px}
+.quick button{flex-shrink:0;border:none;padding:7px 14px;border-radius:999px;
+  background:var(--card);color:var(--text);font-size:12px;cursor:pointer;box-shadow:var(--shadow)}
+.toolbar{display:flex;justify-content:space-around;margin-top:10px;padding:8px;
+  background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);flex-wrap:wrap;gap:2px}
+.tool{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10px;
+  color:var(--text-soft);cursor:pointer;padding:6px 8px;border-radius:10px;transition:background .2s}
+.tool:hover{background:var(--accent);color:#fff}
+.tool .ico{font-size:18px}
+
+.modal-mask{position:fixed;inset:0;background:#00000033;display:none;
+  align-items:flex-end;justify-content:center;z-index:100}
+.modal-mask.show{display:flex}
+.modal{width:100%;max-width:520px;max-height:85vh;overflow-y:auto;background:var(--bg);
+  border-radius:24px 24px 0 0;padding:20px;animation:slideUp .3s ease}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal h2{font-size:17px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
+.modal h2 .close{cursor:pointer;font-size:20px;color:var(--text-soft)}
+.modal .field{margin-bottom:14px}
+.modal label{display:block;font-size:13px;color:var(--text-soft);margin-bottom:6px}
+.modal input,.modal select,.modal textarea{width:100%;border:none;outline:none;padding:11px 14px;
+  border-radius:12px;background:var(--accent);color:var(--text);font-size:14px;font-family:inherit}
+.modal textarea{min-height:70px;resize:vertical}
+.modal .btn{width:100%;border:none;padding:13px;border-radius:12px;background:var(--main);
+  color:#fff;font-size:15px;cursor:pointer;margin-top:6px}
+.modal .btn.ghost{background:var(--accent);color:var(--text)}
+.swatches{display:flex;gap:10px;flex-wrap:wrap}
+.swatch{width:36px;height:36px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:transform .15s}
+.swatch:hover{transform:scale(1.1)}
+.swatch.active{border-color:var(--text)}
+.bg-palette{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+.bg-swatch{aspect-ratio:1;border-radius:12px;cursor:pointer;border:3px solid transparent;
+  transition:transform .15s;box-shadow:0 2px 6px rgba(0,0,0,.06);}
+.bg-swatch:hover{transform:scale(1.06)}
+.bg-swatch.active{border-color:var(--text)}
+.main-palette{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+.main-swatch{aspect-ratio:1;border-radius:12px;cursor:pointer;border:3px solid transparent;
+  transition:transform .15s;box-shadow:0 2px 6px rgba(0,0,0,.08);}
+.main-swatch:hover{transform:scale(1.06)}
+.main-swatch.active{border-color:var(--text)}
+
+.log-item{margin-bottom:12px;font-size:13px;line-height:1.5}
+.log-item .who{font-size:11px;color:var(--text-soft);margin-bottom:2px}
+.log-item.you .txt{color:var(--main-dark)}
+.shop-item{display:flex;justify-content:space-between;align-items:center;padding:12px;
+  background:var(--card);border-radius:14px;margin-bottom:8px;box-shadow:0 2px 8px rgba(229,107,140,.06)}
+.shop-item .info{font-size:14px;flex:1}
+.shop-item .info small{color:var(--text-soft);font-size:11px;display:block}
+.shop-item button{border:none;padding:8px 14px;border-radius:999px;background:var(--main);
+  color:#fff;font-size:12px;cursor:pointer}
+.timer-display{font-size:48px;text-align:center;font-weight:300;margin:30px 0;color:var(--main-dark)}
+.sleep-mask{position:fixed;inset:0;background:#0a0a1a;z-index:200;display:none;
+  flex-direction:column;align-items:center;justify-content:center;color:#aab}
+.sleep-mask.show{display:flex}
+.sleep-mask .zzz{font-size:20px;margin-top:20px;animation:breathe 4s infinite}
+@keyframes breathe{0%,100%{opacity:.4;transform:translateY(0)}50%{opacity:1;transform:translateY(-6px)}}
+.sleep-mask .exit{position:absolute;bottom:40px;font-size:13px;color:#556;cursor:pointer}
+
+.lore-item{background:var(--card);border-radius:12px;padding:10px;margin-bottom:8px;box-shadow:0 2px 8px rgba(229,107,140,.06)}
+.lore-item input{margin-bottom:6px}
+.lore-item .actions{display:flex;gap:6px;justify-content:flex-end}
+.lore-item .actions button{border:none;padding:6px 12px;border-radius:999px;
+  font-size:11px;cursor:pointer;background:var(--main);color:#fff}
+.lore-item .actions button.del{background:#e08a8a}
+
+.face-item{display:flex;gap:8px;align-items:center;background:var(--card);
+  border-radius:12px;padding:8px;margin-bottom:8px;box-shadow:0 2px 8px rgba(229,107,140,.06)}
+.face-item img{width:44px;height:44px;object-fit:cover;border-radius:8px;flex-shrink:0}
+.face-item input{flex:1;margin:0}
+.face-item button{border:none;padding:6px 10px;border-radius:999px;
+  font-size:11px;cursor:pointer;background:#e08a8a;color:#fff;flex-shrink:0}
+.face-item .tag-preview{font-size:11px;color:var(--main-dark);padding:2px 8px;
+  background:var(--accent);border-radius:999px;flex-shrink:0;}
+
+.track-day{margin-bottom:14px}
+.track-day h3{font-size:13px;color:var(--text-soft);margin-bottom:6px;font-weight:500}
+.track-day .row{font-size:12px;padding:4px 0;color:var(--text)}
+.track-day .row .time{color:var(--text-soft);margin-right:8px;font-size:11px}
+
+.test-result{margin-top:8px;padding:10px;border-radius:12px;font-size:12px;line-height:1.5}
+.test-result.ok{background:#e8f8ec;color:#2a7a3a;border:1px solid #b8e8c0}
+.test-result.fail{background:#fdeaea;color:#a04040;border:1px solid #f0b8b8}
+
+.game-item{padding:14px;background:var(--card);border-radius:14px;margin-bottom:10px;cursor:pointer;
+  box-shadow:0 2px 8px rgba(229,107,140,.06);display:flex;justify-content:space-between;align-items:center;}
+.game-item:active{transform:scale(.98)}
+.game-item .g-name{font-size:14px;font-weight:500}
+.game-item .g-desc{font-size:11px;color:var(--text-soft);margin-top:2px}
+.game-item .g-arrow{color:var(--text-soft);}
+.game-panel{background:var(--card);border-radius:14px;padding:14px;box-shadow:0 2px 8px rgba(229,107,140,.06);}
+.game-panel .g-status{font-size:12px;color:var(--text-soft);margin-bottom:8px;text-align:center;}
+.game-panel .g-content{font-size:13px;line-height:1.6;margin-bottom:10px;white-space:pre-wrap;word-break:break-word;}
+.game-panel .g-input-row{display:flex;gap:8px;margin-top:8px;}
+.game-panel .g-input-row input{flex:1;padding:10px 14px;border:none;outline:none;border-radius:12px;
+  background:var(--accent);font-size:14px;color:var(--text);}
+.game-panel .g-input-row button{padding:10px 16px;border:none;border-radius:12px;background:var(--main);
+  color:#fff;font-size:14px;cursor:pointer;}
+.game-panel .g-btn-row{display:flex;gap:8px;margin-top:10px;justify-content:center;flex-wrap:wrap;}
+.game-panel .g-btn-row button{padding:8px 14px;border:none;border-radius:999px;background:var(--accent);
+  color:var(--text);font-size:12px;cursor:pointer;}
+.game-panel .g-btn-row button.primary{background:var(--main);color:#fff;}
+.game-panel .g-log{max-height:180px;overflow-y:auto;font-size:12px;color:var(--text-soft);
+  background:var(--bg);padding:8px;border-radius:10px;margin-top:8px;white-space:pre-wrap;}
+
+.char-list-item{display:flex;align-items:center;gap:10px;padding:12px;background:var(--card);
+  border-radius:14px;margin-bottom:8px;box-shadow:0 2px 8px rgba(229,107,140,.06);cursor:pointer;}
+.char-list-item.active{outline:2px solid var(--main);}
+.char-list-item img{width:44px;height:44px;object-fit:cover;border-radius:10px;flex-shrink:0;}
+.char-list-item .avatar-placeholder{width:44px;height:44px;border-radius:10px;flex-shrink:0;
+  background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:22px;}
+.char-list-item .info{flex:1;min-width:0;}
+.char-list-item .info .n{font-size:14px;font-weight:500;}
+.char-list-item .info .d{font-size:11px;color:var(--text-soft);}
+.char-list-item .del-btn{border:none;padding:6px 10px;border-radius:999px;background:#e08a8a;
+  color:#fff;font-size:11px;cursor:pointer;}
+
+.notice-body{
+  font-size:14px;line-height:1.8;color:var(--text);
+  background:var(--card);border-radius:16px;padding:16px;
+  white-space:pre-wrap;box-shadow:0 2px 8px rgba(229,107,140,.06);
+}
+.notice-email{color:var(--main-dark);font-weight:600;}
+.notice-sign{margin-top:14px;font-size:13px;color:var(--text-soft);text-align:right;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <div class="left">
+      <div class="name" id="charName">他</div>
+      <button class="switch-btn" onclick="openCharSwitch()">⇄ 切换</button>
+    </div>
+    <div class="coin">🪙 <span id="coinNum">0</span></div>
+  </div>
+
+  <div class="trackBar" id="trackBar" onclick="openTrack()">
+    <span class="loc" id="trackNow">📍 正在加载…</span>
+    <span class="weather" id="weatherNow"></span>
+  </div>
+
+  <div class="relBar" id="relBar" onclick="openRelationPanel()">
+    <span>我们的关系：<span class="rel-name" id="relName">朋友</span></span>
+    <span>好感 <span class="rel-value" id="relValue">10</span> / 100</span>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="label"><span>心情</span><span id="vMood">0</span></div><div class="bar"><i id="bMood"></i></div></div>
+    <div class="stat"><div class="label"><span>饱食</span><span id="vFood">0</span></div><div class="bar"><i id="bFood"></i></div></div>
+    <div class="stat"><div class="label"><span>精力</span><span id="vEnergy">0</span></div><div class="bar"><i id="bEnergy"></i></div></div>
+  </div>
+
+  <div class="stage" id="stage">
+    <div class="bgDefault" id="bgDefault"></div>
+    <div class="bgImage" id="bgImage" style="display:none"></div>
+    <div class="weatherFx" id="weatherFx"></div>
+    <div id="charShadow"></div>
+    <div id="petWrap"><img id="petImg" style="display:none;"></div>
+    <div id="userWrap"><img id="userImg"></div>
+    <div id="charWrap">
+      <div id="charFlip">
+        <div id="charAnim">
+          <div class="placeholder" id="charPlaceholder">
+            点这里上传他的图片<br><span style="font-size:11px">（设置里也能上传）</span>
+          </div>
+          <img id="charImg" style="display:none">
+        </div>
+      </div>
+    </div>
+    <div class="bubbles" id="bubbles"></div>
+  </div>
+
+  <div class="quick" id="quick"></div>
+
+  <div class="inputbar">
+    <input id="chatInput" placeholder="和他说点什么…" />
+    <button id="sendBtn">↑</button>
+  </div>
+
+  <div class="toolbar">
+    <div class="tool" data-panel="gift"><span class="ico">🎁</span>送礼物</div>
+    <div class="tool" data-panel="touch"><span class="ico">✋</span>互动</div>
+    <div class="tool" data-panel="game"><span class="ico">🎮</span>小游戏</div>
+    <div class="tool" data-panel="shop"><span class="ico">🛒</span>商城</div>
+    <div class="tool" data-panel="diary"><span class="ico">📔</span>日记</div>
+    <div class="tool" data-panel="timer"><span class="ico">⏱️</span>番茄钟</div>
+    <div class="tool" data-panel="sleep"><span class="ico">🌙</span>陪睡</div>
+    <div class="tool" data-panel="period"><span class="ico">🩸</span>生理期</div>
+    <div class="tool" data-panel="anniv"><span class="ico">💍</span>纪念日</div>
+    <div class="tool" data-panel="log"><span class="ico">📜</span>记录</div>
+    <div class="tool" data-panel="settings"><span class="ico">⚙️</span>设置</div>
+  </div>
+</div>
+
+<div class="modal-mask" id="modalMask"><div class="modal" id="modalContent"></div></div>
+<div class="sleep-mask" id="sleepMask">
+  <div id="sleepText">……</div>
+  <div class="zzz">z z Z</div>
+  <div class="exit" id="sleepExit">轻触结束陪睡</div>
+</div>
+
+<script>
+/* ============================================================
+   关系类型
+   ============================================================ */
+const REL_TYPES = [
+  { key:'friend',    name:'朋友' },
+  { key:'lover',     name:'恋人' },
+  { key:'soulmate',  name:'知己' },
+  { key:'family',    name:'家人' },
+  { key:'colleague', name:'同事' },
+  { key:'neighbor',  name:'邻居' },
+  { key:'mentor',    name:'师徒' },
+];
+
+/* ============================================================
+   公告内容
+   ============================================================ */
+const NOTICE_TEXT = "游戏反馈和bug修复可以投稿至 1473727478@qq.com\n祝你和你的爱人游玩愉快！";
+
+/* ============================================================
+   全局状态
+   ============================================================ */
+const GlobalState = {
+  version: 14,
+  mainColor: '#ff8fab',
+  bgColor: '#ffe0e8',
+  background: null,
+  userImage: null,
+  userShow: false,
+  userX: 0.5,
+  userY: 0.88,
+  fallbackModels: [],
+  useFallback: true,
+  weather: '晴',
+  weatherDate: null,
+  weatherCity: '',
+  weatherLat: null,
+  weatherLon: null,
+  weatherManualCity: '',
+  weatherUpdatedAt: 0,
+  currentCharId: null,
+  characters: [],
+};
+
+function newCharacterData(id){
+  return {
+    id: id,
+    name: '他', callYou: '你',
+    role:'', personality:'', background:'', worldview:'',
+    language:'中文', style:'', intro:'',
+    image:null,
+    images:[],
+    outfits:[],
+    currentOutfitIndex: -1,
+    x:0.5, y:0.72, flip:false,
+    relationType:'friend',
+    relationValue:10,
+    stats:{ mood:80, food:80, energy:80 },
+    sick:false, coin:520, inventory:{},
+    chatLog:[],
+    diary:{ yours:[], his:[], lastSwap:null },
+    period:{ lastStart:null, cycle:28, duration:5, manualOn:false },
+    lorebook:[],
+    track:[],
+    anniversaries:[],
+    lastInteract:null,
+    lastChatDate:null,
+    fightUntil:null,
+    lastSurpriseDate:null,
+    lastMeal:null,
+    emoUntil:null,
+    isSleeping:false,
+    isAway:false,
+    awayUntil:null,
+    customShopItems:[],
+    pet:{ has:false, type:'cat', name:'小家伙', image:null, x:0.78, y:0.82 },
+    lastProactiveAt:0,
+    lastProactiveText:'',
+    recentTopics:[],
+  };
+}
+
+let Current = null;
+
+/* ============================================================
+   ★ 设置面板草稿（核心新增）★
+   ============================================================ */
+let settingsDraft = null;   // 设置面板的临时草稿对象
+let isSettingsOpen = false; // 当前是否正在显示设置面板
+
+// 从当前真实状态初始化草稿
+function initSettingsDraft(){
+  const c = Current || {};
+  settingsDraft = {
+    // ---- 角色基本资料 ----
+    name: c.name || '他',
+    callYou: c.callYou || '你',
+    role: c.role || '',
+    personality: c.personality || '',
+    background: c.background || '',
+    worldview: c.worldview || '',
+    style: c.style || '',
+    language: c.language || '中文',
+    intro: c.intro || '',
+    relationType: c.relationType || 'friend',
+    relationValue: (typeof c.relationValue === 'number') ? c.relationValue : 10,
+
+    // ---- 图片 / 表情 / 服装（草稿副本） ----
+    image: c.image || null,
+    images: deepCloneSafe(c.images || []),
+    outfits: deepCloneSafe(c.outfits || []),
+    currentOutfitIndex: (typeof c.currentOutfitIndex === 'number') ? c.currentOutfitIndex : -1,
+    pet: deepCloneSafe(c.pet || { has:false, type:'cat', name:'小家伙', image:null, x:0.78, y:0.82 }),
+    lorebook: deepCloneSafe(c.lorebook || []),
+
+    // ---- 全局 ----
+    background_img: GlobalState.background || null,
+    userImage: GlobalState.userImage || null,
+    userShow: !!GlobalState.userShow,
+    mainColor: GlobalState.mainColor || '#ff8fab',
+    bgColor: GlobalState.bgColor || '#ffe0e8',
+    weatherManualCity: GlobalState.weatherManualCity || '',
+
+    // ---- API ----
+    apiUrl: API.baseUrl || '',
+    apiKey: API.key || '',
+    apiModel: API.model || '',
+    useFallback: !!GlobalState.useFallback,
+    fallbackModels: (GlobalState.fallbackModels || []).slice(),
+  };
+}
+function deepCloneSafe(obj){
+  try{ return JSON.parse(JSON.stringify(obj)); }catch(e){ return obj; }
+}
+
+// 从面板 DOM 收集所有输入框的当前值，写回草稿（重绘前调用）
+function collectSettingsDraft(){
+  if(!settingsDraft) initSettingsDraft();
+  const g = id => document.getElementById(id);
+  const el = (id)=>g(id);
+  if(el('setName')) settingsDraft.name = el('setName').value.trim() || '他';
+  if(el('setCall')) settingsDraft.callYou = el('setCall').value.trim() || '你';
+  if(el('setRole')) settingsDraft.role = el('setRole').value.trim();
+  if(el('setPersonality')) settingsDraft.personality = el('setPersonality').value.trim();
+  if(el('setBackground')) settingsDraft.background = el('setBackground').value.trim();
+  if(el('setWorldview')) settingsDraft.worldview = el('setWorldview').value.trim();
+  if(el('setStyle')) settingsDraft.style = el('setStyle').value.trim();
+  if(el('setLanguage')) settingsDraft.language = el('setLanguage').value;
+  if(el('setIntro')) settingsDraft.intro = el('setIntro').value.trim();
+  if(el('setRelation')) settingsDraft.relationType = el('setRelation').value;
+  if(el('setRelationValue')) settingsDraft.relationValue = Math.max(0,Math.min(100,parseInt(el('setRelationValue').value)||0));
+  if(el('setWeatherCity')) settingsDraft.weatherManualCity = el('setWeatherCity').value.trim();
+  if(el('setApiUrl')) settingsDraft.apiUrl = el('setApiUrl').value.trim();
+  if(el('setApiKey')) settingsDraft.apiKey = el('setApiKey').value.trim();
+  const sel = el('setApiModelSelect');
+  const custom = el('setApiModelCustom');
+  if(sel){
+    if(sel.value === '__custom__' && custom) settingsDraft.apiModel = custom.value.trim();
+    else settingsDraft.apiModel = sel.value;
+  }
+  if(el('useFallbackChk')) settingsDraft.useFallback = el('useFallbackChk').checked;
+  if(el('setFallback')) settingsDraft.fallbackModels = el('setFallback').value.split(',').map(s=>s.trim()).filter(Boolean);
+  if(el('userShowChk')) settingsDraft.userShow = el('userShowChk').checked;
+}
+
+/* ============================================================
+   图片压缩
+   ============================================================ */
+function compressImage(file, maxSize = 512, quality = 0.7){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if(w > maxSize || h > maxSize){
+          if(w > h){ h = Math.round(h * maxSize / w); w = maxSize; }
+          else { w = Math.round(w * maxSize / h); h = maxSize; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        // 判断是否为支持透明的格式
+        const isPng = file.type === 'image/png'
+          || file.type === 'image/webp'
+          || file.type === 'image/gif'
+          || /\.(png|webp|gif)$/i.test(file.name);
+        if(isPng){
+          // 保留透明通道，输出 PNG
+          resolve(canvas.toDataURL('image/png'));
+        }else{
+          // JPG 等不支持透明的格式，继续用 JPEG 压缩
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        }
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ============================================================
+   IndexedDB 存档层
+   ============================================================ */
+const DB_NAME = 'yunqi_db';
+const DB_STORE = 'save';
+let dbInstance = null;
+
+function openDB(){
+  return new Promise((resolve, reject)=>{
+    if(dbInstance) return resolve(dbInstance);
+    if(!window.indexedDB) return reject(new Error('IndexedDB 不支持'));
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if(!db.objectStoreNames.contains(DB_STORE)){
+        db.createObjectStore(DB_STORE);
+      }
+    };
+    req.onsuccess = e => { dbInstance = e.target.result; resolve(dbInstance); };
+    req.onerror = e => reject(e.target.error);
+  });
+}
+async function idbSet(key, value){
+  const db = await openDB();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(DB_STORE, 'readwrite');
+    tx.objectStore(DB_STORE).put(value, key);
+    tx.oncomplete = ()=>resolve();
+    tx.onerror = e=>reject(e.target.error);
+  });
+}
+async function idbGet(key){
+  const db = await openDB();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(DB_STORE, 'readonly');
+    const req = tx.objectStore(DB_STORE).get(key);
+    req.onsuccess = ()=>resolve(req.result);
+    req.onerror = e=>reject(e.target.error);
+  });
+}
+
+/* ============================================================
+   主题色
+   ============================================================ */
+function hexToRgb(hex){
+  const n=parseInt(hex.replace('#',''),16);
+  return { r:(n>>16)&255, g:(n>>8)&255, b:n&255 };
+}
+function rgbToHex(r,g,b){
+  r=Math.max(0,Math.min(255,Math.round(r)));
+  g=Math.max(0,Math.min(255,Math.round(g)));
+  b=Math.max(0,Math.min(255,Math.round(b)));
+  return '#'+((r<<16)|(g<<8)|b).toString(16).padStart(6,'0');
+}
+function shift(hex, amt){
+  const c = hexToRgb(hex);
+  return rgbToHex(c.r+amt, c.g+amt, c.b+amt);
+}
+function mixWithWhite(hex, ratio){
+  const c = hexToRgb(hex);
+  return rgbToHex(c.r+(255-c.r)*ratio, c.g+(255-c.g)*ratio, c.b+(255-c.b)*ratio);
+}
+function applyMainColor(hex){
+  if(!hex) return;
+  GlobalState.mainColor = hex;
+  const r = document.documentElement.style;
+  r.setProperty('--main', hex);
+  r.setProperty('--main-dark', shift(hex, -40));
+  r.setProperty('--accent', mixWithWhite(hex, 0.7));
+  r.setProperty('--bg', mixWithWhite(hex, 0.92));
+  r.setProperty('--bg2', mixWithWhite(hex, 0.78));
+  r.setProperty('--text', '#3a2530');
+  r.setProperty('--text-soft', '#b08a98');
+  r.setProperty('--card', '#ffffffee');
+  const c = hexToRgb(hex);
+  r.setProperty('--shadow', `0 6px 22px rgba(${c.r},${c.g},${c.b},.18)`);
+  document.body.style.background = `linear-gradient(160deg, ${mixWithWhite(hex,0.92)}, ${mixWithWhite(hex,0.78)})`;
+}
+const MAIN_PALETTE = [
+  '#ff8fab','#ffb3c6','#ff9e7d','#ffcf6b',
+  '#8fd9a8','#5fbf88','#6a9bd8','#a07ad8',
+  '#e08a8a','#c0a080','#5bc0be','#8a9aa8',
+];
+
+/* ============================================================
+   API
+   ============================================================ */
+const KNOWN_MODELS = [
+  { id:'deepseek-v4-flash', label:'deepseek-v4-flash' },
+  { id:'deepseek-v4-pro',   label:'deepseek-v4-pro' },
+  { id:'gpt-4o',            label:'gpt-4o' },
+  { id:'[稳定AG量]claude-sonnet-4-6', label:'[稳定AG量]claude-sonnet-4-6' },
+  { id:'[企业量cli]gemini-2.5-pro',   label:'[企业量cli]gemini-2.5-pro' },
+];
+const API={baseUrl:'',key:'',model:'',get ready(){return !!(this.baseUrl&&this.key&&this.model);}};
+function loadAPIConfig(){
+  try{const c=JSON.parse(localStorage.getItem('dream_api')||'{}');
+    API.baseUrl=c.baseUrl||'';API.key=c.key||'';API.model=c.model||'';
+    if(c.fallbackModels)GlobalState.fallbackModels=c.fallbackModels;
+    if(typeof c.useFallback==='boolean')GlobalState.useFallback=c.useFallback;
+  }catch(e){}
+}
+function saveAPIConfig(){
+  try{localStorage.setItem('dream_api',JSON.stringify({
+    baseUrl:API.baseUrl,key:API.key,model:API.model,
+    fallbackModels:GlobalState.fallbackModels,
+    useFallback:GlobalState.useFallback,
+  }));}catch(e){}
+}
+async function callAIOnce(messages, opts={}){
+  if(!API.ready) throw new Error('API 未配置');
+  const url = API.baseUrl;
+  const model = opts.model || API.model;
+  const body = {
+    model: model, messages: messages,
+    max_tokens: opts.maxTokens ?? 600,
+    temperature: opts.temperature ?? 0.85
+  };
+  const ctrl = new AbortController();
+  const timer = setTimeout(()=>ctrl.abort(), opts.timeout ?? 40000);
+  try{
+    const res = await fetch(url, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer ' + API.key},
+      body: JSON.stringify(body), signal: ctrl.signal
+    });
+    clearTimeout(timer);
+    if(!res.ok){
+      const errText = await res.text();
+      throw new Error(`HTTP ${res.status}: ${errText.slice(0,160)}`);
+    }
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content || null;
+  }catch(e){ clearTimeout(timer); throw e; }
+}
+async function callAI(messages, opts={}){
+  const tried = [];
+  try{
+    tried.push(API.model);
+    return await callAIOnce(messages, opts);
+  }catch(e){
+    if(!GlobalState.useFallback || !GlobalState.fallbackModels || GlobalState.fallbackModels.length===0) throw e;
+    for(const m of GlobalState.fallbackModels){
+      if(!m || tried.includes(m)) continue;
+      tried.push(m);
+      try{
+        return await callAIOnce(messages, Object.assign({}, opts, {model:m}));
+      }catch(e2){ }
+    }
+    throw e;
+  }
+}
+async function testConnection(){
+  const box = document.getElementById('testBox');
+  if(!box) return;
+  if(!API.ready){
+    box.className='test-result fail';
+    box.textContent='❌ 还没填完整：地址 / key / 模型 都要填';
+    return;
+  }
+  box.className='test-result';
+  box.textContent='测试中…';
+  const url = API.baseUrl;
+  try{
+    const reply = await callAIOnce(
+      [{role:'user',content:'回复一个字：好'}],
+      {maxTokens:10, temperature:0.1, timeout:15000}
+    );
+    box.className='test-result ok';
+    box.innerHTML=`✅ 连接成功<br>模型：${API.model}<br>地址：${url}<br>回复：${reply||'（空）'}`;
+  }catch(e){
+    box.className='test-result fail';
+    box.innerHTML=`❌ 连接失败<br>模型：${API.model}<br>地址：${url}<br>错误：${e.message}`;
+  }
+}
+
+/* ============================================================
+   真实天气
+   ============================================================ */
+const WMO_CODE_MAP = {
+  0:'晴', 1:'晴', 2:'多云', 3:'阴', 45:'雾', 48:'雾',
+  51:'小雨', 53:'小雨', 55:'小雨', 56:'冻雨', 57:'冻雨',
+  61:'小雨', 63:'中雨', 65:'大雨', 66:'冻雨', 67:'冻雨',
+  71:'小雪', 73:'中雪', 75:'大雪', 77:'雪',
+  80:'阵雨', 81:'阵雨', 82:'大雨', 85:'阵雪', 86:'大雪',
+  95:'雷雨', 96:'雷雨', 99:'雷雨'
+};
+function wmoToWeather(code){ return WMO_CODE_MAP[code] || '多云'; }
+async function geocodeCity(cityName){
+  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=1&language=zh&format=json`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error('地理编码失败');
+  const data = await res.json();
+  if(!data.results || data.results.length === 0) throw new Error('找不到城市');
+  const r = data.results[0];
+  return { lat: r.latitude, lon: r.longitude, name: r.name };
+}
+async function fetchWeatherByCoords(lat, lon){
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,is_day&timezone=auto`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error('天气查询失败');
+  const data = await res.json();
+  if(!data.current) throw new Error('天气数据无效');
+  return {
+    weather: wmoToWeather(data.current.weather_code),
+    temp: Math.round(data.current.temperature_2m),
+    isDay: data.current.is_day === 1
+  };
+}
+function getUserLocation(){
+  return new Promise((resolve, reject)=>{
+    if(!navigator.geolocation) return reject(new Error('不支持定位'));
+    navigator.geolocation.getCurrentPosition(
+      (pos)=>resolve({lat: pos.coords.latitude, lon: pos.coords.longitude}),
+      (err)=>reject(err),
+      {timeout: 8000, maximumAge: 600000}
+    );
+  });
+}
+async function updateWeatherReal(force=false){
+  const now = Date.now();
+  if(!force && GlobalState.weatherUpdatedAt && (now - GlobalState.weatherUpdatedAt < 3600000)) return;
+  try{
+    let lat = GlobalState.weatherLat;
+    let lon = GlobalState.weatherLon;
+    let cityName = GlobalState.weatherCity;
+    if(lat === null || lon === null){
+      try{ const loc = await getUserLocation(); lat = loc.lat; lon = loc.lon; cityName=''; }catch(e){}
+    }
+    if((lat === null || lon === null) && GlobalState.weatherManualCity){
+      try{
+        const geo = await geocodeCity(GlobalState.weatherManualCity);
+        lat = geo.lat; lon = geo.lon; cityName = geo.name;
+      }catch(e){}
+    }
+    if(lat === null || lon === null){
+      const w = WEATHERS[Math.floor(Math.random()*WEATHERS.length)];
+      GlobalState.weather = w;
+      GlobalState.weatherCity = GlobalState.weatherManualCity || '未知';
+      GlobalState.weatherUpdatedAt = now;
+      renderWeather(); saveGame();
+      return;
+    }
+    const w = await fetchWeatherByCoords(lat, lon);
+    GlobalState.weatherLat = lat; GlobalState.weatherLon = lon;
+    GlobalState.weatherCity = cityName || '当前城市';
+    GlobalState.weather = w.weather;
+    GlobalState.weatherUpdatedAt = now;
+    GlobalState.weatherDate = todayStr();
+    renderWeather(); saveGame();
+  }catch(e){
+    const w = WEATHERS[Math.floor(Math.random()*WEATHERS.length)];
+    GlobalState.weather = w;
+    GlobalState.weatherDate = todayStr();
+    renderWeather(); saveGame();
+  }
+}
+
+/* ============================================================
+   背景色
+   ============================================================ */
+function applyBgColor(hex){
+  if(!hex)return;
+  GlobalState.bgColor=hex;
+}
+
+/* ============================================================
+   服装
+   ============================================================ */
+function pickRandomOutfit(){
+  if(!Current) return;
+  const list = Current.outfits || [];
+  if(list.length === 0){ Current.currentOutfitIndex = -1; saveGame(); return; }
+  Current.currentOutfitIndex = Math.floor(Math.random() * list.length);
+  saveGame();
+}
+function getCurrentOutfitImg(){
+  if(!Current) return null;
+  const list = Current.outfits || [];
+  const idx = Current.currentOutfitIndex;
+  if(idx >= 0 && idx < list.length) return list[idx].img;
+  return null;
+}
+function getBaseCharImage(){
+  if(!Current) return null;
+  const outfit = getCurrentOutfitImg();
+  if(outfit) return outfit;
+  return Current.image || null;
+}
+
+/* ============================================================
+   关系
+   ============================================================ */
+function getRelationName(key){
+  const rt = REL_TYPES.find(r=>r.key===key);
+  return rt ? rt.name : '朋友';
+}
+function addRelationValue(n){
+  if(!Current) return;
+  Current.relationValue = Math.max(0, Math.min(100, Current.relationValue + n));
+  updateRelationUI();
+}
+function updateRelationUI(){
+  if(!Current) return;
+  const nameEl = document.getElementById('relName');
+  const valEl = document.getElementById('relValue');
+  if(nameEl) nameEl.textContent = getRelationName(Current.relationType);
+  if(valEl) valEl.textContent = Math.round(Current.relationValue);
+}
+function openRelationPanel(){
+  if(!Current) return;
+  const modal=document.getElementById('modalContent');
+  modal.innerHTML=`
+    <h2>关系设置 <span class="close" onclick="closeModal()">×</span></h2>
+    <p style="font-size:12px;color:var(--text-soft);margin-bottom:12px;">只能选一个关系，不会自动变。</p>
+    <div class="field"><label>当前关系</label>
+      <select id="relSelect">
+        ${REL_TYPES.map(rt=>`<option value="${rt.key}" ${Current.relationType===rt.key?'selected':''}>${rt.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field"><label>好感度（0-100）</label>
+      <input type="number" id="relValueInput" min="0" max="100" value="${Math.round(Current.relationValue)}">
+    </div>
+    <button class="btn" onclick="saveRelationSetting()">保存</button>
+  `;
+  openModal();
+}
+function saveRelationSetting(){
+  if(!Current) return;
+  Current.relationType = document.getElementById('relSelect').value;
+  Current.relationValue = Math.max(0,Math.min(100,parseInt(document.getElementById('relValueInput').value)||0));
+  saveGame(); updateRelationUI(); closeModal();
+}
+
+/* ============================================================
+   生理期 / 天气 / 作息 / 三餐
+   ============================================================ */
+function isPeriodNow(){
+  if(!Current) return false;
+  const p=Current.period;
+  if(p.manualOn)return true;
+  if(!p.lastStart)return false;
+  const start=new Date(p.lastStart+'T00:00:00');
+  const now=new Date();
+  const diffDays=Math.floor((now-start)/86400000);
+  if(diffDays<0)return false;
+  const cycle=p.cycle||28, dur=p.duration||5;
+  return (diffDays%cycle)<dur;
+}
+function periodInfo(){
+  if(!Current) return {next:null,days:null};
+  const p=Current.period;
+  if(!p.lastStart)return {next:null,days:null};
+  const start=new Date(p.lastStart+'T00:00:00');
+  const cycle=p.cycle||28;
+  const next=new Date(start.getTime()+cycle*86400000);
+  const now=new Date();
+  return {next:next.toISOString().slice(0,10),days:Math.ceil((next-now)/86400000)};
+}
+const WEATHERS = ['晴','多云','阴','小雨','大雨','雪'];
+function renderWeather(){
+  const el=document.getElementById('weatherNow');
+  if(!el)return;
+  const icons={'晴':'☀️','多云':'⛅','阴':'☁️','雾':'🌫️','小雨':'🌦️','中雨':'🌧️','大雨':'🌧️',
+    '阵雨':'🌦️','小雪':'🌨️','中雪':'❄️','大雪':'❄️','雪':'❄️','冻雨':'🌧️','雷雨':'⛈️','阵雪':'🌨️'};
+  el.textContent=(icons[GlobalState.weather]||'') + GlobalState.weather;
+  renderWeatherFx();
+}
+function renderWeatherFx(){
+  const box=document.getElementById('weatherFx');
+  if(!box)return;
+  box.innerHTML='';
+  const w = GlobalState.weather;
+  if(w==='小雨' || w==='中雨' || w==='大雨' || w==='阵雨' || w==='冻雨' || w==='雷雨'){
+    const n=(w==='大雨'||w==='雷雨')?30:15;
+    for(let i=0;i<n;i++){
+      const d=document.createElement('div');
+      d.className='drop';
+      d.style.left=Math.random()*100+'%';
+      d.style.animationDelay=Math.random()*1+'s';
+      d.style.animationDuration=(0.6+Math.random()*0.6)+'s';
+      box.appendChild(d);
+    }
+  } else if(w==='雪' || w==='小雪' || w==='中雪' || w==='大雪' || w==='阵雪'){
+    for(let i=0;i<20;i++){
+      const f=document.createElement('div');
+      f.className='flake';
+      f.textContent='❄';
+      f.style.left=Math.random()*100+'%';
+      f.style.animationDelay=Math.random()*4+'s';
+      f.style.animationDuration=(3+Math.random()*3)+'s';
+      f.style.fontSize=(8+Math.random()*10)+'px';
+      box.appendChild(f);
+    }
+  }
+}
+function weatherLine(){
+  const map={
+    '晴':'今天天气很好，阳光不错。','多云':'今天多云，风很舒服。','阴':'今天有点阴，天色灰灰的。',
+    '雾':'今天起雾了，能见度不高。','小雨':'今天下小雨了。','中雨':'今天雨下得不算小。',
+    '大雨':'今天雨下得挺大的。','阵雨':'今天有阵雨。','冻雨':'今天下冻雨，路很滑。',
+    '雷雨':'今天打雷下雨了。','雪':'今天下雪了。','小雪':'今天下了点小雪。',
+    '中雪':'今天雪下得不小。','大雪':'今天雪下得挺大的。','阵雪':'今天有阵雪。',
+  };
+  return map[GlobalState.weather]||'';
+}
+function isNightTime(){ const h=new Date().getHours(); return (h>=23 || h<6); }
+function checkSleepState(){
+  if(!Current) return;
+  const was=Current.isSleeping;
+  const now=isNightTime();
+  if(now && !was){
+    Current.isSleeping=true;
+    const el=document.getElementById('charAnim');
+    if(el)el.classList.add('sleeping');
+  } else if(!now && was){
+    Current.isSleeping=false;
+    const el=document.getElementById('charAnim');
+    if(el)el.classList.remove('sleeping');
+  }
+}
+function getMealTime(){
+  const h=new Date().getHours();
+  if(h>=6 && h<10) return '早餐';
+  if(h>=11 && h<14) return '午餐';
+  if(h>=17 && h<21) return '晚餐';
+  return null;
+}
+function checkMeal(){
+  if(!Current) return;
+  const meal=getMealTime();
+  if(!meal)return;
+  const today=todayStr();
+  const key=today+'|'+meal;
+  if(Current.lastMeal===key)return;
+  Current.lastMeal=key;
+  if(Current.stats.food < 50){
+    Current.stats.food=Math.max(0,Current.stats.food-5);
+    updateStats();saveGame();
+  }
+}
+
+/* ============================================================
+   行踪
+   ============================================================ */
+function todayStr(){
+  const d=new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function nowHM(){
+  const d=new Date();
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+function logTrack(place, action){
+  if(!Current) return;
+  const date=todayStr();
+  const time=nowHM();
+  const last=Current.track[Current.track.length-1];
+  if(last && last.date===date && last.place===place && last.action===action) return;
+  Current.track.push({date,time,place,action});
+  const cutoff = Date.now() - 7*86400000;
+  Current.track = Current.track.filter(t=>new Date(t.date+'T00:00:00').getTime() >= cutoff);
+  updateTrackBar(); saveGameDebounced();
+}
+function computeTrack(){
+  if(!Current) return {place:'客厅', action:'发呆'};
+  const h=new Date().getHours();
+  if(Current.isAway) return {place:'外面', action:'打工'};
+  if(Current.sick) return {place:'卧室', action:'休息'};
+  if(h>=23 || h<6) return {place:'卧室', action:'睡觉'};
+  if(h>=6 && h<9)  return {place:'阳台', action:'发呆'};
+  if(h>=9 && h<12) return {place:'客厅', action:'看书'};
+  if(h>=12 && h<14)return {place:'厨房', action:'做饭'};
+  if(h>=14 && h<18)return {place:'客厅', action:'发呆'};
+  if(h>=18 && h<21)return {place:'客厅', action:'休息'};
+  return {place:'卧室', action:'看书'};
+}
+function updateTrackBar(){
+  if(!Current) return;
+  const t=computeTrack();
+  const el=document.getElementById('trackNow');
+  if(el)el.textContent=`📍 在${t.place} · ${t.action}`;
+  checkSleepState();
+  const wrap=document.getElementById('charWrap');
+  const sh=document.getElementById('charShadow');
+  if(wrap && sh){
+    if(Current.isAway){ wrap.classList.add('away'); sh.classList.add('away'); }
+    else{ wrap.classList.remove('away'); sh.classList.remove('away'); }
+  }
+}
+let trackTimer=null;
+function startTrackLoop(){
+  if(trackTimer)clearInterval(trackTimer);
+  updateTrackBar();
+  const t=computeTrack();
+  logTrack(t.place, t.action);
+  trackTimer=setInterval(()=>{
+    const t=computeTrack();
+    logTrack(t.place, t.action);
+    updateTrackBar();
+  }, 3600000);
+}
+function openTrack(){
+  if(!Current) return;
+  const modal=document.getElementById('modalContent');
+  const grouped={};
+  Current.track.forEach(t=>{
+    if(!grouped[t.date])grouped[t.date]=[];
+    grouped[t.date].push(t);
+  });
+  const dates=Object.keys(grouped).sort().reverse();
+  const today=todayStr();
+  const rows = dates.length===0
+    ? '<p style="color:var(--text-soft);font-size:13px;">还没有记录。</p>'
+    : dates.map(d=>{
+        const label = d===today ? '今天' : d;
+        return `<div class="track-day"><h3>${label}</h3>`+
+          grouped[d].map(t=>`<div class="row"><span class="time">${t.time}</span>在${t.place} · ${t.action}</div>`).join('')+
+          `</div>`;
+      }).join('');
+  modal.innerHTML=`<h2>行踪 <span class="close" onclick="closeModal()">×</span></h2>
+    <p style="font-size:12px;color:var(--text-soft);margin-bottom:12px;">${weatherLine()}</p>
+    <p style="font-size:11px;color:var(--text-soft);margin-bottom:12px;">天气来源：${GlobalState.weatherCity||'未知'} · 更新于 ${GlobalState.weatherUpdatedAt?new Date(GlobalState.weatherUpdatedAt).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}):'—'}</p>
+    ${rows}`;
+  openModal();
+}
+
+/* ============================================================
+   世界书 / 情绪
+   ============================================================ */
+function matchLorebook(text){
+  if(!Current||!Current.lorebook||Current.lorebook.length===0)return [];
+  const hits=[];
+  for(const entry of Current.lorebook){
+    if(!entry.key||!entry.text)continue;
+    const keys=entry.key.split(/[,，]/).map(k=>k.trim()).filter(Boolean);
+    if(keys.some(k=>text.includes(k)))hits.push(entry);
+  }
+  return hits;
+}
+function moodHint(){
+  if(!Current) return '他还好';
+  const m=Current.stats.mood;
+  if(m>=80)return '他很开心';
+  if(m>=60)return '他心情不错';
+  if(m>=40)return '他还好';
+  if(m>=20)return '他有点低落';
+  return '他很难过';
+}
+
+/* ============================================================
+   反重复
+   ============================================================ */
+function isTooSoonToTalk(){
+  if(!Current) return true;
+  return (Date.now() - Current.lastProactiveAt) < 5 * 60 * 1000;
+}
+function rememberProactive(text){
+  if(!Current) return;
+  Current.lastProactiveAt = Date.now();
+  Current.lastProactiveText = text || '';
+  const keywords = ['吃','饭','睡','冷','热','雨','雪','出门','累','忙','工作','休息'];
+  Current.recentTopics = keywords.filter(k => text.includes(k));
+}
+function getRecentTopicsHint(){
+  if(!Current||!Current.recentTopics||Current.recentTopics.length===0) return '';
+  return '（你最近刚说过：' + Current.recentTopics.join('、') + '，这一轮换点别的，别再提这些。）';
+}
+
+/* ============================================================
+   System Prompt
+   ============================================================ */
+function buildSystemPrompt(userInput){
+  if(!Current) return '';
+  const c=Current;
+  const love = c.relationValue || 0;
+
+  const parts=[
+    '========== 你的人设（最高优先级）==========',
+    `你的名字：「${c.name}」`,
+    `你称呼对方为：「${c.callYou}」`,
+    c.role ? `你的身份：${c.role}` : '',
+    c.personality ? `你的性格：${c.personality}` : '你的性格：温柔、有点慢热，会默默关心人。',
+    c.background ? `你的背景故事：${c.background}` : '',
+    c.worldview ? `你们所处的世界观：${c.worldview}` : '',
+    c.style ? `你的说话风格：${c.style}` : '',
+    '',
+    '【人设是唯一标准】',
+    '上面的「性格」「说话风格」「背景故事」都是 user 亲手写的，是你说话的唯一标准。',
+    '不管下面的规则怎么写，都以人设为最高优先级。',
+    '人设说你是话多的，你就话多。人设说你是冷淡的，你就冷淡。',
+    '人设说你会毒舌、阴阳怪气，那这就是你的性格，可以这么说。',
+    '总之：人设 > 下面的所有规则。',
+    '',
+    '========== 底线规则（不可越过）==========',
+    '1. 不能真的伤害 user：不许人身攻击、贬低、PUA、翻旧账、拿私密事压迫。',
+    '2. 不能违背 user 的明确指令：user 让你做什么，你就做什么（在合理范围内）。',
+    '3. 不能 OOC：不能变成和上面人设完全不同的另一个人。',
+    '4. 不许凭空脑补 user 的性格、外貌、身材、情绪标签。',
+    '5. 不许说违禁词：小祖宗、小野猫、小妖精、命都给你、女人你惹火我了、我是为了你好了、你先记账上、行行行、好好好、服了你了 等。',
+    '========== 底线到此为止 ==========',
+    '',
+    '========== 不许重复（非常重要）==========',
+    '1. 不许反复问同一件事。',
+    '2. 不许一句话反复说。',
+    '3. 如果对方已经回答过某个问题，你不能再问一遍。',
+    '4. 每轮回复先在心里过一遍：这句话我是不是刚说过？',
+    '5. 对话要有推进，不要原地打转。',
+    '========== 反重复到此为止 ==========',
+    '',
+    '========== 默认风格（如果人设没写，用这些）==========',
+    `- 默认回复 1~3 句。`,
+    `- 默认语气：${love>=75?'温柔亲昵':love>=50?'亲近关心':love>=25?'轻松开玩笑':'平淡有点距离'}。`,
+    `- 默认不用颜文字，偶尔用可以。`,
+    `- 默认不用书面语，用口语。`,
+    c.language ? `- 默认用${c.language}回复。` : '',
+    '========== 默认风格到此为止 ==========',
+    '',
+    '========== 你现在的情况（背景信息）==========',
+    `关系：${getRelationName(c.relationType)}（好感 ${Math.round(c.relationValue)}/100）`,
+    `心情：${moodHint()}（心情值 ${Math.round(c.stats.mood)}/100）`,
+    `天气：${GlobalState.weather}${GlobalState.weatherCity?'（'+GlobalState.weatherCity+'）':''}`,
+  ];
+
+  if(c.emoUntil && Date.now() < c.emoUntil) parts.push('（你今天心情有点低，说话会稍微安静一点。人设不变。）');
+  if(c.fightUntil && Date.now() < c.fightUntil) parts.push('（你在闹别扭，说话会有点冷淡，但底色还是在意她的。人设不变。）');
+  if(c.isSleeping) parts.push('（现在是深夜，你在睡觉。被叫醒时说话含糊、困困的。人设不变。）');
+  const meal=getMealTime();
+  if(meal && c.lastMeal !== (todayStr()+'|'+meal)) parts.push(`（现在是${meal}时间。如果聊天里合适可以顺带提一句，但不要刻意追问。）`);
+  if(isPeriodNow())parts.push('（对方现在是生理期，身体不舒服，要温柔关心她。）');
+  if(c.sick)parts.push('（你现在身体不太舒服，说话会有点没精神。）');
+
+  const topicHint = getRecentTopicsHint();
+  if(topicHint) parts.push(topicHint);
+
+  if(userInput){
+    const context = userInput + ' ' + c.chatLog.slice(-6).map(m=>m.text).join(' ');
+    const hits = matchLorebook(context);
+    if(hits.length){
+      parts.push('相关背景设定（务必遵守）：');
+      hits.forEach(e=>parts.push(`- ${e.key}：${e.text}`));
+    }
+  }
+
+  const emoLabels = ['开心','害羞','难过','生气','平静','惊讶','温柔'];
+  if(c.images && c.images.length>0){
+    const custom = c.images.map(i=>i.label).filter(Boolean);
+    emoLabels.push(...custom);
+  }
+  const uniqueEmo = [...new Set(emoLabels)];
+
+  parts.push(
+    '',
+    '========== 输出格式（必须遵守）==========',
+    `1. 你就是这个人，不要提到自己是 AI、模型或程序。`,
+    `2. 每次回复的最后，附上一个情绪标签，格式如 [开心]、[害羞]、[难过]、[生气]、[平静]、[惊讶]、[温柔]。`,
+    `   可用标签：${uniqueEmo.join('、')}。`,
+    `3. 情绪标签只能有一个，放在末尾。`,
+    `4. 如果你想让房间换个氛围，可以在回复末尾附加 [背景色:#RRGGBB] 标签。`,
+    `5. 如果你要用颜文字，请单独放在最后一行，格式：[颜文字]你的颜文字`,
+    '========== 输出格式到此为止 ==========',
+  );
+  return parts.filter(Boolean).join('\n');
+}
+function buildMessages(userInput){
+  if(!Current) return [];
+  const msgs=[{role:'system',content:buildSystemPrompt(userInput)}];
+  Current.chatLog.slice(-40).forEach(m=>msgs.push({role:m.role,content:m.text}));
+  msgs.push({role:'user',content:userInput});
+  return msgs;
+}
+
+/* ============================================================
+   解析
+   ============================================================ */
+const EMO_MAP={'开心':'happy','高兴':'happy','笑':'happy','害羞':'shy','脸红':'shy',
+  '难过':'sad','伤心':'sad','失落':'sad','生气':'angry','不满':'angry','哼':'angry',
+  '惊讶':'surprise','吃惊':'surprise','温柔':'tender','平静':'calm'};
+function parseEmotion(text){
+  const m=text.match(/\[([^\]]+)\]\s*$/);
+  if(!m)return{clean:text,emo:'calm',label:null};
+  const label=m[1].trim();
+  const clean=text.replace(/\[[^\]]+\]\s*$/,'').trim();
+  let emo='calm';
+  for(const k in EMO_MAP){if(label.includes(k)){emo=EMO_MAP[k];break;}}
+  return{clean,emo,label};
+}
+function parseBgColor(text){
+  const m=text.match(/\[背景色[:：]\s*(#[0-9a-fA-F]{3,8})\s*\]/);
+  if(!m)return{clean:text,color:null};
+  return{clean:text.replace(m[0],'').trim(),color:m[1]};
+}
+function parseKaomoji(text){
+  const m=text.match(/\[颜文字\]\s*([\s\S]+?)\s*$/);
+  if(!m)return{clean:text,kaomoji:null};
+  return{clean:text.replace(m[0],'').trim(),kaomoji:m[1].trim()};
+}
+function findEmotionImage(label,emo){
+  if(!Current) return null;
+  const imgs=Current.images||[];
+  if(imgs.length===0)return null;
+  if(label){
+    const hit=imgs.find(i=>i.label && (i.label.includes(label)||label.includes(i.label)));
+    if(hit)return hit.img;
+  }
+  if(emo){
+    const zhMap={happy:'开心',shy:'害羞',sad:'难过',angry:'生气',surprise:'惊讶',tender:'温柔',calm:'平静'};
+    const zh=zhMap[emo];
+    if(zh){
+      const hit=imgs.find(i=>i.label && (i.label.includes(zh)||zh.includes(i.label)));
+      if(hit)return hit.img;
+    }
+  }
+  return null;
+}
+function applyEmotion(emo,label){
+  const el=document.getElementById('charAnim');
+  const img=document.getElementById('charImg');
+  if(!el||!img)return;
+  const customImg=findEmotionImage(label, emo);
+  const baseImg=getBaseCharImage();
+  if(customImg){
+    img.src=customImg;
+    if(window.__emoRestore)clearTimeout(window.__emoRestore);
+    window.__emoRestore=setTimeout(()=>{ if(baseImg)img.src=baseImg; },1500);
+  } else if(baseImg){ img.src=baseImg; }
+  const map={
+    happy:'scale(1.06) translateY(-4px)', shy:'scale(0.97) rotate(-3deg)',
+    sad:'scale(0.96) translateY(3px)', angry:'scale(1.03) rotate(2deg)',
+    surprise:'scale(1.08)', tender:'scale(1.02)', calm:'scale(1)',
+  };
+  el.style.transition='transform .3s';
+  el.style.transform=map[emo]||map.calm;
+  if(window.__emoTimer)clearTimeout(window.__emoTimer);
+  window.__emoTimer=setTimeout(()=>{el.style.transform='scale(1)';},1500);
+}
+
+/* ============================================================
+   气泡
+   ============================================================ */
+const BUBBLE_LINE_HEIGHT = 54;
+const BUBBLE_MAX = 5;
+
+function repositionAllBubbles(){
+  const box=document.getElementById('bubbles');
+  const stage=document.getElementById('stage');
+  const wrap=document.getElementById('charWrap');
+  const userWrap=document.getElementById('userWrap');
+  if(!box||!stage||!wrap) return;
+  const stageRect = stage.getBoundingClientRect();
+
+  const charRect = wrap.getBoundingClientRect();
+  const charCenterX = charRect.left + charRect.width/2 - stageRect.left;
+  const charTopY = charRect.top - stageRect.top;
+
+  let userCenterX = stageRect.width/2, userTopY = stageRect.height/2;
+  if(GlobalState.userShow && GlobalState.userImage && userWrap){
+    const ur = userWrap.getBoundingClientRect();
+    userCenterX = ur.left + ur.width/2 - stageRect.left;
+    userTopY = ur.top - stageRect.top;
+  }
+
+  const themBubbles = Array.from(box.children).filter(c=>c.classList.contains('them'));
+  themBubbles.forEach((el, i)=>{
+    const w = el.offsetWidth || 150;
+    const h = el.offsetHeight || 40;
+    const left = Math.max(4, Math.min(stageRect.width - w - 4, charCenterX - w/2));
+    const fromBottom = (themBubbles.length - 1 - i);
+    const top = Math.max(4, charTopY - 8 - fromBottom * BUBBLE_LINE_HEIGHT - h);
+    el.style.left = left + 'px';
+    el.style.top = top + 'px';
+  });
+
+  const youBubbles = Array.from(box.children).filter(c=>c.classList.contains('you'));
+  youBubbles.forEach((el, i)=>{
+    const w = el.offsetWidth || 150;
+    const h = el.offsetHeight || 40;
+    const left = Math.max(4, Math.min(stageRect.width - w - 4, userCenterX - w/2));
+    const fromBottom = (youBubbles.length - 1 - i);
+    const top = Math.max(4, userTopY - 8 - fromBottom * BUBBLE_LINE_HEIGHT - h);
+    el.style.left = left + 'px';
+    el.style.top = top + 'px';
+  });
+}
+
+let bubbleTimer = null;
+function repositionAllBubblesDebounced(){
+  if(bubbleTimer) clearTimeout(bubbleTimer);
+  bubbleTimer = setTimeout(()=>{ repositionAllBubbles(); }, 80);
+}
+
+function say(text,who='them',opts={}){
+  const box=document.getElementById('bubbles');
+  const stage=document.getElementById('stage');
+  if(!box||!stage)return;
+
+  const div=document.createElement('div');
+  div.className='bubble '+who;
+  const body=document.createElement('div');
+  body.textContent=text;
+  div.appendChild(body);
+  if(opts.kaomoji){
+    const k=document.createElement('div');
+    k.className='kaomoji';
+    k.textContent=opts.kaomoji;
+    div.appendChild(k);
+  }
+
+  div.style.left = '-9999px';
+  div.style.top = '-9999px';
+  box.appendChild(div);
+
+  const sameType = Array.from(box.children).filter(c=>c.classList.contains(who));
+  if(sameType.length > BUBBLE_MAX){
+    const removeCount = sameType.length - BUBBLE_MAX;
+    for(let i=0;i<removeCount;i++) box.removeChild(sameType[i]);
+  }
+
+  repositionAllBubblesDebounced();
+
+  setTimeout(()=>{
+    div.style.transition='opacity 1s';
+    div.style.opacity='0';
+    setTimeout(()=>{
+      if(div.parentNode) div.remove();
+      repositionAllBubblesDebounced();
+    }, 1000);
+  }, 8000);
+}
+
+/* ============================================================
+   数值
+   ============================================================ */
+function updateStats(){
+  if(!Current) return;
+  const s=Current.stats;
+  document.getElementById('vMood').textContent=Math.round(s.mood);
+  document.getElementById('vFood').textContent=Math.round(s.food);
+  document.getElementById('vEnergy').textContent=Math.round(s.energy);
+  document.getElementById('bMood').style.width=s.mood+'%';
+  document.getElementById('bFood').style.width=s.food+'%';
+  document.getElementById('bEnergy').style.width=s.energy+'%';
+  document.getElementById('coinNum').textContent=Current.coin;
+  document.getElementById('charName').textContent=Current.name;
+}
+
+/* ============================================================
+   背景 / 角色 / 玩家 / 宠物
+   ============================================================ */
+function renderBackground(){
+  const bgImg=document.getElementById('bgImage');
+  const bgDef=document.getElementById('bgDefault');
+  bgDef.style.background='linear-gradient(160deg, var(--bg), var(--bg2))';
+  if(GlobalState.background){
+    bgImg.style.backgroundImage=`url(${GlobalState.background})`;
+    bgImg.style.display='block';
+    bgDef.style.display='none';
+  }else{
+    bgImg.style.display='none';
+    bgDef.style.display='block';
+  }
+}
+function renderCharacter(){
+  const img=document.getElementById('charImg');
+  const ph=document.getElementById('charPlaceholder');
+  const base = getBaseCharImage();
+  if(base){ img.src=base;img.style.display='block';ph.style.display='none'; }
+  else{ img.style.display='none';ph.style.display='flex'; }
+  positionCharacter();
+}
+function positionCharacter(){
+  if(!Current) return;
+  const stage=document.getElementById('stage');
+  const wrap=document.getElementById('charWrap');
+  const flip=document.getElementById('charFlip');
+  const sh=document.getElementById('charShadow');
+  if(!stage||!wrap)return;
+  const w=stage.clientWidth, h=stage.clientHeight;
+  const size=Math.min(w,h)*0.42;
+  wrap.style.width=size+'px';
+  wrap.style.left=(Current.x*w - size/2)+'px';
+  wrap.style.top =(Current.y*h - size)+'px';
+  flip.style.transform=Current.flip?'scaleX(-1)':'scaleX(1)';
+  sh.style.width=(size*0.7)+'px';
+  sh.style.height=(size*0.2)+'px';
+  sh.style.left=(Current.x*w - size*0.35)+'px';
+  sh.style.top =(Current.y*h - size*0.1)+'px';
+  repositionAllBubblesDebounced();
+}
+function renderUser(){
+  const wrap=document.getElementById('userWrap');
+  const img=document.getElementById('userImg');
+  if(!wrap)return;
+  if(GlobalState.userShow && GlobalState.userImage){
+    img.src=GlobalState.userImage;
+    wrap.style.display='block';
+    positionUser();
+  }else{ wrap.style.display='none'; }
+  repositionAllBubblesDebounced();
+}
+function positionUser(){
+  const stage=document.getElementById('stage');
+  const wrap=document.getElementById('userWrap');
+  if(!stage||!wrap)return;
+  const w=stage.clientWidth, h=stage.clientHeight;
+  const size=Math.min(w,h)*0.28;
+  wrap.style.width=size+'px';
+  wrap.style.left=(GlobalState.userX*w - size/2)+'px';
+  wrap.style.top =(GlobalState.userY*h - size)+'px';
+  repositionAllBubblesDebounced();
+}
+function renderPet(){
+  if(!Current) return;
+  const el=document.getElementById('petWrap');
+  const img=document.getElementById('petImg');
+  if(!el)return;
+  if(!Current.pet.has){el.style.display='none';return;}
+  el.style.display='flex';
+  if(Current.pet.image){
+    img.src=Current.pet.image;img.style.display='block';
+    el.childNodes.forEach(n=>{if(n.nodeType===3)n.remove();});
+    if(!el.contains(img))el.appendChild(img);
+  }else{
+    img.style.display='none';
+    const icons={cat:'🐱',dog:'🐶',rabbit:'🐰',bird:'🐦'};
+    el.textContent=icons[Current.pet.type]||'🐾';
+    el.appendChild(img);
+  }
+  positionPet();
+}
+function positionPet(){
+  if(!Current) return;
+  const stage=document.getElementById('stage');
+  const el=document.getElementById('petWrap');
+  if(!stage||!el)return;
+  const w=stage.clientWidth, h=stage.clientHeight;
+  el.style.left=(Current.pet.x*w)+'px';
+  el.style.top =(Current.pet.y*h)+'px';
+}
+function walkTo(nx){
+  if(!Current) return;
+  nx=Math.max(0.15,Math.min(0.85,nx));
+  const dx=nx-Current.x;
+  if(Math.abs(dx)>0.05)Current.flip=dx<0;
+  Current.x=nx;
+  positionCharacter();
+  const anim=document.getElementById('charAnim');
+  anim.classList.remove('walking');
+  void anim.offsetWidth;
+  anim.classList.add('walking');
+  setTimeout(()=>anim.classList.remove('walking'),1600);
+}
+function dropToGround(){
+  if(!Current) return;
+  const target=0.72;
+  if(Current.y>=target-0.01)return;
+  const step=()=>{
+    Current.y=Math.min(target, Current.y+0.012);
+    positionCharacter();
+    if(Current.y<target-0.005)setTimeout(step,30);
+  };
+  step();
+}
+
+/* ============================================================
+   上传（★ 全部写入草稿，不直接改 Current ★）
+   ============================================================ */
+async function handleCharUpload(e){
+  if(!settingsDraft) initSettingsDraft();
+  const file=e.target.files[0]; if(!file) return;
+  collectSettingsDraft();
+  const dataUrl = await compressImage(file, 512, 0.7);
+  settingsDraft.image = dataUrl;
+  renderCharacter(); // 临时预览用草稿？—— 这里用草稿让用户看到预览
+  // 为了让用户立即看到预览，把当前角色也临时改一下（但保存前不落盘）
+  if(Current) Current.image = dataUrl;
+  renderCharacter(); openSettings();
+}
+async function handleBgUpload(e){
+  if(!settingsDraft) initSettingsDraft();
+  collectSettingsDraft();
+  const file=e.target.files[0]; if(!file) return;
+  const dataUrl = await compressImage(file, 720, 0.7);
+  settingsDraft.background_img = dataUrl;
+  GlobalState.background = dataUrl;
+  renderBackground(); openSettings();
+}
+async function handleUserUpload(e){
+  if(!settingsDraft) initSettingsDraft();
+  collectSettingsDraft();
+  const file=e.target.files[0]; if(!file) return;
+  const dataUrl = await compressImage(file, 400, 0.7);
+  settingsDraft.userImage = dataUrl;
+  settingsDraft.userShow = true;
+  GlobalState.userImage = dataUrl;
+  GlobalState.userShow = true;
+  renderUser(); openSettings();
+}
+async function handlePetUpload(e){
+  if(!settingsDraft) initSettingsDraft();
+  collectSettingsDraft();
+  const file=e.target.files[0]; if(!file) return;
+  const dataUrl = await compressImage(file, 300, 0.7);
+  settingsDraft.pet.image = dataUrl;
+  if(Current) Current.pet.image = dataUrl;
+  renderPet(); openSettings();
+}
+function handleFaceUpload(e){
+  if(!settingsDraft) initSettingsDraft();
+  collectSettingsDraft();
+  const files=[...e.target.files]; if(!files.length)return;
+  let loaded=0;
+  files.forEach(async file=>{
+    const dataUrl = await compressImage(file, 400, 0.7);
+    settingsDraft.images.push({label:'', img:dataUrl});
+    if(Current) Current.images.push({label:'', img:dataUrl});
+    loaded++;
+    if(loaded===files.length){ openSettings(); }
+  });
+}
+function handleOutfitUpload(e){
+  if(!settingsDraft) initSettingsDraft();
+  collectSettingsDraft();
+  const files=[...e.target.files]; if(!files.length)return;
+  let loaded=0;
+  files.forEach(async file=>{
+    const dataUrl = await compressImage(file, 512, 0.7);
+    settingsDraft.outfits.push({label:'', img:dataUrl});
+    if(Current) Current.outfits.push({label:'', img:dataUrl});
+    loaded++;
+    if(loaded===files.length){ openSettings(); }
+  });
+}
+function updateOutfitLabel(i,v){
+  if(!settingsDraft) return;
+  if(settingsDraft.outfits[i]) settingsDraft.outfits[i].label = v.trim();
+  if(Current && Current.outfits[i]) Current.outfits[i].label = v.trim();
+  saveGameDebounced();
+}
+function removeOutfit(i){
+  if(!settingsDraft) initSettingsDraft();
+  collectSettingsDraft();
+  settingsDraft.outfits.splice(i,1);
+  if(Current) Current.outfits.splice(i,1);
+  if(settingsDraft.currentOutfitIndex >= settingsDraft.outfits.length) settingsDraft.currentOutfitIndex = -1;
+  if(Current && Current.currentOutfitIndex >= Current.outfits.length) Current.currentOutfitIndex = -1;
+  openSettings(); renderCharacter();
+}
+
+/* ============================================================
+   交互
+   ============================================================ */
+let lastDragEnd=0;
+function bindStage(){
+  const stage=document.getElementById('stage');
+  const wrap=document.getElementById('charWrap');
+  const petEl=document.getElementById('petWrap');
+  const userEl=document.getElementById('userWrap');
+  let dragging=false, moved=false;
+  let startX=0, startY=0, startCharX=0, startCharY=0;
+  function onDown(e){
+    if(e.target.closest('#charPlaceholder'))return;
+    if(Current && Current.isAway)return;
+    e.preventDefault();
+    dragging=true; moved=false;
+    wrap.classList.add('dragging');
+    startX=e.clientX; startY=e.clientY;
+    startCharX=Current.x; startCharY=Current.y;
+    document.addEventListener('pointermove',onMove,{passive:false});
+    document.addEventListener('pointerup',onUp);
+    document.addEventListener('pointercancel',onUp);
+  }
+  function onMove(e){
+    if(!dragging)return;
+    e.preventDefault();
+    const rect=stage.getBoundingClientRect();
+    const dx=(e.clientX-startX)/rect.width;
+    const dy=(e.clientY-startY)/rect.height;
+    if(Math.abs(dx)>0.01||Math.abs(dy)>0.01)moved=true;
+    Current.x=Math.max(0.1,Math.min(0.9,startCharX+dx));
+    Current.y=Math.max(0.1,Math.min(0.85,startCharY+dy));
+    positionCharacter();
+  }
+  function onUp(){
+    if(!dragging)return;
+    dragging=false;
+    wrap.classList.remove('dragging');
+    document.removeEventListener('pointermove',onMove);
+    document.removeEventListener('pointerup',onUp);
+    document.removeEventListener('pointercancel',onUp);
+    if(!moved){ touchHead(); }
+    else {
+      addRelationValue(1); saveGameDebounced();
+      if(Current.y < 0.65)dropToGround();
+    }
+    lastDragEnd=Date.now();
+    Current.lastInteract=Date.now();
+  }
+  wrap.addEventListener('pointerdown',onDown);
+
+  if(userEl){
+    let ud=false, ux=0, uy=0, usx=0, usy=0;
+    userEl.addEventListener('pointerdown',e=>{
+      e.preventDefault();e.stopPropagation();
+      ud=true;userEl.classList.add('dragging');
+      usx=e.clientX;usy=e.clientY;ux=GlobalState.userX;uy=GlobalState.userY;
+      document.addEventListener('pointermove',uMove,{passive:false});
+      document.addEventListener('pointerup',uUp);
+    });
+    function uMove(e){
+      if(!ud)return;
+      e.preventDefault();
+      const rect=stage.getBoundingClientRect();
+      const dx=(e.clientX-usx)/rect.width;
+      const dy=(e.clientY-usy)/rect.height;
+      GlobalState.userX=Math.max(0.05,Math.min(0.95,ux+dx));
+      GlobalState.userY=Math.max(0.5,Math.min(0.98,uy+dy));
+      positionUser();
+    }
+    function uUp(){
+      if(!ud)return;
+      ud=false;userEl.classList.remove('dragging');
+      document.removeEventListener('pointermove',uMove);
+      document.removeEventListener('pointerup',uUp);
+      saveGameDebounced();
+    }
+  }
+
+  if(petEl){
+    let petDragging=false, petMoved=false, psx=0, psy=0, pox=0, poy=0;
+    petEl.addEventListener('pointerdown',e=>{
+      e.preventDefault();e.stopPropagation();
+      petDragging=true;petMoved=false;
+      petEl.classList.add('dragging');
+      psx=e.clientX;psy=e.clientY;pox=Current.pet.x;poy=Current.pet.y;
+      document.addEventListener('pointermove',petMove,{passive:false});
+      document.addEventListener('pointerup',petUp);
+    });
+    function petMove(e){
+      if(!petDragging)return;
+      e.preventDefault();
+      const rect=stage.getBoundingClientRect();
+      const dx=(e.clientX-psx)/rect.width;
+      const dy=(e.clientY-psy)/rect.height;
+      if(Math.abs(dx)>0.01||Math.abs(dy)>0.01)petMoved=true;
+      Current.pet.x=Math.max(0.05,Math.min(0.95,pox+dx));
+      Current.pet.y=Math.max(0.3,Math.min(0.92,poy+dy));
+      positionPet();
+    }
+    function petUp(){
+      if(!petDragging)return;
+      petDragging=false;
+      petEl.classList.remove('dragging');
+      document.removeEventListener('pointermove',petMove);
+      document.removeEventListener('pointerup',petUp);
+      if(!petMoved){
+        Current.pet.mood=Math.min(100,Current.pet.mood+5);
+        addRelationValue(1);
+      }
+      saveGameDebounced();
+    }
+  }
+
+  stage.addEventListener('click',e=>{
+    if(e.target.closest('#charWrap'))return;
+    if(e.target.closest('#petWrap'))return;
+    if(e.target.closest('#userWrap'))return;
+    if(Date.now()-lastDragEnd<300)return;
+    const rect=stage.getBoundingClientRect();
+    const nx=(e.clientX-rect.left)/rect.width;
+    walkTo(nx);
+  });
+
+  document.getElementById('charPlaceholder').addEventListener('click',e=>{
+    e.stopPropagation();openSettings();
+  });
+}
+function showTouchFeedback(){
+  const anim=document.getElementById('charAnim');
+  if(!anim)return;
+  anim.style.transition='transform .22s';
+  anim.style.transform='scale(0.94) translateY(4px)';
+  setTimeout(()=>{ anim.style.transform='scale(1) translateY(0)'; },180);
+}
+function touchHead(){
+  if(!Current) return;
+  if(Current.isAway){ say('他不在家。','tip'); return; }
+  addRelationValue(2);
+  showTouchFeedback();
+  Current.lastInteract=Date.now();
+  if(!API.ready){ needApiTip(); return; }
+  proactiveTalk('idle').catch(()=>{});
+}
+let idleWalkTimer=null;
+function startIdleWalk(){
+  if(idleWalkTimer)clearInterval(idleWalkTimer);
+  idleWalkTimer=setInterval(()=>{
+    const wrap=document.getElementById('charWrap');
+    if(!wrap||!Current)return;
+    if(wrap.classList.contains('dragging'))return;
+    if(!Current.image && !getCurrentOutfitImg())return;
+    if(Current.isAway)return;
+    if(Math.random()>0.5)return;
+    walkTo(0.2+Math.random()*0.6);
+  },12000);
+}
+
+/* ============================================================
+   状态衰减 / 打工 / 出行
+   ============================================================ */
+const DECAY_PER_HOUR={food:6,energy:4,mood:3};
+let lastTick=Date.now();
+function tickStats(){
+  if(!Current) return;
+  const now=Date.now();
+  const hours=(now-lastTick)/3600000;
+  if(hours<0.01)return;
+  lastTick=now;
+  const s=Current.stats;
+  s.food=Math.max(0,s.food-DECAY_PER_HOUR.food*hours);
+  s.energy=Math.max(0,s.energy-DECAY_PER_HOUR.energy*hours);
+  s.mood=Math.max(0,s.mood-DECAY_PER_HOUR.mood*hours);
+  if(hours>6)s.mood=Math.max(0,s.mood-(hours-6)*2);
+  if(s.food < 30){ s.mood = Math.max(0, s.mood - 3*hours); }
+  if(Current.lastInteract){
+    const away = (now-Current.lastInteract)/3600000;
+    if(away > 12 && !Current.fightUntil){
+      Current.fightUntil = now + 30*60000;
+      s.mood = Math.max(0, s.mood - 5);
+      say('他似乎有点失落，不太想说话。','them');
+    }
+  }
+  if(s.food<20&&s.energy<20&&!Current.sick){
+    Current.sick=true;say(`${Current.name}看起来不太舒服，脸色有点差……`,'them');
+  }
+  if(Current.sick&&s.food>60&&s.energy>60){
+    Current.sick=false;say(`${Current.name}的精神好多了。`,'them');
+  }
+  updateStats();saveGameDebounced();
+}
+setInterval(tickStats,60000);
+
+function tryWork(){
+  if(!API.ready)return;
+  if(!Current) return;
+  if(Current.sick)return;
+  if(Current.stats.energy<30)return;
+  if(Current.isSleeping)return;
+  if(Current.isAway)return;
+  if(Math.random()>0.35)return;
+
+  Current.isAway=true;
+  Current.stats.energy-=25;
+  Current.stats.food-=15;
+  const awayMinutes = 5 + Math.floor(Math.random()*6);
+  Current.awayUntil = Date.now() + awayMinutes*60000;
+  logTrack('外面','打工');
+  updateTrackBar();
+  say('“我出门一趟。”','them');
+  saveGame();
+
+  setTimeout(()=>{
+    if(!Current) return;
+    Current.isAway=false;
+    Current.awayUntil=null;
+    updateTrackBar();
+    const earn = Math.floor((10 + Math.random()*21) * (0.7 + Current.stats.mood/200));
+    Current.coin += earn;
+    const gotGift = Math.random() < 0.5;
+    if(gotGift){
+      const gifts = ['flower','tea','cake','book','food'];
+      const gid = gifts[Math.floor(Math.random()*gifts.length)];
+      Current.inventory[gid] = (Current.inventory[gid]||0) + 1;
+    }
+    addRelationValue(2);
+    if(gotGift) say(`“回来啦，赚了 ${earn} 金币，路上还看到这个，顺手带回来了。”`,'them');
+    else say(`“回来了，赚了 ${earn} 金币。”`,'them');
+    walkTo(0.5);
+    updateStats();saveGame();
+    if(API.ready) proactiveTalk('idle').catch(()=>{});
+  }, awayMinutes*60000);
+}
+setInterval(tryWork,5*60000);
+
+/* ============================================================
+   小惊喜 / emo
+   ============================================================ */
+function checkSurprise(){
+  if(!Current) return;
+  const today=todayStr();
+  if(Current.lastSurpriseDate===today)return;
+  if(Math.random() > 0.3)return;
+  Current.lastSurpriseDate=today;
+  const pool=[
+    {text:'桌上多了一张小纸条，上面写着「今天也辛苦了」。',item:null},
+    {text:'桌上多了一朵小花，是他早上放上去的。',item:'flower'},
+    {text:'桌上多了一杯还温着的茶。',item:'tea'},
+  ];
+  const s=pool[Math.floor(Math.random()*pool.length)];
+  if(s.item)Current.inventory[s.item]=(Current.inventory[s.item]||0)+1;
+  setTimeout(()=>{
+    say(s.text,'them');
+    Current.stats.mood=Math.min(100,Current.stats.mood+5);
+    updateStats();saveGameDebounced();
+  }, 3000);
+}
+setInterval(checkSurprise, 3600000);
+
+function checkEmo(){
+  if(!Current) return;
+  const today=todayStr();
+  if(Current.__emoDate===today)return;
+  if(Math.random() > 0.2)return;
+  Current.__emoDate=today;
+  Current.emoUntil = Date.now() + 2*3600000;
+  setTimeout(()=>{ say('他今天好像有点安静。','them'); }, 3000);
+}
+setInterval(checkEmo, 600000);
+
+/* ============================================================
+   商城
+   ============================================================ */
+const SHOP_ITEMS=[
+  {id:'tea',name:'热茶',price:5,type:'food',effect:{food:15,mood:5},desc:'暖暖的，喝了心情好'},
+  {id:'cake',name:'小蛋糕',price:8,type:'food',effect:{food:25,mood:10},desc:'甜甜的，他喜欢'},
+  {id:'book',name:'一本书',price:12,type:'gift',effect:{mood:15},desc:'安静地看一会'},
+  {id:'flower',name:'一束花',price:15,type:'gift',effect:{mood:20,rel:3},desc:'放在桌上很好看'},
+  {id:'cloth',name:'新衣服',price:30,type:'cloth',effect:{mood:25,rel:5},desc:'换上新衣服'},
+  {id:'food',name:'食材',price:6,type:'food',effect:{food:20},desc:'可以做饭'},
+  {id:'medicine',name:'药',price:10,type:'cure',effect:{sick:true},desc:'生病时用'},
+  {id:'petfood',name:'宠物粮',price:5,type:'pet',effect:{petFood:30},desc:'给宠物吃'},
+];
+function getAllShopItems(){
+  if(!Current) return SHOP_ITEMS;
+  return SHOP_ITEMS.concat(Current.customShopItems.map(it=>({
+    id:'custom_'+it.id, name:it.name, price:it.price, type:'gift',
+    effect:{mood:10,rel:2}, desc:'自定义礼物',
+    _custom:true, _rawId:it.id,
+  })));
+}
+function openShop(){
+  if(!Current) return;
+  const modal=document.getElementById('modalContent');
+  const items = getAllShopItems();
+  modal.innerHTML=`
+    <h2>商城 <span class="close" onclick="closeModal()">×</span></h2>
+    <p style="font-size:12px;color:var(--text-soft);margin-bottom:12px;">金币：🪙 ${Current.coin}</p>
+    <div style="background:var(--card);border-radius:14px;padding:12px;margin-bottom:12px;box-shadow:0 2px 8px rgba(229,107,140,.06);">
+      <div style="font-size:13px;color:var(--text-soft);margin-bottom:8px;">自定义商品</div>
+      <input id="customShopName" placeholder="想买什么？" style="margin-bottom:6px;">
+      <input id="customShopPrice" type="number" placeholder="价格（金币）" style="margin-bottom:6px;">
+      <button class="btn" onclick="addCustomShopItem()">添加商品</button>
+    </div>
+    ${items.map(it=>{
+      const isCustom = !!it._custom;
+      return `<div class="shop-item">
+        <div class="info">${it.name}<small>${it.desc}${isCustom?'（自定义）':''}</small></div>
+        <button onclick="buyItem('${it.id}')">🪙 ${it.price}</button>
+        ${isCustom?`<button style="background:#e08a8a;margin-left:6px;" onclick="deleteCustomShopItem('${it._rawId}')">×</button>`:''}
+      </div>`;
+    }).join('')}
+  `;
+  openModal();
+}
+function addCustomShopItem(){
+  if(!Current) return;
+  const name=document.getElementById('customShopName').value.trim();
+  const price=parseInt(document.getElementById('customShopPrice').value);
+  if(!name){ say('请输入商品名','tip'); return; }
+  if(!price || price<0){ say('请输入有效价格','tip'); return; }
+  Current.customShopItems.push({id:Date.now()+'_'+Math.random().toString(36).slice(2,6), name, price});
+  saveGame();openShop();
+}
+function deleteCustomShopItem(rawId){
+  if(!Current) return;
+  Current.customShopItems = Current.customShopItems.filter(it=>it.id!==rawId);
+  saveGame();openShop();
+}
+function buyItem(id){
+  if(!Current) return;
+  const items = getAllShopItems();
+  const it = items.find(x=>x.id===id);
+  if(!it)return;
+  if(Current.coin<it.price){say('金币不够呢……','them');return;}
+  Current.coin-=it.price;
+  Current.inventory[id]=(Current.inventory[id]||0)+1;
+  updateStats();saveGame();openShop();
+}
+function useItem(id){
+  if(!Current) return;
+  let it = SHOP_ITEMS.find(x=>x.id===id);
+  if(!it){
+    if(id.startsWith('custom_')){
+      const rawId = id.slice(7);
+      const raw = Current.customShopItems.find(x=>x.id===rawId);
+      if(raw) it = {id, name:raw.name, effect:{mood:10,rel:2}};
+    }
+  }
+  if(!it||!Current.inventory[id])return;
+  Current.inventory[id]--;
+  if(it.effect){
+    if(it.effect.food)Current.stats.food=Math.min(100,Current.stats.food+it.effect.food);
+    if(it.effect.mood)Current.stats.mood=Math.min(100,Current.stats.mood+it.effect.mood);
+    if(it.effect.rel)addRelationValue(it.effect.rel);
+    if(it.effect.sick&&Current.sick){Current.sick=false;}
+    if(it.effect.petFood&&Current.pet.has)Current.pet.food=Math.min(100,(Current.pet.food||80)+it.effect.petFood);
+  }
+  say(`你给了${Current.name}一个「${it.name}」。`,'you');
+  if(API.ready)proactiveTalk('idle').catch(()=>{});
+  updateStats();saveGame();
+}
+function openGift(){
+  if(!Current) return;
+  const owned=Object.keys(Current.inventory).filter(k=>Current.inventory[k]>0);
+  const allItems = getAllShopItems();
+  const modal=document.getElementById('modalContent');
+  modal.innerHTML=`
+    <h2>送礼物 <span class="close" onclick="closeModal()">×</span></h2>
+    ${owned.length===0?'<p style="color:var(--text-soft);font-size:13px;">还没有可以送的东西，去商城看看吧。</p>':''}
+    ${owned.map(id=>{
+      let it = allItems.find(x=>x.id===id);
+      if(!it && id.startsWith('custom_')){
+        const raw = Current.customShopItems.find(x=>('custom_'+x.id)===id);
+        if(raw) it = {name:raw.name};
+      }
+      if(!it) it = {name:'物品'};
+      return `<div class="shop-item">
+        <div class="info">${it.name}<small>×${Current.inventory[id]}</small></div>
+        <button onclick="useItem('${id}');closeModal()">送出</button>
+      </div>`;
+    }).join('')}
+  `;
+  openModal();
+}
+
+/* ============================================================
+   宠物
+   ============================================================ */
+function tickPet(){
+  if(!Current||!Current.pet.has)return;
+  const p=Current.pet;
+  const h=(Date.now()-lastTick)/3600000;
+  p.food=Math.max(0,(p.food||80)-4*h);
+  p.energy=Math.max(0,(p.energy||80)-3*h);
+  p.mood=Math.max(0,(p.mood||80)-2*h);
+  saveGameDebounced();
+}
+setInterval(tickPet,60000);
+function getPet(type,name){
+  if(!Current) return;
+  Current.pet.has=true;Current.pet.type=type;
+  Current.pet.name=name||'小家伙';
+  Current.pet.food=80;Current.pet.energy=80;Current.pet.mood=80;
+  Current.pet.x=0.78;Current.pet.y=0.82;
+  renderPet();saveGame();
+}
+
+/* ============================================================
+   聊天
+   ============================================================ */
+function needApiTip(){ say('先去「设置」里填 API，我才能说话。', 'tip'); }
+async function chat(userText){
+  if(!Current) return;
+  if(Current.isAway){ say('他现在在外面，等他回来吧。','tip'); return; }
+  if(!API.ready){ needApiTip(); return; }
+  say(userText,'you');
+  Current.chatLog.push({role:'user',text:userText,time:Date.now()});
+  try {
+    const reply=await callAI(buildMessages(userText));
+    if(!reply){ say('（他没回应，可能模型返回了空内容。）','err'); return; }
+    let{clean,emo,label}=parseEmotion(reply);
+    const bg=parseBgColor(clean);
+    clean=bg.clean;
+    const km=parseKaomoji(clean);
+    clean=km.clean;
+    if(bg.color)applyBgColor(bg.color);
+    say(clean,'them',{kaomoji:km.kaomoji});
+    applyEmotion(emo,label);
+    Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
+    addRelationValue(0.8);
+    saveGameDebounced();
+    Current.lastInteract=Date.now();
+    Current.lastChatDate=todayStr();
+  } catch(e) { say(`API报错：${e.message}`, 'err'); }
+}
+async function proactiveTalk(type='idle'){
+  if(!API.ready||!Current)return;
+  if(Current.isAway)return;
+  if(isTooSoonToTalk()) return;
+  const prompt={
+    greet:'（对方刚打开页面，主动说一句话打个招呼。）',
+    idle:'（安静了一会，主动说一句话。注意：换点新话题，不要重复之前说过的。）',
+    night:'（现在是深夜，主动关心对方该睡觉了。）',
+    morning:'（现在是早上，主动说早安。）',
+    period:'（对方在生理期，主动关心她。）',
+    fight:'（你们刚闹了点别扭，你想找台阶下，但还端着一点。）',
+    meal:'（到饭点了，随口提一句吃的。）',
+    weather:'（根据今天的天气，随口聊一句。）',
+    emo:'（你今天有点闷，随口说一句。）',
+  }[type]||'（主动说一句话。）';
+  try {
+    const reply=await callAI([
+      {role:'system',content:buildSystemPrompt(prompt)},
+      ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
+      {role:'user',content:prompt},
+    ]);
+    if(reply){
+      let{clean,emo,label}=parseEmotion(reply);
+      const bg=parseBgColor(clean);
+      clean=bg.clean;
+      const km=parseKaomoji(clean);
+      clean=km.clean;
+      if(bg.color)applyBgColor(bg.color);
+      say(clean,'them',{kaomoji:km.kaomoji});
+      applyEmotion(emo,label);
+      Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
+      rememberProactive(clean);
+      saveGameDebounced();
+    }
+  } catch(e) {}
+}
+function timeGreeting(){
+  if(!API.ready||!Current)return;
+  const h=new Date().getHours();
+  if(isPeriodNow())proactiveTalk('period');
+  else if(Current.emoUntil && Date.now()<Current.emoUntil)proactiveTalk('emo');
+  else if(h>=5&&h<11)proactiveTalk('morning');
+  else if(h>=23||h<5)proactiveTalk('night');
+  else proactiveTalk('idle');
+}
+
+/* ============================================================
+   互动
+   ============================================================ */
+function openTouch(){
+  if(!Current) return;
+  const modal=document.getElementById('modalContent');
+  const lv = Current.relationValue || 0;
+  modal.innerHTML=`
+    <h2>互动 <span class="close" onclick="closeModal()">×</span></h2>
+    <div class="shop-item"><div class="info">摸头</div><button onclick="doTouch('head')">做</button></div>
+    <div class="shop-item"><div class="info">牵手</div><button onclick="doTouch('hand')">做</button></div>
+    <div class="shop-item"><div class="info">一起看窗外</div><button onclick="doTouch('window')">做</button></div>
+    <div class="shop-item"><div class="info">让他休息</div><button onclick="doTouch('rest')">做</button></div>
+    <div class="shop-item"><div class="info">做饭</div><button onclick="doTouch('cook')">做</button></div>
+    <div class="shop-item"><div class="info">一起看电影</div><button onclick="doTouch('movie')">做</button></div>
+    <div class="shop-item"><div class="info">睡前道晚安</div><button onclick="doTouch('night')">做</button></div>
+    ${lv>=30?'<div class="shop-item"><div class="info">抱一下</div><button onclick="doTouch(\'hug\')">做</button></div>':''}
+    ${lv>=60?'<div class="shop-item"><div class="info">亲一下</div><button onclick="doTouch(\'kiss\')">做</button></div>':''}
+  `;
+  openModal();
+}
+async function doTouch(type){
+  closeModal();
+  if(!Current) return;
+  if(!API.ready){ needApiTip(); return; }
+  if(Current.isAway){ say('他在外面。','tip'); return; }
+  const prompts={
+    head:'（对方摸了摸你的头。）', hand:'（对方牵住了你的手。）',
+    window:'（你们一起看向窗外。）', rest:'（对方让你休息一会。）',
+    cook:'（对方做了饭，你们一起吃。）', movie:'（你们靠在一起看电影。）',
+    night:'（对方和你说晚安。）', hug:'（对方轻轻抱住了你。）',
+    kiss:'（对方在你脸上轻轻亲了一下。）',
+  };
+  if(type==='rest'){Current.stats.energy=Math.min(100,Current.stats.energy+20);}
+  if(type==='cook'){
+    if(Current.inventory['food']){ Current.inventory['food']--; Current.stats.food=Math.min(100,Current.stats.food+20); }
+    else{ say('没有食材，先去商城买点吧。','them');return; }
+  }
+  if(type==='night'){Current.stats.mood=Math.min(100,Current.stats.mood+10);}
+  let add=2;
+  if(type==='hand')add=3; if(type==='hug')add=5; if(type==='kiss')add=8;
+  addRelationValue(add);
+  updateStats();saveGame();
+  Current.lastInteract=Date.now();
+  try {
+    const reply=await callAI([
+      {role:'system',content:buildSystemPrompt(prompts[type])},
+      ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
+      {role:'user',content:prompts[type]+'（根据你的性格，说一句话回应。）'},
+    ]);
+    if(reply){
+      let{clean,emo,label}=parseEmotion(reply);
+      const bg=parseBgColor(clean);
+      clean=bg.clean;
+      const km=parseKaomoji(clean);
+      clean=km.clean;
+      if(bg.color)applyBgColor(bg.color);
+      say(clean,'them',{kaomoji:km.kaomoji});
+      applyEmotion(emo,label);
+      Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
+      saveGameDebounced();
+    }
+  } catch(e) {}
+}
+
+/* ============================================================
+   日记
+   ============================================================ */
+function openDiary(){
+  if(!Current) return;
+  const modal=document.getElementById('modalContent');
+  const today=todayStr();
+  const yourToday=Current.diary.yours.find(d=>d.date===today);
+  modal.innerHTML=`
+    <h2>交换日记 <span class="close" onclick="closeModal()">×</span></h2>
+    <div class="field">
+      <label>今天的你（${today}）</label>
+      <textarea id="diaryInput" placeholder="今天发生了什么？想对他说什么……">${yourToday?yourToday.text:''}</textarea>
+    </div>
+    <button class="btn" onclick="saveDiary()">保存</button>
+    <hr style="margin:18px 0;border:none;border-top:1px solid #00000011;">
+    <label style="display:block;font-size:13px;color:var(--text-soft);margin-bottom:8px;">他的日记</label>
+    ${Current.diary.his.length===0
+      ?'<p style="color:var(--text-soft);font-size:13px;">他还没有写日记。</p>'
+      :Current.diary.his.slice(-5).reverse().map(d=>`
+        <div class="log-item"><div class="who">${d.date}</div><div class="txt">${d.text}</div></div>
+      `).join('')}
+  `;
+  openModal();
+}
+async function saveDiary(){
+  if(!API.ready||!Current){ needApiTip(); return; }
+  const text=document.getElementById('diaryInput').value.trim();
+  if(!text)return;
+  const today=todayStr();
+  const idx=Current.diary.yours.findIndex(d=>d.date===today);
+  if(idx>=0)Current.diary.yours[idx].text=text;
+  else Current.diary.yours.push({date:today,text});
+  saveGame();
+  try {
+    const reply=await callAI([
+      {role:'system',content:buildSystemPrompt(text)},
+      {role:'user',content:
+        `（你看到了对方今天写的日记：「${text}」）\n`+
+        `（以${Current.name}的身份，写一篇今天的日记来回应，1~3句，口语，不要加情绪标签，不要提AI。）`},
+    ]);
+    if(reply){
+      Current.diary.his.push({date:today,text:reply,replied:true});
+      say('他也在日记里写了一段话。','them');
+      addRelationValue(2);
+      saveGame();openDiary();
+    }
+  } catch(e) {}
+}
+
+/* ============================================================
+   番茄钟 / 陪睡
+   ============================================================ */
+let pomo={timer:null,remain:25*60,running:false,total:25*60};
+function openTimer(){
+  const modal=document.getElementById('modalContent');
+  modal.innerHTML=`
+    <h2>番茄钟 <span class="close" onclick="closeModal()">×</span></h2>
+    <div class="timer-display" id="pomoDisplay">25:00</div>
+    <div class="field"><label>时长（分钟）</label><input type="number" id="pomoMin" value="25" min="1" max="120"></div>
+    <button class="btn" id="pomoBtn" onclick="togglePomo()">开始</button>
+  `;
+  openModal();updatePomoDisplay();
+}
+function togglePomo(){
+  if(pomo.running){
+    clearInterval(pomo.timer);pomo.running=false;
+    document.getElementById('pomoBtn').textContent='继续';
+    return;
+  }
+  const min=parseInt(document.getElementById('pomoMin').value)||25;
+  if(pomo.remain<=0||pomo.remain>min*60)pomo.remain=min*60;
+  pomo.running=true;
+  document.getElementById('pomoBtn').textContent='暂停';
+  if(API.ready)proactiveTalk('idle').catch(()=>{});
+  pomo.timer=setInterval(()=>{
+    pomo.remain--;updatePomoDisplay();
+    if(pomo.remain<=0){
+      clearInterval(pomo.timer);pomo.running=false;
+      document.getElementById('pomoBtn').textContent='开始';
+      addRelationValue(3);
+      if(Current) Current.stats.mood=Math.min(100,Current.stats.mood+5);
+      updateStats();saveGame();
+      if(API.ready)proactiveTalk('idle').catch(()=>{});
+    }
+  },1000);
+}
+function updatePomoDisplay(){
+  const el=document.getElementById('pomoDisplay');if(!el)return;
+  const m=Math.floor(pomo.remain/60),s=pomo.remain%60;
+  el.textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+let sleepTimer=null;
+function openSleep(){
+  const modal=document.getElementById('modalContent');
+  modal.innerHTML=`
+    <h2>陪睡 <span class="close" onclick="closeModal()">×</span></h2>
+    <div class="field"><label>多久后自动结束（分钟，0 = 不自动）</label><input type="number" id="sleepMin" value="0" min="0" max="180"></div>
+    <button class="btn" onclick="startSleep()">进入陪睡</button>
+  `;
+  openModal();
+}
+async function startSleep(){
+  closeModal();
+  const min=parseInt(document.getElementById('sleepMin').value)||0;
+  const mask=document.getElementById('sleepMask');
+  const text=document.getElementById('sleepText');
+  mask.classList.add('show');text.textContent='……';
+  if(API.ready){
+    try {
+      const reply=await callAI([
+        {role:'system',content:buildSystemPrompt('晚安')},
+        {role:'user',content:'（对方要睡了，轻声说一句晚安，1句，温柔一点。）'},
+      ]);
+      if(reply)text.textContent=parseEmotion(reply).clean;
+    } catch(e) {}
+  }
+  let breathe=0;
+  const breathTimer=setInterval(()=>{
+    breathe++;text.style.transform=`scale(${1+Math.sin(breathe/2)*0.02})`;
+  },1000);
+  if(min>0)sleepTimer=setTimeout(()=>endSleep(breathTimer),min*60*1000);
+  else sleepTimer={breathTimer};
+  addRelationValue(2);
+  if(Current) Current.stats.mood=Math.min(100,Current.stats.mood+5);
+  updateStats();saveGame();
+}
+function endSleep(bt){
+  if(bt)clearInterval(bt);
+  if(sleepTimer){clearTimeout(sleepTimer);sleepTimer=null;}
+  document.getElementById('sleepMask').classList.remove('show');
+  addRelationValue(1);saveGame();
+}
+document.getElementById('sleepExit').onclick=()=>{
+  if(sleepTimer&&sleepTimer.breathTimer)clearInterval(sleepTimer.breathTimer);
+  if(sleepTimer){clearTimeout(sleepTimer);sleepTimer=null;}
+  document.getElementById('sleepMask').classList.remove('show');
+  addRelationValue(1);saveGame();
+};
+
+/* ============================================================
+   生理期
+   ============================================================ */
+function openPeriod(){
+  if(!Current) return;
+  const p=Current.period;
+  const info=periodInfo();
+  const now=isPeriodNow();
+  const modal=document.getElementById('modalContent');
+  modal.innerHTML=`
+    <h2>生理期 <span class="close" onclick="closeModal()">×</span></h2>
+    <div class="field" style="background:var(--card);border-radius:12px;padding:12px;font-size:13px;">
+      <div style="margin-bottom:6px;">状态：<b style="color:${now?'var(--main-dark)':'var(--text-soft)'}">${now?'正在生理期':'不在生理期'}</b></div>
+      ${info.next?`<div>预计下次：${info.next}（还有 ${info.days} 天）</div>`:''}
+    </div>
+    <div class="field"><label>上次开始日期</label><input type="date" id="periodStart" value="${p.lastStart||''}"></div>
+    <div class="field"><label>周期（天）</label><input type="number" id="periodCycle" value="${p.cycle||28}"></div>
+    <div class="field"><label>持续（天）</label><input type="number" id="periodDur" value="${p.duration||5}"></div>
+    <button class="btn" onclick="savePeriod()">保存</button>
+    <button class="btn ghost" onclick="markPeriodToday()">${p.manualOn?'取消「今天来了」':'标记「今天来了」'}</button>
+  `;
+  openModal();
+}
+function savePeriod(){
+  if(!Current) return;
+  Current.period.lastStart=document.getElementById('periodStart').value||null;
+  Current.period.cycle=parseInt(document.getElementById('periodCycle').value)||28;
+  Current.period.duration=parseInt(document.getElementById('periodDur').value)||5;
+  Current.period.manualOn=false;
+  saveGame();closeModal();
+  if(isPeriodNow()&&API.ready)proactiveTalk('period').catch(()=>{});
+}
+function markPeriodToday(){
+  if(!Current) return;
+  Current.period.manualOn=!Current.period.manualOn;
+  if(Current.period.manualOn)Current.period.lastStart=todayStr();
+  saveGame();openPeriod();
+  if(Current.period.manualOn&&API.ready)proactiveTalk('period').catch(()=>{});
+}
+
+/* ============================================================
+   纪念日
+   ============================================================ */
+function openAnniv(){
+  if(!Current) return;
+  const modal=document.getElementById('modalContent');
+  modal.innerHTML=`
+    <h2>纪念日 <span class="close" onclick="closeModal()">×</span></h2>
+    <p style="font-size:12px;color:var(--text-soft);margin-bottom:12px;">写下你们的重要日子，到那天他会记得。</p>
+    <div id="annivList">
+      ${Current.anniversaries.length===0?'<p style="color:var(--text-soft);font-size:13px;">还没有纪念日。</p>':''}
+      ${Current.anniversaries.map((a,i)=>`
+        <div class="shop-item">
+          <div class="info">${a.emoji||'💖'} ${a.name||'纪念日'}<small>${a.date}</small></div>
+          <button onclick="removeAnniv(${i})">删除</button>
+        </div>
+      `).join('')}
+    </div>
+    <div class="field"><label>名称</label><input id="annivName" placeholder="例：第一次见面"></div>
+    <div class="field"><label>日期</label><input type="date" id="annivDate" value="${todayStr()}"></div>
+    <div class="field"><label>表情</label><input id="annivEmoji" value="💖" maxlength="4"></div>
+    <button class="btn" onclick="addAnniv()">+ 添加</button>
+  `;
+  openModal();
+}
+function addAnniv(){
+  if(!Current) return;
+  const name=document.getElementById('annivName').value.trim();
+  const date=document.getElementById('annivDate').value;
+  const emoji=document.getElementById('annivEmoji').value.trim()||'💖';
+  if(!name||!date)return;
+  Current.anniversaries.push({name,date,emoji});
+  saveGame();openAnniv();
+}
+function removeAnniv(i){
+  if(!Current) return;
+  Current.anniversaries.splice(i,1);
+  saveGame();openAnniv();
+}
+function checkAnniv(){
+  if(!Current) return;
+  const today=todayStr();
+  const hit=Current.anniversaries.find(a=>a.date===today);
+  if(!hit)return;
+  if(Current.__annivDone===today)return;
+  Current.__annivDone=today;
+  setTimeout(()=>{
+    say(`今天是「${hit.name}」呢……${hit.emoji}`,'them');
+    Current.stats.mood=Math.min(100,Current.stats.mood+10);
+    addRelationValue(5);
+    updateStats();saveGameDebounced();
+  }, 2000);
+}
+setInterval(checkAnniv, 600000);
+
+/* ============================================================
+   聊天记录
+   ============================================================ */
+function openLog(){
+  if(!Current) return;
+  const modal=document.getElementById('modalContent');
+  const log=Current.chatLog.slice(-200).reverse();
+  modal.innerHTML=`
+    <h2>聊天记录 <span class="close" onclick="closeModal()">×</span></h2>
+    ${log.length===0?'<p style="color:var(--text-soft);font-size:13px;">还没有聊天记录。</p>':''}
+    ${log.map(m=>`
+      <div class="log-item ${m.role==='user'?'you':''}">
+        <div class="who">${m.role==='user'?'你':Current.name}</div>
+        <div class="txt">${m.text}</div>
+      </div>
+    `).join('')}
+  `;
+  openModal();
+}
+
+/* ============================================================
+   小游戏
+   ============================================================ */
+function openGameMenu(){
+  const modal=document.getElementById('modalContent');
+  modal.innerHTML=`
+    <h2>小游戏 <span class="close" onclick="closeModal()">×</span></h2>
+    <div class="game-item" onclick="startGame('turtle')">
+      <div><div class="g-name">🐢 海龟汤</div><div class="g-desc">他给一个诡异故事，你来猜真相</div></div>
+      <div class="g-arrow">›</div>
+    </div>
+    <div class="game-item" onclick="startGame('bomb')">
+      <div><div class="g-name">💣 数字炸弹</div><div class="g-desc">1-100 里有个雷，轮流猜</div></div>
+      <div class="g-arrow">›</div>
+    </div>
+    <div class="game-item" onclick="startGame('twenty')">
+      <div><div class="g-name">❓ 20 问</div><div class="g-desc">他想了样东西，你问 20 个问题猜</div></div>
+      <div class="g-arrow">›</div>
+    </div>
+    <div class="game-item" onclick="startGame('story')">
+      <div><div class="g-name">📖 接龙编故事</div><div class="g-desc">你一句他一句，一起编故事</div></div>
+      <div class="g-arrow">›</div>
+    </div>
+  `;
+  openModal();
+}
+function startGame(type){
+  if(!API.ready){ needApiTip(); return; }
+  if(!Current) return;
+  Current.game = { active:true, type:type, subState:{} };
+  if(type==='turtle') initTurtleGame();
+  else if(type==='bomb') initBombGame();
+  else if(type==='twenty') initTwentyGame();
+  else if(type==='story') initStoryGame();
+}
+async function initTurtleGame(){
+  const modal=document.getElementById('modalContent');
+  modal.innerHTML=`
+    <h2>🐢 海龟汤 <span class="close" onclick="closeModal()">×</span></h2>
+    <div class="game-panel">
+      <div class="g-status">正在生成谜题…</div>
+      <div class="g-content" id="turtleStory"></div>
+      <div class="g-log" id="turtleLog"></div>
+      <div class="g-input-row">
+        <input id="turtleInput" placeholder="问一个是/不是的问题…">
+        <button onclick="turtleAsk()">问</button>
+      </div>
+      <div class="g-btn-row">
+        <button onclick="turtleReveal()">揭晓答案</button>
+        <button onclick="closeGame()">结束</button>
+      </div>
+    </div>
+  `;
+  openModal();
+  try{
+    const reply = await callAI([
+      {role:'system',content:'你是一个海龟汤游戏主持人。只输出JSON，不要别的文字。'},
+      {role:'user',content:'请生成一个海龟汤谜题。输出 JSON：{"story":"故事开头（1-2句，诡异但不恐怖，适合情侣玩）","answer":"真相（1-2句）"}。'}
+    ], {maxTokens:300, temperature:0.9});
+    let story='', answer='';
+    try{
+      const j = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]);
+      story = j.story || '一个人走进酒吧，点了一杯水，酒保却拔出了一把枪。';
+      answer = j.answer || '他打嗝，酒保用枪吓他。';
+    }catch(e){
+      story = '一个人走进酒吧，点了一杯水，酒保却拔出了一把枪。';
+      answer = '他打嗝，酒保用枪吓他。';
+    }
+    Current.game.subState.story = story;
+    Current.game.subState.answer = answer;
+    Current.game.subState.log = [];
+    document.getElementById('turtleStory').textContent = story;
+    document.getElementById('turtleLog').textContent = '';
+  }catch(e){
+    document.getElementById('turtleStory').textContent = '生成失败：' + e.message;
+  }
+}
+async function turtleAsk(){
+  const input = document.getElementById('turtleInput');
+  const q = input.value.trim();
+  if(!q||!Current||!Current.game||!Current.game.subState)return;
+  const s = Current.game.subState;
+  s.log = s.log || [];
+  s.log.push('你：'+q);
+  document.getElementById('turtleLog').textContent = s.log.join('\n');
+  input.value = '';
+  try{
+    const reply = await callAI([
+      {role:'system',content:`你是海龟汤主持人。谜题：${s.story}。真相：${s.answer}。玩家会问是/不是问题，你只能回答"是"、"不是"、"无关"三者之一，不要多说。`},
+      {role:'user',content:q}
+    ], {maxTokens:20, temperature:0.1});
+    s.log.push('他：'+(reply||'无关').trim());
+    document.getElementById('turtleLog').textContent = s.log.join('\n');
+  }catch(e){
+    s.log.push('他：（网络出错）');
+    document.getElementById('turtleLog').textContent = s.log.join('\n');
+  }
+}
+function turtleReveal(){
+  if(!Current||!Current.game||!Current.game.subState)return;
+  const s = Current.game.subState;
+  s.log = s.log || [];
+  s.log.push('【真相】'+s.answer);
+  document.getElementById('turtleLog').textContent = s.log.join('\n');
+}
+async function initBombGame(){
+  const target = Math.floor(Math.random()*100)+1;
+  Current.game.subState = { target, low: 1, high: 100, turn: 'user', log: [] };
+  const modal=document.getElementById('modalContent');
+  modal.innerHTML=`
+    <h2>💣 数字炸弹 <span class="close" onclick="closeModal()">×</span></h2>
+    <div class="game-panel">
+      <div class="g-status" id="bombRange">范围：1 - 100</div>
+      <div class="g-content" id="bombHint">你猜一个数字，我猜一个，谁先踩到雷谁输。</div>
+      <div class="g-log" id="bombLog"></div>
+      <div class="g-input-row">
+        <input id="bombInput" type="number" min="1" max="100" placeholder="猜 1-100">
+        <button onclick="bombGuess()">猜</button>
+      </div>
+      <div class="g-btn-row">
+        <button onclick="closeGame()">结束</button>
+      </div>
+    </div>
+  `;
+  openModal();
+}
+async function bombGuess(){
+  if(!Current||!Current.game||!Current.game.subState)return;
+  const s = Current.game.subState;
+  if(s.turn !== 'user')return;
+  const input = document.getElementById('bombInput');
+  const n = parseInt(input.value);
+  if(!n || n<s.low || n>s.high){
+    document.getElementById('bombHint').textContent = `请输入 ${s.low}-${s.high} 之间的数字`;
+    return;
+  }
+  input.value = '';
+  s.log = s.log || [];
+  s.log.push(`你猜：${n}`);
+  if(n === s.target){
+    s.log.push(`💥 踩到炸弹了！数字是 ${s.target}，你输了。`);
+    document.getElementById('bombLog').textContent = s.log.join('\n');
+    document.getElementById('bombHint').textContent = '你输了！点结束退出。';
+    s.turn = 'over';
+    return;
+  }
+  if(n < s.target) s.low = n+1; else s.high = n-1;
+  document.getElementById('bombRange').textContent = `范围：${s.low} - ${s.high}`;
+  document.getElementById('bombLog').textContent = s.log.join('\n');
+  s.turn = 'ai';
+  document.getElementById('bombHint').textContent = '他想一想…';
+  setTimeout(()=>{
+    const aiGuess = Math.floor(Math.random()*(s.high - s.low + 1)) + s.low;
+    s.log.push(`他猜：${aiGuess}`);
+    if(aiGuess === s.target){
+      s.log.push(`💥 踩到炸弹了！数字是 ${s.target}，他输了。`);
+      document.getElementById('bombLog').textContent = s.log.join('\n');
+      document.getElementById('bombHint').textContent = '他输了！点结束退出。';
+      s.turn = 'over';
+      addRelationValue(2); saveGame();
+      return;
+    }
+    if(aiGuess < s.target) s.low = aiGuess+1; else s.high = aiGuess-1;
+    document.getElementById('bombRange').textContent = `范围：${s.low} - ${s.high}`;
+    document.getElementById('bombLog').textContent = s.log.join('\n');
+    document.getElementById('bombHint').textContent = '轮到你了';
+    s.turn = 'user';
+  }, 800);
+}
+async function initTwentyGame(){
+  Current.game.subState = { item: null, questions: 0, max: 20, log: [], turn: 'user' };
+  const modal=document.getElementById('modalContent');
+  modal.innerHTML=`
+    <h2>❓ 20 问 <span class="close" onclick="closeModal()">×</span></h2>
+    <div class="game-panel">
+      <div class="g-status" id="twentyStatus">他正在想一个东西…</div>
+      <div class="g-content" id="twentyHint">你可以问 20 个是/不是问题，猜出他想的是什么。</div>
+      <div class="g-log" id="twentyLog"></div>
+      <div class="g-input-row">
+        <input id="twentyInput" placeholder="问一个是/不是问题…">
+        <button onclick="twentyAsk()">问</button>
+      </div>
+      <div class="g-btn-row">
+        <button onclick="twentyGuessMode()">我要猜答案</button>
+        <button onclick="closeGame()">结束</button>
+      </div>
+    </div>
+  `;
+  openModal();
+  try{
+    const reply = await callAI([
+      {role:'system',content:'你是一个 20 问游戏主持人。只输出 JSON。'},
+      {role:'user',content:'请想一个常见的物品（日常、不要太冷门）。输出 JSON：{"item":"物品名"}。'}
+    ], {maxTokens:50, temperature:1.0});
+    let item='苹果';
+    try{
+      const j = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]);
+      item = j.item || '苹果';
+    }catch(e){}
+    Current.game.subState.item = item;
+    document.getElementById('twentyStatus').textContent = '他已经想好了。开始问吧（还剩 20 个问题）';
+  }catch(e){
+    document.getElementById('twentyStatus').textContent = '生成失败：'+e.message;
+  }
+}
+async function twentyAsk(){
+  if(!Current||!Current.game||!Current.game.subState)return;
+  const s = Current.game.subState;
+  if(!s.item)return;
+  if(s.questions >= s.max){
+    document.getElementById('twentyStatus').textContent = '20 个问题用完了，点「我要猜答案」';
+    return;
+  }
+  const input = document.getElementById('twentyInput');
+  const q = input.value.trim();
+  if(!q)return;
+  input.value = '';
+  s.questions++;
+  s.log = s.log || [];
+  s.log.push(`你问：${q}`);
+  document.getElementById('twentyLog').textContent = s.log.join('\n');
+  try{
+    const reply = await callAI([
+      {role:'system',content:`你想的东西是：${s.item}。玩家会问是/不是问题，你只能回答"是"、"不是"、"无关"。不要多说。`},
+      {role:'user',content:q}
+    ], {maxTokens:15, temperature:0.1});
+    s.log.push('他答：'+(reply||'无关').trim());
+    document.getElementById('twentyLog').textContent = s.log.join('\n');
+  }catch(e){
+    s.log.push('他答：（网络出错）');
+    document.getElementById('twentyLog').textContent = s.log.join('\n');
+  }
+  document.getElementById('twentyStatus').textContent = `还剩 ${s.max - s.questions} 个问题`;
+}
+async function twentyGuessMode(){
+  if(!Current||!Current.game||!Current.game.subState)return;
+  const s = Current.game.subState;
+  if(!s.item)return;
+  const guess = prompt('你觉得他想的什么？');
+  if(!guess)return;
+  s.log = s.log || [];
+  s.log.push(`你猜：${guess}`);
+  if(guess.trim() === s.item || s.item.includes(guess.trim()) || guess.trim().includes(s.item)){
+    s.log.push(`🎉 猜对了！就是「${s.item}」。`);
+    addRelationValue(3); saveGame();
+  }else{
+    s.log.push(`❌ 不对。他想的是「${s.item}」。`);
+  }
+  document.getElementById('twentyLog').textContent = s.log.join('\n');
+  s.item = null;
+}
+async function initStoryGame(){
+  Current.game.subState = { turns: [], turn: 'user' };
+  const modal=document.getElementById('modalContent');
+  modal.innerHTML=`
+    <h2>📖 接龙编故事 <span class="close" onclick="closeModal()">×</span></h2>
+    <div class="game-panel">
+      <div class="g-status">你一句，他一句，一起编一个故事</div>
+      <div class="g-log" id="storyLog" style="min-height:150px;"></div>
+      <div class="g-input-row">
+        <input id="storyInput" placeholder="你写第一句…">
+        <button onclick="storySend()">发</button>
+      </div>
+      <div class="g-btn-row">
+        <button onclick="storyEnd()">结束并查看全篇</button>
+        <button onclick="closeGame()">退出</button>
+      </div>
+    </div>
+  `;
+  openModal();
+}
+async function storySend(){
+  if(!Current||!Current.game||!Current.game.subState)return;
+  const s = Current.game.subState;
+  const input = document.getElementById('storyInput');
+  const text = input.value.trim();
+  if(!text)return;
+  input.value = '';
+  s.turns.push('你：'+text);
+  document.getElementById('storyLog').textContent = s.turns.join('\n');
+  try{
+    const history = s.turns.join('\n');
+    const reply = await callAI([
+      {role:'system',content:'你们在玩接龙编故事。根据前面的内容，接一句（1-2句），延续故事，别结束太快。只输出你要接的话。'},
+      {role:'user',content:'当前故事：\n'+history+'\n\n请接一句。'}
+    ], {maxTokens:120, temperature:0.9});
+    if(reply){
+      s.turns.push('他：'+reply.trim());
+      document.getElementById('storyLog').textContent = s.turns.join('\n');
+    }
+  }catch(e){
+    s.turns.push('他：（网络出错）');
+    document.getElementById('storyLog').textContent = s.turns.join('\n');
+  }
+}
+function storyEnd(){
+  if(!Current||!Current.game||!Current.game.subState)return;
+  const s = Current.game.subState;
+  alert('你们一起编的故事：\n\n' + s.turns.join('\n'));
+}
+function closeGame(){
+  if(Current) Current.game = { active:false, type:null, subState:null };
+  closeModal();
+}
+
+/* ============================================================
+   角色切换
+   ============================================================ */
+function openCharSwitch(){
+  const modal=document.getElementById('modalContent');
+  modal.innerHTML=`
+    <h2>切换角色 <span class="close" onclick="closeModal()">×</span></h2>
+    ${GlobalState.characters.map(c=>{
+      const isActive = c.id === GlobalState.currentCharId;
+      const img = (c.outfits&&c.outfits[c.currentOutfitIndex]) ? c.outfits[c.currentOutfitIndex].img : c.image;
+      return `<div class="char-list-item ${isActive?'active':''}" onclick="switchCharacter('${c.id}')">
+        ${img ? `<img src="${img}">` : `<div class="avatar-placeholder">🧑</div>`}
+        <div class="info">
+          <div class="n">${c.name}${isActive?' （当前）':''}</div>
+          <div class="d">${getRelationName(c.relationType)} · 好感 ${Math.round(c.relationValue)}</div>
+        </div>
+        ${GlobalState.characters.length>1 ? `<button class="del-btn" onclick="event.stopPropagation();deleteCharacter('${c.id}')">删除</button>` : ''}
+      </div>`;
+    }).join('')}
+    <button class="btn" onclick="createCharacter()">+ 新建角色</button>
+  `;
+  openModal();
+}
+function switchCharacter(id){
+  if(id === GlobalState.currentCharId) { closeModal(); return; }
+  saveGame();
+  GlobalState.currentCharId = id;
+  Current = GlobalState.characters.find(c=>c.id===id);
+  if(!Current){
+    Current = newCharacterData(id);
+    GlobalState.characters.push(Current);
+  }
+  const box=document.getElementById('bubbles');
+  if(box) box.innerHTML='';
+  pickRandomOutfit();
+  renderCharacter(); renderPet(); updateStats(); updateRelationUI(); updateTrackBar();
+  saveGame(); closeModal();
+  say(`已切换到「${Current.name}」。`,'tip');
+}
+function createCharacter(){
+  const id = 'c_' + Date.now();
+  const c = newCharacterData(id);
+  c.name = '新角色';
+  GlobalState.characters.push(c);
+  saveGame();
+  switchCharacter(id);
+}
+function deleteCharacter(id){
+  if(GlobalState.characters.length <= 1){
+    say('至少要保留一个角色。','tip'); return;
+  }
+  if(!confirm('确定要删除这个角色吗？聊天记录、好感、服装都会一起删掉。')) return;
+  GlobalState.characters = GlobalState.characters.filter(c=>c.id!==id);
+  if(GlobalState.currentCharId === id){
+    GlobalState.currentCharId = GlobalState.characters[0].id;
+    Current = GlobalState.characters[0];
+  }
+  saveGame();
+  const box=document.getElementById('bubbles');
+  if(box) box.innerHTML='';
+  renderCharacter(); renderPet(); updateStats(); updateRelationUI(); updateTrackBar();
+  openCharSwitch();
+}
+
+/* ============================================================
+   设置（★ 核心改造：草稿机制 ★）
+   ============================================================ */
+function openSettings(){
+  if(!Current) return;
+  // 如果草稿不存在（第一次打开），从当前状态初始化
+  if(!settingsDraft) initSettingsDraft();
+  isSettingsOpen = true;
+
+  // 用草稿对象 d 来渲染
+  const d = settingsDraft;
+  const c = Current;
+
+  const modal=document.getElementById('modalContent');
+  const isKnown = KNOWN_MODELS.some(m=>m.id === d.apiModel);
+  modal.innerHTML=`
+    <h2>设置 <span class="close" onclick="closeSettings()">×</span></h2>
+    <div class="field"><label>上传他的图片</label>
+      <input type="file" id="setUpload" accept="image/*" onchange="handleCharUpload(event)">
+      ${d.image?'<button class="btn ghost" onclick="removeCharImage()">删除角色图</button>':''}
+    </div>
+    <div class="field"><label>上传背景图</label>
+      <input type="file" id="setBg" accept="image/*" onchange="handleBgUpload(event)">
+      ${d.background_img?'<button class="btn ghost" onclick="removeBgImage()">删除背景图</button>':''}
+    </div>
+    <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
+    <div class="field"><label>他叫什么</label><input id="setName" value="${d.name}" oninput="settingsDraft.name=this.value"></div>
+    <div class="field"><label>他叫你什么</label><input id="setCall" value="${d.callYou}" oninput="settingsDraft.callYou=this.value"></div>
+    <div class="field"><label>角色 / 身份</label>
+      <input id="setRole" value="${d.role||''}" placeholder="例：某公司的 CEO、隔壁邻居" oninput="settingsDraft.role=this.value"></div>
+    <div class="field"><label>性格（人设最高优先级）</label>
+      <textarea id="setPersonality" placeholder="例：外冷内热，嘴硬但会偷偷关心我。" oninput="settingsDraft.personality=this.value">${d.personality||''}</textarea></div>
+    <div class="field"><label>背景故事</label>
+      <textarea id="setBackground" placeholder="例：他从小在国外长大……" oninput="settingsDraft.background=this.value">${d.background||''}</textarea></div>
+    <div class="field"><label>世界观</label>
+      <textarea id="setWorldview" placeholder="例：现代都市，有隐藏的异能者……" oninput="settingsDraft.worldview=this.value">${d.worldview||''}</textarea></div>
+    <div class="field"><label>说话风格</label>
+      <input id="setStyle" value="${d.style||''}" placeholder="例：简洁、冷淡、偶尔毒舌" oninput="settingsDraft.style=this.value"></div>
+    <div class="field"><label>语言</label>
+      <select id="setLanguage" onchange="settingsDraft.language=this.value">
+        ${['中文','English','日本語','한국어'].map(l=>
+          `<option value="${l}" ${d.language===l?'selected':''}>${l}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field"><label>开场白</label>
+      <input id="setIntro" value="${d.intro||''}" placeholder="他见你说的第一句话" oninput="settingsDraft.intro=this.value"></div>
+    <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
+    <div class="field"><label>我们的关系（只能选一个）</label>
+      <select id="setRelation" onchange="settingsDraft.relationType=this.value">
+        ${REL_TYPES.map(rt=>`<option value="${rt.key}" ${d.relationType===rt.key?'selected':''}>${rt.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field"><label>关系好感度（0-100）</label>
+      <input type="number" id="setRelationValue" min="0" max="100" value="${Math.round(d.relationValue)}" oninput="settingsDraft.relationValue=parseInt(this.value)||0">
+    </div>
+    <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
+    <div class="field"><label>天气城市（留空 = 自动定位，全局）</label>
+      <input id="setWeatherCity" value="${d.weatherManualCity||''}" placeholder="例：北京、上海、广州" oninput="settingsDraft.weatherManualCity=this.value">
+      <p style="font-size:11px;color:var(--text-soft);margin-top:6px;">当前：${GlobalState.weatherCity||'未知'} · ${GlobalState.weather}</p>
+      <button class="btn ghost" onclick="collectSettingsDraft();updateWeatherReal(true).then(()=>openSettings())">🔄 立即刷新天气</button>
+    </div>
+    <button class="btn ghost" onclick="collectSettingsDraft();openLorebook()">📖 编辑世界书（${(d.lorebook||[]).length} 条）</button>
+    <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
+    <div class="field"><label>表情图</label>
+      <div id="faceList">
+        ${(d.images||[]).map((im,i)=>`
+          <div class="face-item">
+            <img src="${im.img}">
+            <input value="${im.label||''}" placeholder="备注，如：开心" onchange="settingsDraft.images[${i}].label=this.value.trim()">
+            <button onclick="collectSettingsDraft();removeFace(${i})">删除</button>
+          </div>
+        `).join('')}
+        ${(d.images||[]).length===0?'<p style="color:var(--text-soft);font-size:12px;">还没有表情图。</p>':''}
+      </div>
+      <input type="file" id="faceUpload" accept="image/*" multiple onchange="handleFaceUpload(event)">
+    </div>
+    <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
+    <div class="field"><label>服装（每次打开随机一套）</label>
+      <div id="outfitList">
+        ${(d.outfits||[]).map((o,i)=>`
+          <div class="face-item">
+            <img src="${o.img}">
+            <input value="${o.label||''}" placeholder="备注，如：睡衣" onchange="settingsDraft.outfits[${i}].label=this.value.trim()">
+            ${d.currentOutfitIndex === i ? '<span class="tag-preview">当前</span>' : ''}
+            <button onclick="collectSettingsDraft();removeOutfit(${i})">删除</button>
+          </div>
+        `).join('')}
+        ${(d.outfits||[]).length===0?'<p style="color:var(--text-soft);font-size:12px;">还没有服装图。</p>':''}
+      </div>
+      <input type="file" id="outfitUpload" accept="image/*" multiple onchange="handleOutfitUpload(event)">
+    </div>
+    <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
+    <div class="field"><label>我的形象（全局）</label>
+      <input type="file" id="userUpload" accept="image/*" onchange="handleUserUpload(event)">
+      <label style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+        <input type="checkbox" id="userShowChk" ${d.userShow?'checked':''}
+          onchange="settingsDraft.userShow=this.checked">
+        <span>在舞台上显示我的形象</span>
+      </label>
+      ${d.userImage?'<button class="btn ghost" onclick="collectSettingsDraft();removeUserImage()">删除我的形象</button>':''}
+    </div>
+    <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
+    <div class="field"><label>API 地址（全局）</label>
+      <input id="setApiUrl" value="${d.apiUrl}" placeholder="https://api.blanka.cc/v1/chat/completions" oninput="settingsDraft.apiUrl=this.value">
+    </div>
+    <div class="field"><label>API Key</label>
+      <input id="setApiKey" value="${d.apiKey}" placeholder="sk-..." oninput="settingsDraft.apiKey=this.value">
+    </div>
+    <div class="field"><label>模型</label>
+      <select id="setApiModelSelect" onchange="onModelChange()">
+        ${KNOWN_MODELS.map(m=>`<option value="${m.id}" ${d.apiModel===m.id?'selected':''}>${m.label}</option>`).join('')}
+        <option value="__custom__" ${!isKnown?'selected':''}>自定义</option>
+      </select>
+      <input id="setApiModelCustom" value="${d.apiModel}" placeholder="手填模型名" style="margin-top:6px;${isKnown?'display:none':''}" oninput="settingsDraft.apiModel=this.value">
+    </div>
+    <div class="field">
+      <label style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="useFallbackChk" ${d.useFallback?'checked':''}
+          onchange="settingsDraft.useFallback=this.checked">
+        <span>主模型失败时，自动试备用模型</span>
+      </label>
+      <label style="margin-top:6px;">备用模型（逗号分隔）</label>
+      <input id="setFallback" value="${(d.fallbackModels||[]).join(',')}" placeholder="例：deepseek-v4-pro,deepseek-v4-flash" oninput="settingsDraft.fallbackModels=this.value.split(',').map(s=>s.trim()).filter(Boolean)">
+    </div>
+    <button class="btn ghost" onclick="collectSettingsDraft();testConnection()">🔌 测试连接</button>
+    <div id="testBox"></div>
+    <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
+    <div class="field"><label>主题色（选一个主色，其他自动派生）</label>
+      <div class="main-palette">
+        ${MAIN_PALETTE.map(cl=>`<div class="main-swatch ${d.mainColor===cl?'active':''}"
+          style="background:${cl}" onclick="pickMainColor('${cl}')"></div>`).join('')}
+      </div>
+      <label style="font-size:12px;">自定义主题色</label>
+      <input type="color" value="${d.mainColor||'#ff8fab'}"
+             onchange="pickMainColor(this.value)"
+             style="width:100%;height:48px;cursor:pointer;border-radius:12px;">
+    </div>
+    <div class="field"><label>背景色（独立）</label>
+      <div class="bg-palette">
+        ${['#ffe0e8','#fff5cc','#d8ecff','#d8f0dc','#e8d8ff','#f0e0d0','#ffd8d8','#d8f0f0','#ffd8f0','#d8ffe0','#f0e8d8','#d8d8ff'].map(cl=>`<div class="bg-swatch ${d.bgColor===cl?'active':''}"
+          style="background:${cl}" onclick="setBgColor('${cl}')"></div>`).join('')}
+      </div>
+      <input type="color" value="${d.bgColor||'#ffe0e8'}"
+             onchange="setBgColor(this.value)"
+             style="width:100%;height:48px;cursor:pointer;border-radius:12px;">
+    </div>
+    <button class="btn" onclick="saveSettings()">保存设置</button>
+    <button class="btn ghost" onclick="collectSettingsDraft();openPetSetup()">宠物</button>
+    <button class="btn ghost" onclick="collectSettingsDraft();openNotice(true)">📢 查看公告</button>
+    <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
+    <button class="btn ghost" onclick="exportSave()">📤 导出存档</button>
+    <input type="file" id="importFile" style="display:none" onchange="importSave(event)">
+    <button class="btn ghost" onclick="document.getElementById('importFile').click()">📥 导入存档</button>
+    <button class="btn ghost" onclick="resetAll()">重新开始（清空存档）</button>
+  `;
+  openModal();
+}
+
+/* 关闭设置：丢弃草稿 */
+function closeSettings(){
+  collectSettingsDraft();
+  // 把草稿里的图也临时还原到真实状态，避免预览残留
+  if(settingsDraft){
+    if(Current){
+      // 注意：这里把预览期间临时改过的图还原为上次真实保存的内容
+      // 简单做法：重新 loadGame 一次，再刷新渲染
+    }
+  }
+  isSettingsOpen = false;
+  settingsDraft = null;
+  closeModal();
+  // 从存档重新读一次，把预览期间的临时改动全部还原
+  loadGame().then(()=>{
+    Current = GlobalState.characters.find(c=>c.id===GlobalState.currentCharId) || GlobalState.characters[0];
+    applyMainColor(GlobalState.mainColor);
+    renderBackground(); renderCharacter(); renderUser(); renderPet();
+    updateStats(); updateRelationUI();
+  });
+}
+
+function onModelChange(){
+  collectSettingsDraft();
+  const sel=document.getElementById('setApiModelSelect');
+  const input=document.getElementById('setApiModelCustom');
+  if(!sel||!input)return;
+  if(sel.value==='__custom__'){ input.style.display='block'; settingsDraft.apiModel = input.value.trim() || ''; }
+  else{ input.style.display='none'; input.value=sel.value; settingsDraft.apiModel = sel.value; }
+}
+
+/* 删除图（只改草稿，不落盘） */
+function removeCharImage(){
+  collectSettingsDraft();
+  if(settingsDraft) settingsDraft.image = null;
+  if(Current) Current.image = null;
+  renderCharacter(); openSettings();
+}
+function removeBgImage(){
+  collectSettingsDraft();
+  if(settingsDraft) settingsDraft.background_img = null;
+  GlobalState.background = null;
+  renderBackground(); openSettings();
+}
+function removeUserImage(){
+  collectSettingsDraft();
+  if(settingsDraft){ settingsDraft.userImage = null; settingsDraft.userShow = false; }
+  GlobalState.userImage = null; GlobalState.userShow = false;
+  renderUser(); openSettings();
+}
+function removeFace(i){
+  collectSettingsDraft();
+  if(settingsDraft) settingsDraft.images.splice(i,1);
+  if(Current) Current.images.splice(i,1);
+  openSettings();
+}
+
+/* 主题色 / 背景色：立即预览 + 存入草稿 + 不关面板 */
+function pickMainColor(hex){
+  collectSettingsDraft();
+  if(settingsDraft) settingsDraft.mainColor = hex;
+  applyMainColor(hex);        // 立即预览
+  openSettings();             // 重绘，但用草稿渲染，输入不丢
+}
+function setBgColor(hex){
+  collectSettingsDraft();
+  if(settingsDraft) settingsDraft.bgColor = hex;
+  applyBgColor(hex);
+  openSettings();
+}
+
+/* 保存设置：把草稿正式写入 Current / API / GlobalState，然后落盘 */
+function saveSettings(){
+  if(!settingsDraft) return;
+  collectSettingsDraft();
+  const d = settingsDraft;
+
+  // ---- 角色资料 ----
+  Current.name = d.name || '他';
+  Current.callYou = d.callYou || '你';
+  Current.role = d.role;
+  Current.personality = d.personality;
+  Current.background = d.background;
+  Current.worldview = d.worldview;
+  Current.style = d.style;
+  Current.language = d.language;
+  Current.intro = d.intro;
+  Current.relationType = d.relationType;
+  Current.relationValue = Math.max(0, Math.min(100, parseInt(d.relationValue)||0));
+
+  // ---- 图片 / 表情 / 服装 / 宠物 / 世界书 ----
+  Current.image = d.image;
+  Current.images = d.images;
+  Current.outfits = d.outfits;
+  Current.currentOutfitIndex = d.currentOutfitIndex;
+  Current.pet = d.pet;
+  Current.lorebook = d.lorebook;
+
+  // ---- 全局 ----
+  GlobalState.background = d.background_img;
+  GlobalState.userImage = d.userImage;
+  GlobalState.userShow = d.userShow;
+  GlobalState.mainColor = d.mainColor;
+  GlobalState.bgColor = d.bgColor;
+
+  // ---- 天气城市 ----
+  const newCity = (d.weatherManualCity || '').trim();
+  if(newCity !== GlobalState.weatherManualCity){
+    GlobalState.weatherManualCity = newCity;
+    GlobalState.weatherLat = null; GlobalState.weatherLon = null; GlobalState.weatherUpdatedAt = 0;
+    updateWeatherReal(true);
+  }
+
+  // ---- API ----
+  API.baseUrl = d.apiUrl;
+  API.key = d.apiKey;
+  API.model = d.apiModel;
+  GlobalState.useFallback = d.useFallback;
+  GlobalState.fallbackModels = d.fallbackModels;
+  saveAPIConfig();
+
+  // ---- 落盘 ----
+  saveGame();
+  // 主题色已经实时应用，这里再应用一次确保一致
+  applyMainColor(GlobalState.mainColor);
+
+  // 清空草稿
+  settingsDraft = null;
+  isSettingsOpen = false;
+  closeModal();
+
+  updateStats(); updateRelationUI();
+  renderBackground(); renderCharacter(); renderUser(); renderPet();
+
+  if(API.ready) say('设置已保存。','them');
+  else say('已保存。别忘了填 API 哦。','tip');
+}
+
+function resetAll(){
+  if(!confirm('确定要清空存档、重新开始吗？'))return;
+  localStorage.removeItem('dream_save');localStorage.removeItem('dream_api');
+  localStorage.removeItem('dream_notice_seen');
+  try{ indexedDB.deleteDatabase(DB_NAME); }catch(e){}
+  location.reload();
+}
+
+/* ============================================================
+   导出 / 导入存档
+   ============================================================ */
+function exportSave(){
+  const payload = {
+    app: 'yunqi', version: GlobalState.version,
+    exportedAt: new Date().toISOString(),
+    api: {baseUrl:API.baseUrl, key:API.key, model:API.model,
+      fallbackModels:GlobalState.fallbackModels, useFallback:GlobalState.useFallback},
+    global: {
+      mainColor: GlobalState.mainColor, bgColor: GlobalState.bgColor,
+      background: GlobalState.background, userImage: GlobalState.userImage,
+      userShow: GlobalState.userShow, userX: GlobalState.userX, userY: GlobalState.userY,
+      weather: GlobalState.weather, weatherManualCity: GlobalState.weatherManualCity,
+      currentCharId: GlobalState.currentCharId, characters: GlobalState.characters,
+      lastTick: lastTick,
+    }
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `yunqi_save_${todayStr()}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function importSave(e){
+  const file = e.target.files[0]; if(!file)return;
+  const reader = new FileReader();
+  reader.onload = async ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if(!data.global && !data.save) throw new Error('文件格式不正确');
+      if(!confirm('导入会覆盖当前存档，确定吗？')) return;
+
+      if(data.api){
+        API.baseUrl = data.api.baseUrl || '';
+        API.key = data.api.key || '';
+        API.model = data.api.model || '';
+        if(data.api.fallbackModels) GlobalState.fallbackModels = data.api.fallbackModels;
+        if(typeof data.api.useFallback==='boolean') GlobalState.useFallback = data.api.useFallback;
+        saveAPIConfig();
+      }
+
+      if(data.global){
+        GlobalState.mainColor = data.global.mainColor || '#ff8fab';
+        GlobalState.bgColor = data.global.bgColor || '#ffe0e8';
+        GlobalState.background = data.global.background || null;
+        GlobalState.userImage = data.global.userImage || null;
+        GlobalState.userShow = !!data.global.userShow;
+        GlobalState.userX = typeof data.global.userX === 'number' ? data.global.userX : 0.5;
+        GlobalState.userY = typeof data.global.userY === 'number' ? data.global.userY : 0.88;
+        GlobalState.weather = data.global.weather || '晴';
+        GlobalState.weatherManualCity = data.global.weatherManualCity || '';
+        GlobalState.currentCharId = data.global.currentCharId || null;
+
+        const rawChars = Array.isArray(data.global.characters) ? data.global.characters : [];
+        GlobalState.characters = rawChars.map(raw => {
+          const c = newCharacterData(raw.id || ('c_' + Date.now() + '_' + Math.random().toString(36).slice(2,6)));
+          for(const k in raw){ if(k in c) c[k] = raw[k]; }
+          if(!c.pet || typeof c.pet !== 'object'){
+            c.pet = { has:false, type:'cat', name:'小家伙', image:null, x:0.78, y:0.82 };
+          }
+          if(!c.stats || typeof c.stats !== 'object'){
+            c.stats = { mood:80, food:80, energy:80 };
+          }
+          ['images','outfits','lorebook','track','anniversaries','customShopItems','recentTopics'].forEach(k=>{
+            if(!Array.isArray(c[k])) c[k] = [];
+          });
+          if(!c.inventory || typeof c.inventory !== 'object') c.inventory = {};
+          if(!c.diary || typeof c.diary !== 'object') c.diary = { yours:[], his:[], lastSwap:null };
+          if(!c.period || typeof c.period !== 'object') c.period = { lastStart:null, cycle:28, duration:5, manualOn:false };
+          if(!c.chatLog || !Array.isArray(c.chatLog)) c.chatLog = [];
+          return c;
+        });
+
+        if(GlobalState.characters.length === 0){
+          const c = newCharacterData('c_default');
+          GlobalState.characters = [c];
+          GlobalState.currentCharId = c.id;
+        }
+        if(!GlobalState.currentCharId || !GlobalState.characters.find(c=>c.id===GlobalState.currentCharId)){
+          GlobalState.currentCharId = GlobalState.characters[0].id;
+        }
+      }
+      else if(data.save){
+        const oldChar = data.save;
+        const c = newCharacterData(oldChar.id || ('c_' + Date.now()));
+        for(const k in oldChar){ if(k in c) c[k] = oldChar[k]; }
+        GlobalState.characters = [c];
+        GlobalState.currentCharId = c.id;
+      }
+
+      if(data.global && data.global.lastTick) lastTick = data.global.lastTick;
+
+      applyMainColor(GlobalState.mainColor);
+      saveGame();
+      try{ await idbSet('dream_save', buildSaveObject()); }catch(e){}
+      alert('导入成功，即将刷新页面。');
+      location.reload();
+    } catch(err) {
+      console.error('导入失败', err);
+      alert('导入失败：' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+/* ============================================================
+   世界书 / 宠物（从设置进入，保留草稿）
+   ============================================================ */
+function openLorebook(){
+  if(!Current) return;
+  const modal=document.getElementById('modalContent');
+  // 从草稿读世界书
+  const lb = (settingsDraft ? settingsDraft.lorebook : (Current.lorebook || []));
+  modal.innerHTML=`
+    <h2>世界书 <span class="close" onclick="collectSettingsDraft();openSettings()">×</span></h2>
+    <p style="font-size:12px;color:var(--text-soft);margin-bottom:12px;">当聊天里出现关键词时，会自动把对应内容加入设定。</p>
+    <div id="loreList">
+      ${lb.length===0?'<p style="color:var(--text-soft);font-size:13px;">还没有条目。</p>':
+        lb.map((e,i)=>`
+          <div class="lore-item">
+            <input placeholder="关键词（多个用逗号分隔）" value="${e.key||''}" onchange="settingsDraft.lorebook[${i}].key=this.value">
+            <input placeholder="对应设定内容" value="${e.text||''}" onchange="settingsDraft.lorebook[${i}].text=this.value">
+            <div class="actions"><button class="del" onclick="deleteLore(${i})">删除</button></div>
+          </div>
+        `).join('')}
+    </div>
+    <button class="btn ghost" onclick="addLore()">+ 添加条目</button>
+    <button class="btn" onclick="collectSettingsDraft();openSettings()">保存并返回</button>
+  `;
+  openModal();
+}
+function addLore(){
+  if(!settingsDraft) initSettingsDraft();
+  settingsDraft.lorebook.push({key:'',text:''});
+  openLorebook();
+}
+function deleteLore(i){
+  if(!settingsDraft) return;
+  settingsDraft.lorebook.splice(i,1);
+  openLorebook();
+}
+
+function openPetSetup(){
+  if(!Current) return;
+  if(!settingsDraft) initSettingsDraft();
+  const modal=document.getElementById('modalContent');
+  const p = settingsDraft.pet;
+  modal.innerHTML=`
+    <h2>宠物 <span class="close" onclick="collectSettingsDraft();openSettings()">×</span></h2>
+    ${p.has?`
+      <p style="font-size:13px;color:var(--text-soft);margin-bottom:12px;">当前宠物：${p.name}（${p.type}）</p>
+      <div class="field"><label>上传宠物图片</label>
+        <input type="file" id="petUpload" accept="image/*" onchange="handlePetUpload(event)">
+        ${p.image?'<button class="btn ghost" onclick="collectSettingsDraft();removePetImage()">删除宠物图</button>':''}
+      </div>
+      <button class="btn ghost" onclick="collectSettingsDraft();removePet()">送走宠物</button>
+    `:`
+      <div class="field"><label>种类</label>
+        <select id="petType">
+          <option value="cat">猫</option><option value="dog">狗</option>
+          <option value="rabbit">兔</option><option value="bird">鸟</option>
+        </select>
+      </div>
+      <div class="field"><label>名字</label><input id="petName" value="小家伙"></div>
+      <button class="btn" onclick="createPet()">领养</button>
+    `}
+  `;
+  openModal();
+}
+function createPet(){
+  if(!settingsDraft) initSettingsDraft();
+  const type=document.getElementById('petType').value;
+  const name=document.getElementById('petName').value.trim()||'小家伙';
+  settingsDraft.pet = { has:true, type, name, image:null, x:0.78, y:0.82 };
+  if(Current) Current.pet = deepCloneSafe(settingsDraft.pet);
+  renderPet(); openSettings();
+}
+function removePet(){
+  if(!settingsDraft) return;
+  settingsDraft.pet = { has:false, type:'cat', name:'小家伙', image:null, x:0.78, y:0.82 };
+  if(Current) Current.pet = deepCloneSafe(settingsDraft.pet);
+  renderPet(); openSettings();
+}
+function removePetImage(){
+  if(!settingsDraft) return;
+  settingsDraft.pet.image = null;
+  if(Current) Current.pet.image = null;
+  renderPet(); openSettings();
+}
+
+/* ============================================================
+   公告
+   ============================================================ */
+function noticeHash(text){
+  let h = 0;
+  for(let i=0;i<text.length;i++){ h = ((h<<5)-h+text.charCodeAt(i))|0; }
+  return 'h'+h;
+}
+function isNoticeSeen(){
+  try{
+    const saved = JSON.parse(localStorage.getItem('dream_notice_seen')||'null');
+    if(!saved) return false;
+    return saved.hash === noticeHash(NOTICE_TEXT);
+  }catch(e){ return false; }
+}
+function markNoticeSeen(){
+  try{
+    localStorage.setItem('dream_notice_seen', JSON.stringify({
+      hash: noticeHash(NOTICE_TEXT),
+      seenAt: Date.now(),
+    }));
+  }catch(e){}
+}
+function openNotice(fromSettings){
+  const modal=document.getElementById('modalContent');
+  let html = NOTICE_TEXT
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/(1473727478@qq\.com)/g, '<span class="notice-email">$1</span>');
+  modal.innerHTML=`
+    <h2>📢 公告 <span class="close" onclick="closeNotice()">×</span></h2>
+    <div class="notice-body">${html}</div>
+    <button class="btn" onclick="closeNotice()">知道了</button>
+  `;
+  openModal();
+}
+function closeNotice(){
+  markNoticeSeen();
+  closeModal();
+}
+
+/* ============================================================
+   弹层 / 工具栏
+   ============================================================ */
+function openModal(){document.getElementById('modalMask').classList.add('show');}
+function closeModal(){document.getElementById('modalMask').classList.remove('show');}
+document.getElementById('modalMask').addEventListener('click',e=>{
+  if(e.target.id==='modalMask'){
+    if(isSettingsOpen){ closeSettings(); }
+    else closeModal();
+  }
+});
+function bindToolbar(){
+  document.querySelectorAll('.tool').forEach(t=>{
+    t.onclick=()=>{
+      const p=t.dataset.panel;
+      if(p==='gift')openGift();
+      else if(p==='touch')openTouch();
+      else if(p==='game')openGameMenu();
+      else if(p==='shop')openShop();
+      else if(p==='settings')openSettings();
+      else if(p==='diary')openDiary();
+      else if(p==='timer')openTimer();
+      else if(p==='sleep')openSleep();
+      else if(p==='period')openPeriod();
+      else if(p==='anniv')openAnniv();
+      else if(p==='log')openLog();
+    };
+  });
+}
+
+/* ============================================================
+   输入 / 快捷
+   ============================================================ */
+function bindChat(){
+  const input=document.getElementById('chatInput');
+  const btn=document.getElementById('sendBtn');
+  const send=()=>{
+    const t=input.value.trim();if(!t)return;
+    if(!API.ready){ needApiTip(); return; }
+    input.value='';chat(t);
+  };
+  btn.onclick=send;
+  input.addEventListener('keydown',e=>{if(e.key==='Enter')send();});
+}
+const QUICK_TOPICS=['今天过得怎么样？','我有点累','想你了','在做什么？','陪我聊聊天','今天发生了一件小事'];
+function renderQuick(){
+  document.getElementById('quick').innerHTML=QUICK_TOPICS.map(t=>
+    `<button onclick="quickSend('${t}')">${t}</button>`).join('');
+}
+function quickSend(t){
+  if(!API.ready){ needApiTip(); return; }
+  document.getElementById('chatInput').value=t;
+  chat(t);document.getElementById('chatInput').value='';
+}
+
+/* ============================================================
+   存档
+   ============================================================ */
+function deepClone(obj){return JSON.parse(JSON.stringify(obj));}
+function buildSaveObject(){
+  return {
+    version: GlobalState.version,
+    mainColor: GlobalState.mainColor,
+    bgColor: GlobalState.bgColor,
+    background: GlobalState.background,
+    userImage: GlobalState.userImage,
+    userShow: GlobalState.userShow,
+    userX: GlobalState.userX,
+    userY: GlobalState.userY,
+    weather: GlobalState.weather,
+    weatherDate: GlobalState.weatherDate,
+    weatherCity: GlobalState.weatherCity,
+    weatherLat: GlobalState.weatherLat,
+    weatherLon: GlobalState.weatherLon,
+    weatherManualCity: GlobalState.weatherManualCity,
+    weatherUpdatedAt: GlobalState.weatherUpdatedAt,
+    currentCharId: GlobalState.currentCharId,
+    characters: deepClone(GlobalState.characters),
+    lastTick: lastTick,
+  };
+}
+function applySaveObject(d){
+  if(!d)return;
+  GlobalState.version = d.version || 14;
+  GlobalState.mainColor = d.mainColor || '#ff8fab';
+  GlobalState.bgColor = d.bgColor || '#ffe0e8';
+  GlobalState.background = d.background || null;
+  GlobalState.userImage = d.userImage || null;
+  GlobalState.userShow = !!d.userShow;
+  GlobalState.userX = typeof d.userX === 'number' ? d.userX : 0.5;
+  GlobalState.userY = typeof d.userY === 'number' ? d.userY : 0.88;
+  GlobalState.weather = d.weather || '晴';
+  GlobalState.weatherDate = d.weatherDate || null;
+  GlobalState.weatherCity = d.weatherCity || '';
+  GlobalState.weatherLat = (typeof d.weatherLat === 'number') ? d.weatherLat : null;
+  GlobalState.weatherLon = (typeof d.weatherLon === 'number') ? d.weatherLon : null;
+  GlobalState.weatherManualCity = d.weatherManualCity || '';
+  GlobalState.weatherUpdatedAt = d.weatherUpdatedAt || 0;
+  GlobalState.characters = Array.isArray(d.characters) ? d.characters : [];
+  GlobalState.currentCharId = d.currentCharId || null;
+  if(d.lastTick) lastTick = d.lastTick;
+}
+function saveGame(){
+  try{
+    const data = buildSaveObject();
+    const str = JSON.stringify(data);
+    try{
+      localStorage.setItem('dream_save_bak', localStorage.getItem('dream_save') || '');
+      localStorage.setItem('dream_save', str);
+    }catch(e){}
+    idbSet('dream_save', data).catch(()=>{});
+  }catch(e){ console.warn('存档失败', e); }
+}
+let saveTimer = null;
+function saveGameDebounced(){
+  if(saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>{ saveGame(); }, 1200);
+}
+async function loadGame(){
+  try{
+    let d = null;
+    try{ d = await idbGet('dream_save'); }catch(e){}
+    if(!d){
+      const raw = localStorage.getItem('dream_save') || localStorage.getItem('dream_save_bak');
+      if(raw) d = JSON.parse(raw);
+    }
+    if(!d) return false;
+    if(!d.version || d.version < 14){
+      let mainColor = d.mainColor;
+      if(!mainColor && d.theme && d.theme.main) mainColor = d.theme.main;
+      if(!mainColor) mainColor = '#ff8fab';
+      d.mainColor = mainColor;
+      delete d.theme;
+      if(d.version < 12){
+        const oldChar = d;
+        const c = newCharacterData('c_migrated');
+        const charFields = ['name','callYou','role','personality','background','worldview','language','style','intro',
+          'image','images','outfits','currentOutfitIndex','x','y','flip','relationType','relationValue','stats',
+          'sick','coin','inventory','chatLog','diary','period','lorebook','track','anniversaries','lastInteract',
+          'lastChatDate','fightUntil','lastSurpriseDate','lastMeal','emoUntil','isSleeping','isAway','awayUntil',
+          'customShopItems','pet','lastProactiveAt','lastProactiveText','recentTopics'];
+        charFields.forEach(k=>{ if(oldChar[k] !== undefined) c[k] = oldChar[k]; });
+        d.characters = [c];
+        d.currentCharId = c.id;
+        d.bgColor = oldChar.bgColor || '#ffe0e8';
+        d.background = oldChar.background || null;
+        d.userImage = oldChar.userImage || null;
+        d.userShow = !!oldChar.userShow;
+        d.userX = typeof oldChar.userX === 'number' ? oldChar.userX : 0.5;
+        d.userY = typeof oldChar.userY === 'number' ? oldChar.userY : 0.88;
+        d.weather = oldChar.weather || '晴';
+        d.weatherDate = oldChar.weatherDate || null;
+        d.weatherCity = oldChar.weatherCity || '';
+        d.weatherLat = (typeof oldChar.weatherLat === 'number') ? oldChar.weatherLat : null;
+        d.weatherLon = (typeof oldChar.weatherLon === 'number') ? oldChar.weatherLon : null;
+        d.weatherManualCity = oldChar.weatherManualCity || '';
+        d.weatherUpdatedAt = oldChar.weatherUpdatedAt || 0;
+      }
+      d.version = 14;
+    }
+    applySaveObject(d);
+    return true;
+  }catch(e){ console.warn('读档失败', e); return false; }
+}
+
+/* ============================================================
+   初始化
+   ============================================================ */
+setInterval(saveGame, 30000);
+window.addEventListener('beforeunload', ()=>{ try{ saveGame(); }catch(e){} });
+window.addEventListener('resize',()=>{positionCharacter();positionUser();positionPet();repositionAllBubblesDebounced();});
+function firstTimeSetup(){
+  const modal=document.getElementById('modalContent');
+  modal.innerHTML=`
+    <h2>欢迎来到云栖阁 <span class="close" onclick="closeModal()">×</span></h2>
+    <p style="font-size:13px;color:var(--text-soft);margin-bottom:16px;">先上传他的图片，再填一下 API 吧。</p>
+    <button class="btn" onclick="closeModal();openSettings()">开始设置</button>
+    <button class="btn ghost" onclick="closeModal()">先随便看看</button>
+  `;
+  openModal();
+}
+async function boot(){
+  loadAPIConfig();
+  const hasSave = await loadGame();
+  if(!GlobalState.characters || GlobalState.characters.length === 0){
+    const c = newCharacterData('c_default');
+    GlobalState.characters = [c];
+    GlobalState.currentCharId = c.id;
+  }
+  if(!GlobalState.currentCharId || !GlobalState.characters.find(c=>c.id===GlobalState.currentCharId)){
+    GlobalState.currentCharId = GlobalState.characters[0].id;
+  }
+  Current = GlobalState.characters.find(c=>c.id===GlobalState.currentCharId);
+
+  applyMainColor(GlobalState.mainColor || '#ff8fab');
+
+  pickRandomOutfit();
+
+  saveGame();
+  renderBackground(); renderCharacter(); renderUser(); renderPet();
+  renderWeather(); updateStats(); updateRelationUI(); renderQuick();
+  bindChat(); bindToolbar(); bindStage();
+  startIdleWalk(); startTrackLoop(); checkSleepState();
+  setTimeout(()=>{positionCharacter();positionUser();positionPet();repositionAllBubbles();},100);
+  updateWeatherReal(true);
+  setInterval(()=>{
+    updateWeatherReal(true);
+    checkMeal(); checkSleepState(); updateTrackBar();
+  }, 3600000);
+  setInterval(()=>{ checkMeal(); checkSleepState(); updateTrackBar(); }, 60000);
+
+  if(!isNoticeSeen()){
+    setTimeout(()=>{ openNotice(false); }, 500);
+  }
+
+  if(!hasSave){
+    setTimeout(()=>{
+      if(API.ready)proactiveTalk('greet').catch(()=>{});
+      else say('先去设置里填 API 和上传图片吧。','tip');
+    },1200);
+    setTimeout(firstTimeSetup,2500);
+  }else{
+    setTimeout(()=>{
+      if(Current.sick)say(`${Current.name}还病着，需要照顾。`,'them');
+      else timeGreeting();
+    },1000);
+  }
+}
+boot();
+</script>
+</body>
+</html>
