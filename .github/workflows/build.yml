@@ -1,0 +1,51 @@
+姓名: 构建安装包
+
+在……之上:
+推:
+分支机构: [主要的]
+workflow_dispatch:
+
+工作:
+建立:
+连续的：Ubuntu-最新
+
+步骤:
+      - 姓名: 结帐
+uses: 操作/结帐@v4
+
+-姓名: 设置节点.js
+uses: 操作/设置-节点@v4
+和……一起:
+节点版本: '20'
+
+      - 姓名: 安装Java
+uses: 操作/设置-Java@v4
+和……一起:
+分布: 'temurin'
+java版: '17'
+
+      - 姓名: 安装相依性
+跑: npm安装
+
+      - 姓名: 创建www文件夹并复制index.html
+跑: |
+mkdir-p www
+CP index.htmlwww/index.html
+
+      - 姓名: 初始化电容器
+跑: |
+npx cap init Yunqi com。示例.云奇--web-dir=www-no-git
+npx帽添加安卓
+npx cap sync android
+
+      - 姓名: 构建安装包
+跑: |
+          cd android
+chmod+x gradlew
+./gradlew装配调试
+
+      - 姓名: 上传安装包
+uses: 操作/上载工件@v4
+和……一起:
+姓名: 云奇调试apk
+路径: Android/app/build/outputs/apk/debug/app-debug.APK
