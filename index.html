@@ -77,7 +77,7 @@ body{
 #userWrap.dragging{transition:none;cursor:grabbing}
 #userWrap img{width:100%;display:block;pointer-events:none;filter:drop-shadow(0 5px 8px rgba(0,0,0,.12))}
 
-#petWrap{position:absolute;z-index:2;cursor:grab;user-select:none;touch-action:none;
+#petWrap{position:absolute;z-index:2;cursor:pointer;user-select:none;touch-action:none;
   width:70px;height:70px;filter:drop-shadow(0 3px 5px rgba(0,0,0,.15));
   transition:left .5s ease, top .5s ease;display:none;align-items:center;justify-content:center;
   font-size:38px;line-height:1;will-change:left, top;}
@@ -96,6 +96,7 @@ body{
   white-space:pre-wrap;}
 .bubble.them{background:#fff;color:var(--text);border-bottom-left-radius:4px}
 .bubble.you{background:var(--main);color:#fff;border-bottom-right-radius:4px}
+.bubble.action{background:rgba(220,220,230,.92);color:#5a5a6a;border-bottom-right-radius:4px;font-style:italic;border:1px solid rgba(0,0,0,.05);}
 .bubble.tip{background:#fff8e0;color:#a08040;border:1px solid #ffe0a0;font-size:11px}
 .bubble.err{background:#ffe0e0;color:#a04040;border:1px solid #ffb0b0;font-size:11px;max-width:220px}
 .bubble .kaomoji{display:block;margin-top:6px;font-size:11px;opacity:.75;text-align:center;letter-spacing:1px;}
@@ -118,6 +119,22 @@ body{
 .tool:hover{background:var(--accent);color:#fff}
 .tool .ico{font-size:18px}
 
+/* App 内通知 */
+#inAppNotif{
+  position:fixed;top:10px;left:50%;transform:translate(-50%,-120%);
+  z-index:9999;max-width:92%;width:380px;
+  background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.18);
+  padding:12px 14px;display:flex;gap:10px;align-items:center;
+  transition:transform .35s cubic-bezier(.2,1.2,.4,1);
+}
+#inAppNotif.show{transform:translate(-50%,0);}
+#inAppNotif .icon{width:38px;height:38px;border-radius:10px;background:var(--accent);flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:20px;overflow:hidden;}
+#inAppNotif .icon img{width:100%;height:100%;object-fit:cover;}
+#inAppNotif .body{flex:1;min-width:0;}
+#inAppNotif .title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px;}
+#inAppNotif .msg{font-size:12px;color:var(--text-soft);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+
 .modal-mask{position:fixed;inset:0;background:#00000033;display:none;
   align-items:flex-end;justify-content:center;z-index:100}
 .modal-mask.show{display:flex}
@@ -134,14 +151,11 @@ body{
 .modal .btn{width:100%;border:none;padding:13px;border-radius:12px;background:var(--main);
   color:#fff;font-size:15px;cursor:pointer;margin-top:6px}
 .modal .btn.ghost{background:var(--accent);color:var(--text)}
-.modal .btn.danger{background:#e08a8a}
 .main-palette{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
-.main-swatch{aspect-ratio:1;border-radius:12px;cursor:pointer;border:3px solid transparent;
-  transition:transform .15s;box-shadow:0 2px 6px rgba(0,0,0,.08);}
+.main-swatch{aspect-ratio:1;border-radius:12px;cursor:pointer;border:3px solid transparent;box-shadow:0 2px 6px rgba(0,0,0,.08);}
 .main-swatch.active{border-color:var(--text)}
 .bg-palette{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
-.bg-swatch{aspect-ratio:1;border-radius:12px;cursor:pointer;border:3px solid transparent;
-  transition:transform .15s;box-shadow:0 2px 6px rgba(0,0,0,.06);}
+.bg-swatch{aspect-ratio:1;border-radius:12px;cursor:pointer;border:3px solid transparent;box-shadow:0 2px 6px rgba(0,0,0,.06);}
 .bg-swatch.active{border-color:var(--text)}
 
 .log-item{margin-bottom:12px;font-size:13px;line-height:1.5}
@@ -151,14 +165,12 @@ body{
   background:var(--card);border-radius:14px;margin-bottom:8px;box-shadow:0 2px 8px rgba(229,107,140,.06)}
 .shop-item .info{font-size:14px;flex:1}
 .shop-item .info small{color:var(--text-soft);font-size:11px;display:block}
-.shop-item button{border:none;padding:8px 14px;border-radius:999px;background:var(--main);
-  color:#fff;font-size:12px;cursor:pointer}
+.shop-item button{border:none;padding:8px 14px;border-radius:999px;background:var(--main);color:#fff;font-size:12px;cursor:pointer}
 .timer-display{font-size:48px;text-align:center;font-weight:300;margin:30px 0;color:var(--main-dark)}
 .sleep-mask{position:fixed;inset:0;background:#0a0a1a;z-index:200;display:none;
   flex-direction:column;align-items:center;justify-content:center;color:#aab}
 .sleep-mask.show{display:flex}
 .sleep-mask .zzz{font-size:20px;margin-top:20px;animation:breathe 4s infinite}
-.sleep-mask .story{max-width:340px;text-align:center;font-size:14px;line-height:1.8;color:#bbc;padding:0 20px;}
 .sleep-mask .timer-small{font-size:12px;color:#556;margin-top:14px;}
 @keyframes breathe{0%,100%{opacity:.4;transform:translateY(0)}50%{opacity:1;transform:translateY(-6px)}}
 .sleep-mask .exit{position:absolute;bottom:40px;font-size:13px;color:#556;cursor:pointer}
@@ -169,15 +181,12 @@ body{
   border-radius:12px;padding:8px;margin-bottom:8px;box-shadow:0 2px 8px rgba(229,107,140,.06)}
 .face-item img{width:44px;height:44px;object-fit:cover;border-radius:8px;flex-shrink:0}
 .face-item input{flex:1;margin:0}
-.face-item button{border:none;padding:6px 10px;border-radius:999px;
-  font-size:11px;cursor:pointer;background:#e08a8a;color:#fff;flex-shrink:0}
-.face-item .tag-preview{font-size:11px;color:var(--main-dark);padding:2px 8px;
-  background:var(--accent);border-radius:999px;flex-shrink:0;}
+.face-item button{border:none;padding:6px 10px;border-radius:999px;font-size:11px;cursor:pointer;background:#e08a8a;color:#fff;flex-shrink:0}
+.face-item .tag-preview{font-size:11px;color:var(--main-dark);padding:2px 8px;background:var(--accent);border-radius:999px;flex-shrink:0;}
 .lore-item{background:var(--card);border-radius:12px;padding:10px;margin-bottom:8px;box-shadow:0 2px 8px rgba(229,107,140,.06)}
 .lore-item input{margin-bottom:6px}
 .lore-item .actions{display:flex;gap:6px;justify-content:flex-end}
-.lore-item .actions button{border:none;padding:6px 12px;border-radius:999px;
-  font-size:11px;cursor:pointer;background:var(--main);color:#fff}
+.lore-item .actions button{border:none;padding:6px 12px;border-radius:999px;font-size:11px;cursor:pointer;background:var(--main);color:#fff}
 .lore-item .actions button.del{background:#e08a8a}
 .track-day{margin-bottom:14px}
 .track-day h3{font-size:13px;color:var(--text-soft);margin-bottom:6px;font-weight:500}
@@ -188,7 +197,6 @@ body{
 .test-result.fail{background:#fdeaea;color:#a04040;border:1px solid #f0b8b8}
 .game-item{padding:14px;background:var(--card);border-radius:14px;margin-bottom:10px;cursor:pointer;
   box-shadow:0 2px 8px rgba(229,107,140,.06);display:flex;justify-content:space-between;align-items:center;}
-.game-item:active{transform:scale(.98)}
 .game-item .g-name{font-size:14px;font-weight:500}
 .game-item .g-desc{font-size:11px;color:var(--text-soft);margin-top:2px}
 .game-item .g-arrow{color:var(--text-soft);}
@@ -196,40 +204,36 @@ body{
 .game-panel .g-status{font-size:12px;color:var(--text-soft);margin-bottom:8px;text-align:center;}
 .game-panel .g-content{font-size:13px;line-height:1.6;margin-bottom:10px;white-space:pre-wrap;word-break:break-word;}
 .game-panel .g-input-row{display:flex;gap:8px;margin-top:8px;}
-.game-panel .g-input-row input{flex:1;padding:10px 14px;border:none;outline:none;border-radius:12px;
-  background:var(--accent);font-size:14px;color:var(--text);}
-.game-panel .g-input-row button{padding:10px 16px;border:none;border-radius:12px;background:var(--main);
-  color:#fff;font-size:14px;cursor:pointer;}
+.game-panel .g-input-row input{flex:1;padding:10px 14px;border:none;outline:none;border-radius:12px;background:var(--accent);font-size:14px;color:var(--text);}
+.game-panel .g-input-row button{padding:10px 16px;border:none;border-radius:12px;background:var(--main);color:#fff;font-size:14px;cursor:pointer;}
 .game-panel .g-btn-row{display:flex;gap:8px;margin-top:10px;justify-content:center;flex-wrap:wrap;}
-.game-panel .g-btn-row button{padding:8px 14px;border:none;border-radius:999px;background:var(--accent);
-  color:var(--text);font-size:12px;cursor:pointer;}
-.game-panel .g-btn-row button.primary{background:var(--main);color:#fff;}
-.game-panel .g-log{max-height:180px;overflow-y:auto;font-size:12px;color:var(--text-soft);
-  background:var(--bg);padding:8px;border-radius:10px;margin-top:8px;white-space:pre-wrap;}
-.char-list-item{display:flex;align-items:center;gap:10px;padding:12px;background:var(--card);
-  border-radius:14px;margin-bottom:8px;box-shadow:0 2px 8px rgba(229,107,140,.06);cursor:pointer;}
+.game-panel .g-btn-row button{padding:8px 14px;border:none;border-radius:999px;background:var(--accent);color:var(--text);font-size:12px;cursor:pointer;}
+.game-panel .g-log{max-height:180px;overflow-y:auto;font-size:12px;color:var(--text-soft);background:var(--bg);padding:8px;border-radius:10px;margin-top:8px;white-space:pre-wrap;}
+.char-list-item{display:flex;align-items:center;gap:10px;padding:12px;background:var(--card);border-radius:14px;margin-bottom:8px;box-shadow:0 2px 8px rgba(229,107,140,.06);cursor:pointer;}
 .char-list-item.active{outline:2px solid var(--main);}
 .char-list-item img{width:44px;height:44px;object-fit:cover;border-radius:10px;flex-shrink:0;}
-.char-list-item .avatar-placeholder{width:44px;height:44px;border-radius:10px;flex-shrink:0;
-  background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:22px;}
+.char-list-item .avatar-placeholder{width:44px;height:44px;border-radius:10px;flex-shrink:0;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:22px;}
 .char-list-item .info{flex:1;min-width:0;}
 .char-list-item .info .n{font-size:14px;font-weight:500;}
 .char-list-item .info .d{font-size:11px;color:var(--text-soft);}
-.char-list-item .del-btn{border:none;padding:6px 10px;border-radius:999px;background:#e08a8a;
-  color:#fff;font-size:11px;cursor:pointer;}
+.char-list-item .del-btn{border:none;padding:6px 10px;border-radius:999px;background:#e08a8a;color:#fff;font-size:11px;cursor:pointer;}
 .pet-stat{margin-bottom:10px}
 .pet-stat .lab{display:flex;justify-content:space-between;font-size:12px;color:var(--text-soft);margin-bottom:4px;}
 .pet-stat .bar{height:8px;background:var(--accent);border-radius:4px;overflow:hidden;}
 .pet-stat .bar>i{display:block;height:100%;background:var(--main);border-radius:4px;transition:width .4s;}
-.notice-body{
-  font-size:14px;line-height:1.8;color:var(--text);
-  background:var(--card);border-radius:16px;padding:16px;
-  white-space:pre-wrap;box-shadow:0 2px 8px rgba(229,107,140,.06);
-}
+.notice-body{font-size:14px;line-height:1.8;color:var(--text);background:var(--card);border-radius:16px;padding:16px;white-space:pre-wrap;box-shadow:0 2px 8px rgba(229,107,140,.06);}
 .notice-email{color:var(--main-dark);font-weight:600;}
 </style>
 </head>
 <body>
+<div id="inAppNotif">
+  <div class="icon" id="inAppNotifIcon">💬</div>
+  <div class="body">
+    <div class="title" id="inAppNotifTitle">他</div>
+    <div class="msg" id="inAppNotifMsg"></div>
+  </div>
+</div>
+
 <div id="app">
   <div class="topbar">
     <div class="left">
@@ -308,6 +312,38 @@ body{
 </div>
 
 <script>
+/* ============ App 内通知 ============ */
+let notifTimer = null;
+function showInAppNotif(text){
+  const box = document.getElementById('inAppNotif');
+  const title = document.getElementById('inAppNotifTitle');
+  const msg = document.getElementById('inAppNotifMsg');
+  const icon = document.getElementById('inAppNotifIcon');
+  if(!box) return;
+  // 头像
+  if(Current){
+    const img = getBaseCharImage();
+    if(img) icon.innerHTML = `<img src="${img}">`;
+    else icon.textContent = '💬';
+    title.textContent = Current.name;
+  }
+  msg.textContent = text;
+  box.classList.add('show');
+  if(notifTimer) clearTimeout(notifTimer);
+  notifTimer = setTimeout(()=>{ box.classList.remove('show'); }, 4000);
+  // 顺便尝试系统通知
+  try {
+    if('Notification' in window && Notification.permission === 'granted'){
+      new Notification(Current ? Current.name : '他', { body: text });
+    } else if('Notification' in window && Notification.permission === 'default'){
+      Notification.requestPermission();
+    }
+  } catch(e){}
+}
+document.getElementById('inAppNotif').addEventListener('click', ()=>{
+  document.getElementById('inAppNotif').classList.remove('show');
+});
+
 /* ============ 关系类型 ============ */
 const REL_TYPES = [
   { key:'friend',    name:'朋友' },
@@ -330,7 +366,6 @@ const GlobalState = {
   weatherLat: null, weatherLon: null, weatherManualCity: '', weatherUpdatedAt: 0,
   currentCharId: null, characters: [],
 };
-
 function newCharacterData(id){
   return {
     id, name:'他', callYou:'你',
@@ -379,8 +414,7 @@ function initSettingsDraft(){
 }
 function collectSettingsDraft(){
   if(!settingsDraft) initSettingsDraft();
-  const el = id => document.getElementById(id);
-  const g = id => el(id);
+  const g = id => document.getElementById(id);
   if(g('setName')) settingsDraft.name = g('setName').value.trim() || '他';
   if(g('setCall')) settingsDraft.callYou = g('setCall').value.trim() || '你';
   if(g('setRole')) settingsDraft.role = g('setRole').value.trim();
@@ -438,10 +472,7 @@ function openDB(){
     if(dbInstance) return resolve(dbInstance);
     if(!window.indexedDB) return reject(new Error('IndexedDB 不支持'));
     const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = e => {
-      const db = e.target.result;
-      if(!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE);
-    };
+    req.onupgradeneeded = e => { const db = e.target.result; if(!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE); };
     req.onsuccess = e => { dbInstance = e.target.result; resolve(dbInstance); };
     req.onerror = e => reject(e.target.error);
   });
@@ -467,8 +498,7 @@ async function idbGet(key){
 
 /* ============ 主题色 ============ */
 function hexToRgb(hex){ const n=parseInt(hex.replace('#',''),16); return { r:(n>>16)&255, g:(n>>8)&255, b:n&255 }; }
-function rgbToHex(r,g,b){ r=Math.max(0,Math.min(255,Math.round(r))); g=Math.max(0,Math.min(255,Math.round(g))); b=Math.max(0,Math.min(255,Math.round(b)));
-  return '#'+((r<<16)|(g<<8)|b).toString(16).padStart(6,'0'); }
+function rgbToHex(r,g,b){ r=Math.max(0,Math.min(255,Math.round(r))); g=Math.max(0,Math.min(255,Math.round(g))); b=Math.max(0,Math.min(255,Math.round(b))); return '#'+((r<<16)|(g<<8)|b).toString(16).padStart(6,'0'); }
 function shift(hex, amt){ const c=hexToRgb(hex); return rgbToHex(c.r+amt,c.g+amt,c.b+amt); }
 function mixWithWhite(hex, ratio){ const c=hexToRgb(hex); return rgbToHex(c.r+(255-c.r)*ratio, c.g+(255-c.g)*ratio, c.b+(255-c.b)*ratio); }
 function applyMainColor(hex){
@@ -506,11 +536,7 @@ function loadAPIConfig(){
   }catch(e){}
 }
 function saveAPIConfig(){
-  try{localStorage.setItem('dream_api',JSON.stringify({
-    baseUrl:API.baseUrl,key:API.key,model:API.model,
-    fallbackModels:GlobalState.fallbackModels,
-    useFallback:GlobalState.useFallback,
-  }));}catch(e){}
+  try{localStorage.setItem('dream_api',JSON.stringify({baseUrl:API.baseUrl,key:API.key,model:API.model,fallbackModels:GlobalState.fallbackModels,useFallback:GlobalState.useFallback}));}catch(e){}
 }
 async function callAIOnce(messages, opts={}){
   if(!API.ready) throw new Error('API 未配置');
@@ -518,11 +544,7 @@ async function callAIOnce(messages, opts={}){
   const ctrl = new AbortController();
   const timer = setTimeout(()=>ctrl.abort(), opts.timeout ?? 40000);
   try{
-    const res = await fetch(API.baseUrl, {
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer ' + API.key},
-      body: JSON.stringify(body), signal: ctrl.signal
-    });
+    const res = await fetch(API.baseUrl, { method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer ' + API.key}, body: JSON.stringify(body), signal: ctrl.signal });
     clearTimeout(timer);
     if(!res.ok){ const errText = await res.text(); throw new Error(`HTTP ${res.status}: ${errText.slice(0,160)}`); }
     const data = await res.json();
@@ -558,31 +580,26 @@ async function testConnection(){
 }
 
 /* ============ 天气 ============ */
-const WMO_CODE_MAP = {0:'晴',1:'晴',2:'多云',3:'阴',45:'雾',48:'雾',51:'小雨',53:'小雨',55:'小雨',56:'冻雨',57:'冻雨',
-  61:'小雨',63:'中雨',65:'大雨',66:'冻雨',67:'冻雨',71:'小雪',73:'中雪',75:'大雪',77:'雪',80:'阵雨',81:'阵雨',82:'大雨',85:'阵雪',86:'大雪',95:'雷雨',96:'雷雨',99:'雷雨'};
+const WMO_CODE_MAP = {0:'晴',1:'晴',2:'多云',3:'阴',45:'雾',48:'雾',51:'小雨',53:'小雨',55:'小雨',56:'冻雨',57:'冻雨',61:'小雨',63:'中雨',65:'大雨',66:'冻雨',67:'冻雨',71:'小雪',73:'中雪',75:'大雪',77:'雪',80:'阵雨',81:'阵雨',82:'大雨',85:'阵雪',86:'大雪',95:'雷雨',96:'雷雨',99:'雷雨'};
 function wmoToWeather(code){ return WMO_CODE_MAP[code] || '多云'; }
 async function geocodeCity(cityName){
   const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=1&language=zh&format=json`);
   if(!res.ok) throw new Error('地理编码失败');
   const data = await res.json();
   if(!data.results || !data.results.length) throw new Error('找不到城市');
-  const r = data.results[0];
-  return { lat: r.latitude, lon: r.longitude, name: r.name };
+  const r = data.results[0]; return { lat: r.latitude, lon: r.longitude, name: r.name };
 }
 async function fetchWeatherByCoords(lat, lon){
   const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,is_day&timezone=auto`);
   if(!res.ok) throw new Error('天气查询失败');
   const data = await res.json();
   if(!data.current) throw new Error('天气数据无效');
-  return { weather: wmoToWeather(data.current.weather_code), temp: Math.round(data.current.temperature_2m), isDay: data.current.is_day === 1 };
+  return { weather: wmoToWeather(data.current.weather_code) };
 }
 function getUserLocation(){
   return new Promise((resolve, reject)=>{
     if(!navigator.geolocation) return reject(new Error('不支持定位'));
-    navigator.geolocation.getCurrentPosition(
-      (pos)=>resolve({lat: pos.coords.latitude, lon: pos.coords.longitude}),
-      (err)=>reject(err), {timeout: 8000, maximumAge: 600000}
-    );
+    navigator.geolocation.getCurrentPosition((pos)=>resolve({lat: pos.coords.latitude, lon: pos.coords.longitude}), (err)=>reject(err), {timeout: 8000, maximumAge: 600000});
   });
 }
 async function updateWeatherReal(force=false){
@@ -606,8 +623,7 @@ async function updateWeatherReal(force=false){
     GlobalState.weatherLat = lat; GlobalState.weatherLon = lon;
     GlobalState.weatherCity = cityName || '当前城市';
     GlobalState.weather = w.weather;
-    GlobalState.weatherUpdatedAt = now;
-    GlobalState.weatherDate = todayStr();
+    GlobalState.weatherUpdatedAt = now; GlobalState.weatherDate = todayStr();
     renderWeather(); saveGameDebounced();
   }catch(e){
     GlobalState.weather = WEATHERS[Math.floor(Math.random()*WEATHERS.length)];
@@ -645,10 +661,9 @@ function addRelationValue(n){
 }
 function updateRelationUI(){
   if(!Current) return;
-  const nameEl = document.getElementById('relName');
-  const valEl = document.getElementById('relValue');
-  if(nameEl) nameEl.textContent = getRelationName(Current.relationType);
-  if(valEl) valEl.textContent = Math.round(Current.relationValue);
+  const n=document.getElementById('relName'), v=document.getElementById('relValue');
+  if(n) n.textContent = getRelationName(Current.relationType);
+  if(v) v.textContent = Math.round(Current.relationValue);
 }
 function openRelationPanel(){
   if(!Current) return;
@@ -656,13 +671,9 @@ function openRelationPanel(){
   modal.innerHTML=`
     <h2>关系设置 <span class="close" onclick="closeModal()">×</span></h2>
     <div class="field"><label>当前关系</label>
-      <select id="relSelect">
-        ${REL_TYPES.map(rt=>`<option value="${rt.key}" ${Current.relationType===rt.key?'selected':''}>${rt.name}</option>`).join('')}
-      </select>
+      <select id="relSelect">${REL_TYPES.map(rt=>`<option value="${rt.key}" ${Current.relationType===rt.key?'selected':''}>${rt.name}</option>`).join('')}</select>
     </div>
-    <div class="field"><label>好感度（0-100）</label>
-      <input type="number" id="relValueInput" min="0" max="100" value="${Math.round(Current.relationValue)}">
-    </div>
+    <div class="field"><label>好感度</label><input type="number" id="relValueInput" min="0" max="100" value="${Math.round(Current.relationValue)}"></div>
     <button class="btn" onclick="saveRelationSetting()">保存</button>
   `;
   openModal();
@@ -674,14 +685,13 @@ function saveRelationSetting(){
   saveGame(); updateRelationUI(); closeModal();
 }
 
-/* ============ 生理期 / 天气渲染 / 作息 ============ */
+/* ============ 生理期 / 作息 ============ */
 function isPeriodNow(){
   if(!Current) return false;
   const p=Current.period;
   if(p.manualOn)return true;
   if(!p.lastStart)return false;
-  const start=new Date(p.lastStart+'T00:00:00');
-  const diffDays=Math.floor((new Date()-start)/86400000);
+  const diffDays=Math.floor((new Date()-new Date(p.lastStart+'T00:00:00'))/86400000);
   if(diffDays<0)return false;
   return (diffDays%(p.cycle||28)) < (p.duration||5);
 }
@@ -689,8 +699,7 @@ function periodInfo(){
   if(!Current) return {next:null,days:null};
   const p=Current.period;
   if(!p.lastStart)return {next:null,days:null};
-  const start=new Date(p.lastStart+'T00:00:00');
-  const next=new Date(start.getTime()+(p.cycle||28)*86400000);
+  const next=new Date(new Date(p.lastStart+'T00:00:00').getTime()+(p.cycle||28)*86400000);
   return {next:next.toISOString().slice(0,10),days:Math.ceil((next-new Date())/86400000)};
 }
 const WEATHERS = ['晴','多云','阴','小雨','大雨','雪'];
@@ -708,27 +717,10 @@ function renderWeatherFx(){
   const w = GlobalState.weather;
   if(['小雨','中雨','大雨','阵雨','冻雨','雷雨'].includes(w)){
     const n=(w==='大雨'||w==='雷雨')?30:15;
-    for(let i=0;i<n;i++){
-      const d=document.createElement('div'); d.className='drop';
-      d.style.left=Math.random()*100+'%';
-      d.style.animationDelay=Math.random()*1+'s';
-      d.style.animationDuration=(0.6+Math.random()*0.6)+'s';
-      box.appendChild(d);
-    }
+    for(let i=0;i<n;i++){ const d=document.createElement('div'); d.className='drop'; d.style.left=Math.random()*100+'%'; d.style.animationDelay=Math.random()*1+'s'; d.style.animationDuration=(0.6+Math.random()*0.6)+'s'; box.appendChild(d); }
   } else if(['雪','小雪','中雪','大雪','阵雪'].includes(w)){
-    for(let i=0;i<20;i++){
-      const f=document.createElement('div'); f.className='flake'; f.textContent='❄';
-      f.style.left=Math.random()*100+'%';
-      f.style.animationDelay=Math.random()*4+'s';
-      f.style.animationDuration=(3+Math.random()*3)+'s';
-      f.style.fontSize=(8+Math.random()*10)+'px';
-      box.appendChild(f);
-    }
+    for(let i=0;i<20;i++){ const f=document.createElement('div'); f.className='flake'; f.textContent='❄'; f.style.left=Math.random()*100+'%'; f.style.animationDelay=Math.random()*4+'s'; f.style.animationDuration=(3+Math.random()*3)+'s'; f.style.fontSize=(8+Math.random()*10)+'px'; box.appendChild(f); }
   }
-}
-function weatherLine(){
-  const map={'晴':'今天天气很好，阳光不错。','多云':'今天多云，风很舒服。','阴':'今天有点阴，天色灰灰的。','雾':'今天起雾了，能见度不高。','小雨':'今天下小雨了。','中雨':'今天雨下得不算小。','大雨':'今天雨下得挺大的。','阵雨':'今天有阵雨。','冻雨':'今天下冻雨，路很滑。','雷雨':'今天打雷下雨了。','雪':'今天下雪了。','小雪':'今天下了点小雪。','中雪':'今天雪下得不小。','大雪':'今天雪下得挺大的。','阵雪':'今天有阵雪。'};
-  return map[GlobalState.weather]||'';
 }
 function isNightTime(){ const h=new Date().getHours(); return (h>=23 || h<6); }
 function checkSleepState(){
@@ -798,17 +790,12 @@ function updateTrackBar(){
     }
   }
   checkSleepState();
-  const wrap=document.getElementById('charWrap');
-  const sh=document.getElementById('charShadow');
-  const noteBtn=document.getElementById('awayNoteBtn');
+  const wrap=document.getElementById('charWrap'), sh=document.getElementById('charShadow'), noteBtn=document.getElementById('awayNoteBtn');
   if(wrap && sh){
     if(Current.isAway){ wrap.classList.add('away'); sh.classList.add('away'); }
     else{ wrap.classList.remove('away'); sh.classList.remove('away'); }
   }
-  if(noteBtn){
-    if(Current.isAway) noteBtn.classList.add('show');
-    else noteBtn.classList.remove('show');
-  }
+  if(noteBtn){ if(Current.isAway) noteBtn.classList.add('show'); else noteBtn.classList.remove('show'); }
 }
 let trackTimer=null;
 function startTrackLoop(){
@@ -825,16 +812,9 @@ function openTrack(){
   Current.track.forEach(t=>{ if(!grouped[t.date])grouped[t.date]=[]; grouped[t.date].push(t); });
   const dates=Object.keys(grouped).sort().reverse();
   const today=todayStr();
-  const rows = dates.length===0
-    ? '<p style="color:var(--text-soft);font-size:13px;">还没有记录。</p>'
-    : dates.map(d=>{
-        const label = d===today ? '今天' : d;
-        return `<div class="track-day"><h3>${label}</h3>`+
-          grouped[d].map(t=>`<div class="row"><span class="time">${t.time}</span>在${t.place} · ${t.action}</div>`).join('')+`</div>`;
-      }).join('');
-  modal.innerHTML=`<h2>行踪 <span class="close" onclick="closeModal()">×</span></h2>
-    <p style="font-size:12px;color:var(--text-soft);margin-bottom:12px;">${weatherLine()}</p>
-    ${rows}`;
+  const rows = dates.length===0 ? '<p style="color:var(--text-soft);font-size:13px;">还没有记录。</p>'
+    : dates.map(d=>`<div class="track-day"><h3>${d===today?'今天':d}</h3>`+grouped[d].map(t=>`<div class="row"><span class="time">${t.time}</span>在${t.place} · ${t.action}</div>`).join('')+`</div>`).join('');
+  modal.innerHTML=`<h2>行踪 <span class="close" onclick="closeModal()">×</span></h2>${rows}`;
   openModal();
 }
 function openAwayNote(){
@@ -842,7 +822,6 @@ function openAwayNote(){
   const modal=document.getElementById('modalContent');
   modal.innerHTML=`
     <h2>留一张小纸条 <span class="close" onclick="closeModal()">×</span></h2>
-    <p style="font-size:12px;color:var(--text-soft);margin-bottom:12px;">他出门了，你可以留一张纸条，回来他会看到。</p>
     <div class="field"><textarea id="awayNoteInput" placeholder="想对他说点什么…">${Current.awayNote||''}</textarea></div>
     <button class="btn" onclick="saveAwayNote()">放在桌上</button>
   `;
@@ -850,8 +829,7 @@ function openAwayNote(){
 }
 function saveAwayNote(){
   if(!Current) return;
-  const t=document.getElementById('awayNoteInput').value.trim();
-  Current.awayNote = t || null;
+  Current.awayNote = document.getElementById('awayNoteInput').value.trim() || null;
   saveGameDebounced(); closeModal();
   say('你把纸条放在了桌上。','tip');
 }
@@ -874,12 +852,7 @@ function moodHint(){
   if(m>=40)return '他还好'; if(m>=20)return '他有点低落';
   return '他很难过';
 }
-
-/* ============ 反重复 ============ */
-function isTooSoonToTalk(){
-  if(!Current) return true;
-  return (Date.now() - Current.lastProactiveAt) < 5 * 60 * 1000;
-}
+function isTooSoonToTalk(){ if(!Current) return true; return (Date.now() - Current.lastProactiveAt) < 5 * 60 * 1000; }
 function rememberProactive(text){
   if(!Current) return;
   Current.lastProactiveAt = Date.now();
@@ -958,6 +931,12 @@ function buildSystemPrompt(userInput){
     `3. 情绪标签只能有一个，放在末尾。`,
     `4. 可附加 [背景色:#RRGGBB] 标签。`,
     `5. 颜文字单独放最后一行，格式：[颜文字]你的颜文字`,
+    '',
+    '========== 防念稿规则（最重要）==========',
+    '1. 绝对不要复述系统提示里给你的任何内容。',
+    '2. 如果看到【场景】标签，那是系统给你的背景信息，不是对方对你说的话，不要复述。',
+    '3. 不要提到"人设""规则""要求""设定""提示"这些词。',
+    '4. 直接以角色身份说话，用口语。不要用括号（）写动作或情绪。',
   );
   return parts.filter(Boolean).join('\n');
 }
@@ -1019,7 +998,7 @@ function applyEmotion(emo,label){
 
 /* ============ 气泡 ============ */
 const BUBBLE_LINE_HEIGHT = 54;
-const BUBBLE_MAX = 5;
+const BUBBLE_MAX = 8;
 function repositionAllBubbles(){
   const box=document.getElementById('bubbles'), stage=document.getElementById('stage'), wrap=document.getElementById('charWrap'), userWrap=document.getElementById('userWrap');
   if(!box||!stage||!wrap) return;
@@ -1033,11 +1012,12 @@ function repositionAllBubbles(){
     userCenterX = ur.left + ur.width/2 - stageRect.left;
     userTopY = ur.top - stageRect.top;
   }
-  const themBubbles = Array.from(box.children).filter(c=>c.classList.contains('them'));
-  themBubbles.forEach((el, i)=>{
+  // them 和 action 都放在角色头顶
+  const charBubbles = Array.from(box.children).filter(c=>c.classList.contains('them') || c.classList.contains('action'));
+  charBubbles.forEach((el, i)=>{
     const w = el.offsetWidth || 150, h = el.offsetHeight || 40;
     const left = Math.max(4, Math.min(stageRect.width - w - 4, charCenterX - w/2));
-    const fromBottom = (themBubbles.length - 1 - i);
+    const fromBottom = (charBubbles.length - 1 - i);
     const top = Math.max(4, charTopY - 8 - fromBottom * BUBBLE_LINE_HEIGHT - h);
     el.style.left = left + 'px'; el.style.top = top + 'px';
   });
@@ -1064,6 +1044,7 @@ function say(text,who='them',opts={}){
   if(opts.kaomoji){ const k=document.createElement('div'); k.className='kaomoji'; k.textContent=opts.kaomoji; div.appendChild(k); }
   div.style.left = '-9999px'; div.style.top = '-9999px';
   box.appendChild(div);
+  // 按 who 分别计数
   const sameType = Array.from(box.children).filter(c=>c.classList.contains(who));
   if(sameType.length > BUBBLE_MAX){
     const removeCount = sameType.length - BUBBLE_MAX;
@@ -1094,10 +1075,8 @@ function updateStats(){
 function renderBackground(){
   const bgImg=document.getElementById('bgImage'), bgDef=document.getElementById('bgDefault');
   bgDef.style.background='linear-gradient(160deg, var(--bg), var(--bg2))';
-  if(GlobalState.background){
-    bgImg.style.backgroundImage=`url(${GlobalState.background})`;
-    bgImg.style.display='block'; bgDef.style.display='none';
-  }else{ bgImg.style.display='none'; bgDef.style.display='block'; }
+  if(GlobalState.background){ bgImg.style.backgroundImage=`url(${GlobalState.background})`; bgImg.style.display='block'; bgDef.style.display='none'; }
+  else{ bgImg.style.display='none'; bgDef.style.display='block'; }
 }
 function renderCharacter(){
   const img=document.getElementById('charImg'), ph=document.getElementById('charPlaceholder');
@@ -1247,7 +1226,7 @@ function removeOutfit(i){
   openSettings(); renderCharacter();
 }
 
-/* ============ 触碰角色 ============ */
+/* ============ 触碰角色（独立气泡 + AI不带动作） ============ */
 let charPressTimer = null, charPressed = false, charDownY = 0, lastDragEnd=0;
 function bindCharTouch(wrap){
   let dragging=false, moved=false;
@@ -1317,28 +1296,36 @@ async function triggerTouchAction(action){
   if(Current.focusMode){ say('专注中，先专心。','tip'); return; }
   if(!API.ready){ needApiTip(); return; }
   const map = {
-    head:  { text:'（你伸手摸了摸他的头。）', prompt:'对方伸手摸了摸你的头。', anim:'scale(1.03) translateY(-2px)' },
-    face:  { text:'（你轻轻戳了戳他的脸。）', prompt:'对方轻轻戳了戳你的脸。', anim:'scale(0.98) rotate(2deg)' },
-    hand:  { text:'（你牵住了他的手。）', prompt:'对方牵住了你的手。', anim:'scale(1.02)' },
-    hug:   { text:'（你从背后轻轻抱住了他。）', prompt:'对方轻轻抱住了你。', anim:'scale(1.05) translateY(-3px)' },
-    carry: { text:'（你把他抱了起来，又轻轻放下。）', prompt:'对方把你抱起来，又轻轻放下。', anim:'scale(1.04)' },
-    hold:  { text:'（你伸手碰了碰他。）', prompt:'对方伸手碰了碰你。', anim:'scale(1.02)' },
+    head:  { text:'（你伸手摸了摸他的头。）', scene:'对方刚刚伸手摸了摸你的头。' },
+    face:  { text:'（你轻轻戳了戳他的脸。）', scene:'对方刚刚轻轻戳了戳你的脸。' },
+    hand:  { text:'（你牵住了他的手。）', scene:'对方刚刚牵住了你的手。' },
+    hug:   { text:'（你从背后轻轻抱住了他。）', scene:'对方刚刚从背后轻轻抱住了你。' },
+    carry: { text:'（你把他抱了起来，又轻轻放下。）', scene:'对方刚刚把你抱起来，又轻轻放下。' },
+    hold:  { text:'（你伸手碰了碰他。）', scene:'对方刚刚伸手碰了碰你。' },
   };
   const a = map[action] || map.hold;
+
+  // ① 先弹一个"你的动作"独立气泡（灰色斜体）
+  say(a.text, 'action');
+
+  // ② 动画
   const anim=document.getElementById('charAnim');
   if(anim){
     anim.style.transition='transform .3s';
-    anim.style.transform = a.anim;
-    setTimeout(()=>{ anim.style.transform='scale(1)'; }, 600);
+    anim.style.transform = 'scale(1.03)';
+    setTimeout(()=>{ anim.style.transform='scale(1)'; }, 500);
   }
-  say(a.text, 'tip');
+
   addRelationValue(1);
   updateStats(); saveGameDebounced();
+
+  // ③ 调 AI，但 prompt 里只写【场景】，不带括号、不带"（根据你的性格…）"
   try {
+    const sys = buildSystemPrompt('') + '\n\n【场景】' + a.scene + '\n【要求】这是已经发生的事，不是对方对你说的话。请直接以你的身份回应，1~2句。不要复述【场景】，不要提到"设定""规则""人设"，不要用括号写动作。';
     const reply = await callAI([
-      {role:'system',content:buildSystemPrompt(a.prompt)},
+      {role:'system',content: sys},
       ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
-      {role:'user',content:a.prompt + '（根据你的性格，说一句话回应。1~2句。）'},
+      {role:'user',content:'嗯。'},
     ]);
     if(reply){
       let{clean,emo,label}=parseEmotion(reply);
@@ -1385,6 +1372,7 @@ function bindStage(){
       saveGameDebounced();
     }
   }
+  // 宠物：拖动移动 / 点击弹面板
   if(petEl){
     let petDragging=false, petMoved=false, psx=0, psy=0, pox=0, poy=0;
     petEl.addEventListener('pointerdown',e=>{
@@ -1405,12 +1393,16 @@ function bindStage(){
       Current.pet.y=Math.max(0.3,Math.min(0.92,poy+dy));
       positionPet();
     }
-    function petUp(){
+    function petUp(e){
       if(!petDragging)return;
-      petDragging=false; petEl.classList.remove('dragging');
+      petDragging=false;
+      petEl.classList.remove('dragging');
       document.removeEventListener('pointermove',petMove);
       document.removeEventListener('pointerup',petUp);
-      if(!petMoved){ openPetPanel(); }
+      if(!petMoved){
+        e.stopPropagation();
+        openPetPanel();
+      }
       saveGameDebounced();
     }
   }
@@ -1459,8 +1451,8 @@ async function petFeed(){
   p.mood = Math.min(100, p.mood + 3);
   saveGameDebounced(); closeModal();
   if(Current.inventory['petfood']){ Current.inventory['petfood']--; }
-  say('你喂了宠物一点吃的。','tip');
-  await petAIReply('（对方喂了你的宠物，它吃得很开心。你说一句话。）');
+  say('（你喂了宠物一点吃的。）','action');
+  await petAIReply('对方刚刚喂了你的宠物，它吃得很开心。');
 }
 async function petPlay(){
   if(!Current) return;
@@ -1468,8 +1460,8 @@ async function petPlay(){
   p.mood = Math.min(100, p.mood + 20);
   p.food = Math.max(0, p.food - 5);
   saveGameDebounced(); closeModal();
-  say('你逗宠物玩了一会儿。','tip');
-  await petAIReply('（对方逗了你的宠物玩，它很兴奋。你说一句话。）');
+  say('（你逗宠物玩了一会儿。）','action');
+  await petAIReply('对方刚刚逗了你的宠物玩，它很兴奋。');
 }
 async function petClean(){
   if(!Current) return;
@@ -1477,21 +1469,22 @@ async function petClean(){
   p.clean = Math.min(100, p.clean + 25);
   p.mood = Math.min(100, p.mood + 5);
   saveGameDebounced(); closeModal();
-  say('你帮宠物清理了一下。','tip');
-  await petAIReply('（对方帮你的宠物清理干净了。你说一句话。）');
+  say('（你帮宠物清理了一下。）','action');
+  await petAIReply('对方刚刚帮你的宠物清理干净了。');
 }
 async function petTalk(){
   if(!Current) return;
   closeModal();
-  await petAIReply('（对方在看你的宠物。）');
+  await petAIReply('对方正在看着你的宠物。');
 }
-async function petAIReply(prompt){
+async function petAIReply(scene){
   if(!API.ready || !Current) return;
   try {
+    const sys = buildSystemPrompt('') + '\n\n【场景】' + scene + '\n【要求】这是已经发生的事，不是对方对你说的话。请直接以你的身份回应，1~2句。不要复述【场景】，不要提到"设定""规则""人设"，不要用括号写动作。';
     const reply = await callAI([
-      {role:'system',content:buildSystemPrompt(prompt)},
+      {role:'system',content: sys},
       ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
-      {role:'user',content:prompt+'（根据你的性格，说一句话回应。1~2句。）'},
+      {role:'user',content:'嗯。'},
     ]);
     if(reply){
       let{clean,emo,label}=parseEmotion(reply);
@@ -1522,7 +1515,7 @@ function checkPetInteract(){
   if(!API.ready || !Current || !Current.pet.has) return;
   if(Current.isAway || Current.isSleeping || Current.focusMode) return;
   if(Math.random() > 0.12) return;
-  const lines = ['（你摸了摸宠物，跟它说了句话。）','（你把宠物抱起来又放下。）','（你看了一眼宠物，笑了笑。）','（你逗了下宠物。）'];
+  const lines = ['你摸了摸宠物，跟它说了句话。','你把宠物抱起来又放下。','你看了一眼宠物，笑了笑。','你逗了下宠物。'];
   petAIReply(lines[Math.floor(Math.random()*lines.length)]);
 }
 setInterval(checkPetInteract, 30*60*1000);
@@ -1544,11 +1537,7 @@ function tickStats(){
   if(s.food < 30){ s.mood = Math.max(0, s.mood - 3*hours); }
   if(Current.lastInteract){
     const away = (now-Current.lastInteract)/3600000;
-    if(away > 12 && !Current.fightUntil){
-      Current.fightUntil = now + 30*60000;
-      s.mood = Math.max(0, s.mood - 5);
-      say('他似乎有点失落，不太想说话。','them');
-    }
+    if(away > 12 && !Current.fightUntil){ Current.fightUntil = now + 30*60000; s.mood = Math.max(0, s.mood - 5); say('他似乎有点失落，不太想说话。','them'); }
   }
   if(s.food<20&&s.energy<20&&!Current.sick){ Current.sick=true;say(`${Current.name}看起来不太舒服，脸色有点差……`,'them'); }
   if(Current.sick&&s.food>60&&s.energy>60){ Current.sick=false;say(`${Current.name}的精神好多了。`,'them'); }
@@ -1582,17 +1571,19 @@ function tryWork(){
       Current.inventory[gid] = (Current.inventory[gid]||0) + 1;
     }
     addRelationValue(2);
-    if(gotGift) say(`“回来啦，赚了 ${earn} 金币，路上还看到这个，顺手带回来了。”`,'them');
-    else say(`“回来了，赚了 ${earn} 金币。”`,'them');
+    const msg = gotGift ? `“回来啦，赚了 ${earn} 金币，路上还看到这个，顺手带回来了。”` : `“回来了，赚了 ${earn} 金币。”`;
+    say(msg,'them');
+    showInAppNotif(msg.replace(/[“”]/g,''));
     if(Current.awayNote){
       const note = Current.awayNote;
       Current.awayNote = null;
       setTimeout(()=>{
         if(API.ready){
+          const sys = buildSystemPrompt('') + '\n\n【场景】你刚回家，看到对方留在桌上的一张纸条，内容是：' + note + '\n【要求】请直接以你的身份回应这张纸条，1~2句。不要复述【场景】，不要提到"设定""规则"，不要用括号写动作。';
           callAI([
-            {role:'system',content:buildSystemPrompt('（你回家看到了对方留的纸条：' + note + '）')},
+            {role:'system',content:sys},
             ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
-            {role:'user',content:'（你回家看到了对方留的纸条：「' + note + '」）根据你的性格说一句回应，1~2句。'},
+            {role:'user',content:'嗯。'},
           ]).then(reply=>{
             if(reply){
               let{clean,emo,label}=parseEmotion(reply);
@@ -1602,6 +1593,7 @@ function tryWork(){
               say(clean,'them',{kaomoji:km.kaomoji});
               applyEmotion(emo,label);
               Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
+              showInAppNotif(clean);
               saveGameDebounced();
             }
           }).catch(()=>{});
@@ -1628,7 +1620,7 @@ function checkSurprise(){
   ];
   const s=pool[Math.floor(Math.random()*pool.length)];
   if(s.item)Current.inventory[s.item]=(Current.inventory[s.item]||0)+1;
-  setTimeout(()=>{ say(s.text,'them'); Current.stats.mood=Math.min(100,Current.stats.mood+5); updateStats();saveGameDebounced(); }, 3000);
+  setTimeout(()=>{ say(s.text,'them'); showInAppNotif(s.text); Current.stats.mood=Math.min(100,Current.stats.mood+5); updateStats();saveGameDebounced(); }, 3000);
 }
 setInterval(checkSurprise, 3600000);
 function checkEmo(){
@@ -1780,21 +1772,22 @@ async function proactiveTalk(type='idle'){
   if(Current.isAway || Current.focusMode)return;
   if(isTooSoonToTalk()) return;
   const prompt={
-    greet:'（对方刚打开页面，主动说一句话打个招呼。）',
-    idle:'（安静了一会，主动说一句话。注意：换点新话题，不要重复之前说过的。）',
-    night:'（现在是深夜，主动关心对方该睡觉了。）',
-    morning:'（现在是早上，主动说早安。）',
-    period:'（对方在生理期，主动关心她。）',
-    fight:'（你们刚闹了点别扭，你想找台阶下，但还端着一点。）',
-    meal:'（到饭点了，随口提一句吃的。）',
-    weather:'（根据今天的天气，随口聊一句。）',
-    emo:'（你今天有点闷，随口说一句。）',
-  }[type]||'（主动说一句话。）';
+    greet:'对方刚打开页面，主动说一句话打个招呼。',
+    idle:'安静了一会，主动说一句话。注意：换点新话题，不要重复之前说过的。',
+    night:'现在是深夜，主动关心对方该睡觉了。',
+    morning:'现在是早上，主动说早安。',
+    period:'对方在生理期，主动关心她。',
+    fight:'你们刚闹了点别扭，你想找台阶下，但还端着一点。',
+    meal:'到饭点了，随口提一句吃的。',
+    weather:'根据今天的天气，随口聊一句。',
+    emo:'你今天有点闷，随口说一句。',
+  }[type]||'主动说一句话。';
   try {
+    const sys = buildSystemPrompt('') + '\n\n【场景】' + prompt + '\n【要求】直接以你的身份说 1~2 句话。不要复述【场景】，不要提到"设定""规则"，不要用括号写动作。';
     const reply=await callAI([
-      {role:'system',content:buildSystemPrompt(prompt)},
+      {role:'system',content:sys},
       ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
-      {role:'user',content:prompt},
+      {role:'user',content:'嗯。'},
     ]);
     if(reply){
       let{clean,emo,label}=parseEmotion(reply);
@@ -1805,6 +1798,7 @@ async function proactiveTalk(type='idle'){
       applyEmotion(emo,label);
       Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
       rememberProactive(clean);
+      showInAppNotif(clean);
       saveGameDebounced();
     }
   } catch(e) {}
@@ -1825,7 +1819,7 @@ function openTouch(){
   const modal=document.getElementById('modalContent');
   modal.innerHTML=`
     <h2>互动 <span class="close" onclick="closeModal()">×</span></h2>
-    <p style="font-size:12px;color:var(--text-soft);margin-bottom:12px;">也可以在舞台上直接触碰他：点头部 / 点脸 / 点身体 / 长按 / 拖动。</p>
+    <p style="font-size:12px;color:var(--text-soft);margin-bottom:12px;">也可以直接触碰他：点头部 / 点脸 / 点身体 / 长按 / 拖动。</p>
     <div class="shop-item"><div class="info">摸头</div><button onclick="doTouch('head')">做</button></div>
     <div class="shop-item"><div class="info">戳脸</div><button onclick="doTouch('face')">做</button></div>
     <div class="shop-item"><div class="info">牵手</div><button onclick="doTouch('hand')">做</button></div>
@@ -1844,18 +1838,17 @@ async function doTouch(type){
   if(Current.isAway){ say('他在外面。','tip'); return; }
   if(Current.focusMode){ say('专注中。','tip'); return; }
   const map={
-    head:  { text:'（对方摸了摸你的头。）', anim:'scale(1.03) translateY(-2px)' },
-    face:  { text:'（对方戳了戳你的脸。）', anim:'scale(0.98) rotate(2deg)' },
-    hand:  { text:'（对方牵住了你的手。）', anim:'scale(1.02)' },
-    hug:   { text:'（对方抱住了你。）', anim:'scale(1.05)' },
-    window:{ text:'（你们一起看向窗外。）', anim:'scale(1)' },
-    cook:  { text:'（对方做了饭，你们一起吃。）', anim:'scale(1)' },
-    movie: { text:'（你们靠在一起看电影。）', anim:'scale(1.02)' },
-    night: { text:'（对方和你说晚安。）', anim:'scale(1)' },
+    head:  { text:'（你摸了摸他的头。）', scene:'对方刚刚摸了摸你的头。' },
+    face:  { text:'（你戳了戳他的脸。）', scene:'对方刚刚戳了戳你的脸。' },
+    hand:  { text:'（你牵住了他的手。）', scene:'对方刚刚牵住了你的手。' },
+    hug:   { text:'（你抱住了他。）', scene:'对方刚刚抱住了你。' },
+    window:{ text:'（你们一起看向窗外。）', scene:'你们正在一起看向窗外。' },
+    cook:  { text:'（你做了饭，你们一起吃。）', scene:'对方做了饭，你们正在一起吃。' },
+    movie: { text:'（你们靠在一起看电影。）', scene:'你们正在靠在一起看电影。' },
+    night: { text:'（你和他说晚安。）', scene:'对方正在和你说晚安。' },
   };
   const a = map[type] || map.head;
-  const anim=document.getElementById('charAnim');
-  if(anim){ anim.style.transition='transform .3s'; anim.style.transform = a.anim; setTimeout(()=>{ anim.style.transform='scale(1)'; }, 600); }
+  say(a.text, 'action');
   if(type==='cook'){
     if(Current.inventory['food']){ Current.inventory['food']--; Current.stats.food=Math.min(100,Current.stats.food+20); }
     else{ say('没有食材，先去商城买点吧。','them');return; }
@@ -1865,10 +1858,11 @@ async function doTouch(type){
   updateStats();saveGame();
   Current.lastInteract=Date.now();
   try {
+    const sys = buildSystemPrompt('') + '\n\n【场景】' + a.scene + '\n【要求】这是已经发生的事，不是对方对你说的话。请直接以你的身份回应，1~2句。不要复述【场景】，不要提到"设定""规则""人设"，不要用括号写动作。';
     const reply=await callAI([
-      {role:'system',content:buildSystemPrompt(a.text)},
+      {role:'system',content:sys},
       ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
-      {role:'user',content:a.text+'（根据你的性格，说一句话回应。1~2句。）'},
+      {role:'user',content:'嗯。'},
     ]);
     if(reply){
       let{clean,emo,label}=parseEmotion(reply);
@@ -1898,11 +1892,8 @@ function openDiary(){
     <button class="btn" onclick="saveDiary()">保存</button>
     <hr style="margin:18px 0;border:none;border-top:1px solid #00000011;">
     <label style="display:block;font-size:13px;color:var(--text-soft);margin-bottom:8px;">他的日记</label>
-    ${Current.diary.his.length===0
-      ?'<p style="color:var(--text-soft);font-size:13px;">他还没有写日记。</p>'
-      :Current.diary.his.slice(-5).reverse().map(d=>`
-        <div class="log-item"><div class="who">${d.date}</div><div class="txt">${d.text}</div></div>
-      `).join('')}
+    ${Current.diary.his.length===0?'<p style="color:var(--text-soft);font-size:13px;">他还没有写日记。</p>'
+      :Current.diary.his.slice(-5).reverse().map(d=>`<div class="log-item"><div class="who">${d.date}</div><div class="txt">${d.text}</div></div>`).join('')}
   `;
   openModal();
 }
@@ -1916,12 +1907,14 @@ async function saveDiary(){
   else Current.diary.yours.push({date:today,text});
   saveGame();
   try {
+    const sys = buildSystemPrompt('') + '\n\n【场景】你看到了对方今天写的日记，内容是：' + text + '\n【要求】请以' + Current.name + '的身份，写一篇今天的日记来回应，1~3句，口语，不要加情绪标签，不要提AI，不要用括号写动作。';
     const reply=await callAI([
-      {role:'system',content:buildSystemPrompt(text)},
-      {role:'user',content:`（你看到了对方今天写的日记：「${text}」）\n（以${Current.name}的身份，写一篇今天的日记来回应，1~3句，口语，不要加情绪标签。）`},
+      {role:'system',content:sys},
+      {role:'user',content:'嗯。'},
     ]);
     if(reply){
-      Current.diary.his.push({date:today,text:reply,replied:true});
+      const clean = parseEmotion(reply).clean;
+      Current.diary.his.push({date:today,text:clean,replied:true});
       say('他也在日记里写了一段话。','them');
       addRelationValue(2);
       saveGame();openDiary();
@@ -1951,7 +1944,6 @@ function openTimer(){
     </div>
     <p style="font-size:12px;color:var(--text-soft);margin-bottom:12px;">今天已完成 ${todayCount} 次 · 累计 ${todayMin} 分钟</p>
     <button class="btn" id="pomoBtn" onclick="togglePomo()">开始专注</button>
-    <p style="font-size:11px;color:var(--text-soft);margin-top:10px;text-align:center;">专注期间会锁住聊天框，角色会陪着你。</p>
     ${hist.length?'<hr style="margin:16px 0;border:none;border-top:1px solid #00000011;"><label style="font-size:13px;color:var(--text-soft);">最近专注</label>'+hist.map(h=>`<div class="log-item"><div class="who">${h.date}</div><div class="txt">${h.min} 分钟</div></div>`).join(''):''}
   `;
   openModal();updatePomoDisplay();
@@ -1986,10 +1978,11 @@ function togglePomo(){
       lockChat(false);
       updateStats();saveGame();
       if(API.ready && Current){
+        const sys = buildSystemPrompt('') + '\n\n【场景】对方刚完成一次专注，用了 ' + pomo.min + ' 分钟。\n【要求】根据你的性格，说一句关心或夸奖的话，1~2句。不要提到"设定""规则"，不要用括号写动作。';
         callAI([
-          {role:'system',content:buildSystemPrompt('（对方刚完成一次专注。）')},
+          {role:'system',content:sys},
           ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
-          {role:'user',content:`（对方刚专注了 ${pomo.min} 分钟。根据你的性格，说一句关心或夸奖的话，1~2句。）`},
+          {role:'user',content:'嗯。'},
         ]).then(reply=>{
           if(reply){
             let{clean,emo,label}=parseEmotion(reply);
@@ -1999,6 +1992,7 @@ function togglePomo(){
             say(clean,'them',{kaomoji:km.kaomoji});
             applyEmotion(emo,label);
             Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
+            showInAppNotif(clean);
             saveGameDebounced();
           }
         }).catch(()=>{});
@@ -2019,16 +2013,13 @@ function lockChat(lock){
 }
 
 /* ============ 陪睡 ============ */
-let sleepTimer=null;
-let sleepStartAt=null;
-let sleepTickTimer=null;
+let sleepTimer=null, sleepStartAt=null, sleepTickTimer=null;
 function openSleep(){
   const modal=document.getElementById('modalContent');
   modal.innerHTML=`
     <h2>陪睡 <span class="close" onclick="closeModal()">×</span></h2>
     <div class="field"><label>多久后自动结束（分钟，0 = 不自动）</label><input type="number" id="sleepMin" value="0" min="0" max="180"></div>
     <button class="btn" onclick="startSleep()">进入陪睡</button>
-    <p style="font-size:11px;color:var(--text-soft);margin-top:10px;text-align:center;">他会陪着你，可以听晚安故事。</p>
   `;
   openModal();
 }
@@ -2041,8 +2032,8 @@ async function startSleep(){
   if(API.ready){
     try {
       const reply=await callAI([
-        {role:'system',content:buildSystemPrompt('晚安')},
-        {role:'user',content:'（对方要睡了，轻声说一句晚安，1句，温柔一点。）'},
+        {role:'system',content:buildSystemPrompt('')+'\n\n【场景】对方要睡了。\n【要求】轻声说一句晚安，1句，温柔一点。'},
+        {role:'user',content:'嗯。'},
       ]);
       if(reply)text.textContent=parseEmotion(reply).clean;
     } catch(e) {}
@@ -2071,8 +2062,8 @@ async function tellSleepStory(){
   text.textContent = '……他想了想，开始轻声讲……';
   try {
     const reply=await callAI([
-      {role:'system',content:buildSystemPrompt('晚安故事')},
-      {role:'user',content:'（对方想听你讲一个晚安故事。根据你的性格，用 3~5 句话讲一个温柔的、安静的、适合睡前听的小故事。不要加情绪标签。）'},
+      {role:'system',content:buildSystemPrompt('')+'\n\n【场景】对方想听你讲一个晚安故事。\n【要求】用 3~5 句话讲一个温柔的、安静的、适合睡前听的小故事。不要加情绪标签，不要用括号写动作。'},
+      {role:'user',content:'嗯。'},
     ]);
     if(reply) text.textContent = parseEmotion(reply).clean;
   } catch(e){ text.textContent = '（故事讲不出来，网络有点卡。）'; }
@@ -2087,9 +2078,11 @@ function endSleep(){
   addRelationValue(1);saveGame();
   if(API.ready && Current){
     setTimeout(()=>{
+      const sys = buildSystemPrompt('') + '\n\n【场景】对方刚醒来。\n【要求】根据你的性格，轻声问一句「睡得好吗」之类，1~2句。不要提到"设定""规则"，不要用括号写动作。';
       callAI([
-        {role:'system',content:buildSystemPrompt('早安')},
-        {role:'user',content:'（对方刚醒来。根据你的性格，轻声问一句「睡得好吗」之类，1~2句。）'},
+        {role:'system',content:sys},
+        ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
+        {role:'user',content:'嗯。'},
       ]).then(reply=>{
         if(reply){
           let{clean,emo,label}=parseEmotion(reply);
@@ -2099,6 +2092,7 @@ function endSleep(){
           say(clean,'them',{kaomoji:km.kaomoji});
           applyEmotion(emo,label);
           Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
+          showInAppNotif(clean);
           saveGameDebounced();
         }
       }).catch(()=>{});
@@ -2149,13 +2143,10 @@ function openAnniv(){
   const modal=document.getElementById('modalContent');
   modal.innerHTML=`
     <h2>纪念日 <span class="close" onclick="closeModal()">×</span></h2>
-    <div id="annivList">
+    <div>
       ${Current.anniversaries.length===0?'<p style="color:var(--text-soft);font-size:13px;">还没有纪念日。</p>':''}
       ${Current.anniversaries.map((a,i)=>`
-        <div class="shop-item">
-          <div class="info">${a.emoji||'💖'} ${a.name||'纪念日'}<small>${a.date}</small></div>
-          <button onclick="removeAnniv(${i})">删除</button>
-        </div>
+        <div class="shop-item"><div class="info">${a.emoji||'💖'} ${a.name||'纪念日'}<small>${a.date}</small></div><button onclick="removeAnniv(${i})">删除</button></div>
       `).join('')}
     </div>
     <div class="field"><label>名称</label><input id="annivName" placeholder="例：第一次见面"></div>
@@ -2182,7 +2173,8 @@ function checkAnniv(){
   if(!hit || Current.__annivDone===today)return;
   Current.__annivDone=today;
   setTimeout(()=>{
-    say(`今天是「${hit.name}」呢……${hit.emoji}`,'them');
+    const t=`今天是「${hit.name}」呢……${hit.emoji}`;
+    say(t,'them'); showInAppNotif(t);
     Current.stats.mood=Math.min(100,Current.stats.mood+10);
     addRelationValue(5);
     updateStats();saveGameDebounced();
@@ -2198,12 +2190,7 @@ function openLog(){
   modal.innerHTML=`
     <h2>聊天记录 <span class="close" onclick="closeModal()">×</span></h2>
     ${log.length===0?'<p style="color:var(--text-soft);font-size:13px;">还没有聊天记录。</p>':''}
-    ${log.map(m=>`
-      <div class="log-item ${m.role==='user'?'you':''}">
-        <div class="who">${m.role==='user'?'你':Current.name}</div>
-        <div class="txt">${m.text}</div>
-      </div>
-    `).join('')}
+    ${log.map(m=>`<div class="log-item ${m.role==='user'?'you':''}"><div class="who">${m.role==='user'?'你':Current.name}</div><div class="txt">${m.text}</div></div>`).join('')}
   `;
   openModal();
 }
@@ -2213,22 +2200,10 @@ function openGameMenu(){
   const modal=document.getElementById('modalContent');
   modal.innerHTML=`
     <h2>小游戏 <span class="close" onclick="closeModal()">×</span></h2>
-    <div class="game-item" onclick="startGame('turtle')">
-      <div><div class="g-name">🐢 海龟汤</div><div class="g-desc">他给一个诡异故事，你来猜真相</div></div>
-      <div class="g-arrow">›</div>
-    </div>
-    <div class="game-item" onclick="startGame('bomb')">
-      <div><div class="g-name">💣 数字炸弹</div><div class="g-desc">1-100 里有个雷，轮流猜</div></div>
-      <div class="g-arrow">›</div>
-    </div>
-    <div class="game-item" onclick="startGame('twenty')">
-      <div><div class="g-name">❓ 20 问</div><div class="g-desc">他想了样东西，你问 20 个问题猜</div></div>
-      <div class="g-arrow">›</div>
-    </div>
-    <div class="game-item" onclick="startGame('story')">
-      <div><div class="g-name">📖 接龙编故事</div><div class="g-desc">你一句他一句，一起编故事</div></div>
-      <div class="g-arrow">›</div>
-    </div>
+    <div class="game-item" onclick="startGame('turtle')"><div><div class="g-name">🐢 海龟汤</div><div class="g-desc">他给一个诡异故事，你来猜真相</div></div><div class="g-arrow">›</div></div>
+    <div class="game-item" onclick="startGame('bomb')"><div><div class="g-name">💣 数字炸弹</div><div class="g-desc">1-100 里有个雷，轮流猜</div></div><div class="g-arrow">›</div></div>
+    <div class="game-item" onclick="startGame('twenty')"><div><div class="g-name">❓ 20 问</div><div class="g-desc">他想了样东西，你问 20 个问题猜</div></div><div class="g-arrow">›</div></div>
+    <div class="game-item" onclick="startGame('story')"><div><div class="g-name">📖 接龙编故事</div><div class="g-desc">你一句他一句，一起编故事</div></div><div class="g-arrow">›</div></div>
   `;
   openModal();
 }
@@ -2249,14 +2224,8 @@ async function initTurtleGame(){
       <div class="g-status">正在生成谜题…</div>
       <div class="g-content" id="turtleStory"></div>
       <div class="g-log" id="turtleLog"></div>
-      <div class="g-input-row">
-        <input id="turtleInput" placeholder="问一个是/不是的问题…">
-        <button onclick="turtleAsk()">问</button>
-      </div>
-      <div class="g-btn-row">
-        <button onclick="turtleReveal()">揭晓答案</button>
-        <button onclick="closeGame()">结束</button>
-      </div>
+      <div class="g-input-row"><input id="turtleInput" placeholder="问一个是/不是的问题…"><button onclick="turtleAsk()">问</button></div>
+      <div class="g-btn-row"><button onclick="turtleReveal()">揭晓答案</button><button onclick="closeGame()">结束</button></div>
     </div>
   `;
   openModal();
@@ -2266,7 +2235,7 @@ async function initTurtleGame(){
       {role:'user',content:'请生成一个海龟汤谜题。输出 JSON：{"story":"故事开头（1-2句，诡异但不恐怖，适合情侣玩）","answer":"真相（1-2句）"}。'}
     ], {maxTokens:300, temperature:0.9});
     let story='', answer='';
-    try{ const j = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); story=j.story; answer=j.answer; }catch(e){ story='一个人走进酒吧，点了一杯水，酒保却拔出了一把枪。'; answer='他打嗝，酒保用枪吓他。'; }
+    try{ const j = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); story=j.story||'一个人走进酒吧，点了一杯水，酒保却拔出了一把枪。'; answer=j.answer||'他打嗝，酒保用枪吓他。'; }catch(e){ story='一个人走进酒吧，点了一杯水，酒保却拔出了一把枪。'; answer='他打嗝，酒保用枪吓他。'; }
     Current.game.subState.story = story; Current.game.subState.answer = answer; Current.game.subState.log = [];
     document.getElementById('turtleStory').textContent = story;
     document.getElementById('turtleLog').textContent = '';
@@ -2277,8 +2246,7 @@ async function turtleAsk(){
   const q = input.value.trim();
   if(!q||!Current||!Current.game||!Current.game.subState)return;
   const s = Current.game.subState;
-  s.log = s.log || [];
-  s.log.push('你：'+q);
+  s.log = s.log || []; s.log.push('你：'+q);
   document.getElementById('turtleLog').textContent = s.log.join('\n');
   input.value = '';
   try{
@@ -2292,10 +2260,8 @@ async function turtleAsk(){
 }
 function turtleReveal(){
   if(!Current||!Current.game||!Current.game.subState)return;
-  const s = Current.game.subState;
-  s.log = s.log || [];
-  s.log.push('【真相】'+s.answer);
-  document.getElementById('turtleLog').textContent = s.log.join('\n');
+  Current.game.subState.log.push('【真相】'+Current.game.subState.answer);
+  document.getElementById('turtleLog').textContent = Current.game.subState.log.join('\n');
 }
 async function initBombGame(){
   const target = Math.floor(Math.random()*100)+1;
@@ -2307,10 +2273,7 @@ async function initBombGame(){
       <div class="g-status" id="bombRange">范围：1 - 100</div>
       <div class="g-content" id="bombHint">你猜一个数字，我猜一个，谁先踩到雷谁输。</div>
       <div class="g-log" id="bombLog"></div>
-      <div class="g-input-row">
-        <input id="bombInput" type="number" min="1" max="100" placeholder="猜 1-100">
-        <button onclick="bombGuess()">猜</button>
-      </div>
+      <div class="g-input-row"><input id="bombInput" type="number" min="1" max="100" placeholder="猜 1-100"><button onclick="bombGuess()">猜</button></div>
       <div class="g-btn-row"><button onclick="closeGame()">结束</button></div>
     </div>
   `;
@@ -2324,8 +2287,7 @@ async function bombGuess(){
   const n = parseInt(input.value);
   if(!n || n<s.low || n>s.high){ document.getElementById('bombHint').textContent = `请输入 ${s.low}-${s.high} 之间的数字`; return; }
   input.value = '';
-  s.log = s.log || [];
-  s.log.push(`你猜：${n}`);
+  s.log = s.log || []; s.log.push(`你猜：${n}`);
   if(n === s.target){
     s.log.push(`💥 踩到炸弹了！数字是 ${s.target}，你输了。`);
     document.getElementById('bombLog').textContent = s.log.join('\n');
@@ -2335,8 +2297,7 @@ async function bombGuess(){
   if(n < s.target) s.low = n+1; else s.high = n-1;
   document.getElementById('bombRange').textContent = `范围：${s.low} - ${s.high}`;
   document.getElementById('bombLog').textContent = s.log.join('\n');
-  s.turn = 'ai';
-  document.getElementById('bombHint').textContent = '他想一想…';
+  s.turn = 'ai'; document.getElementById('bombHint').textContent = '他想一想…';
   setTimeout(()=>{
     const aiGuess = Math.floor(Math.random()*(s.high - s.low + 1)) + s.low;
     s.log.push(`他猜：${aiGuess}`);
@@ -2344,15 +2305,12 @@ async function bombGuess(){
       s.log.push(`💥 踩到炸弹了！数字是 ${s.target}，他输了。`);
       document.getElementById('bombLog').textContent = s.log.join('\n');
       document.getElementById('bombHint').textContent = '他输了！点结束退出。';
-      s.turn = 'over';
-      addRelationValue(2); saveGame();
-      return;
+      s.turn = 'over'; addRelationValue(2); saveGame(); return;
     }
     if(aiGuess < s.target) s.low = aiGuess+1; else s.high = aiGuess-1;
     document.getElementById('bombRange').textContent = `范围：${s.low} - ${s.high}`;
     document.getElementById('bombLog').textContent = s.log.join('\n');
-    document.getElementById('bombHint').textContent = '轮到你了';
-    s.turn = 'user';
+    document.getElementById('bombHint').textContent = '轮到你了'; s.turn = 'user';
   }, 800);
 }
 async function initTwentyGame(){
@@ -2364,21 +2322,15 @@ async function initTwentyGame(){
       <div class="g-status" id="twentyStatus">他正在想一个东西…</div>
       <div class="g-content" id="twentyHint">你可以问 20 个是/不是问题，猜出他想的是什么。</div>
       <div class="g-log" id="twentyLog"></div>
-      <div class="g-input-row">
-        <input id="twentyInput" placeholder="问一个是/不是问题…">
-        <button onclick="twentyAsk()">问</button>
-      </div>
-      <div class="g-btn-row">
-        <button onclick="twentyGuessMode()">我要猜答案</button>
-        <button onclick="closeGame()">结束</button>
-      </div>
+      <div class="g-input-row"><input id="twentyInput" placeholder="问一个是/不是问题…"><button onclick="twentyAsk()">问</button></div>
+      <div class="g-btn-row"><button onclick="twentyGuessMode()">我要猜答案</button><button onclick="closeGame()">结束</button></div>
     </div>
   `;
   openModal();
   try{
     const reply = await callAI([
       {role:'system',content:'你是一个 20 问游戏主持人。只输出 JSON。'},
-      {role:'user',content:'请想一个常见的物品（日常、不要太冷门）。输出 JSON：{"item":"物品名"}。'}
+      {role:'user',content:'请想一个常见的物品。输出 JSON：{"item":"物品名"}。'}
     ], {maxTokens:50, temperature:1.0});
     let item='苹果';
     try{ const j = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); item = j.item || '苹果'; }catch(e){}
@@ -2394,8 +2346,7 @@ async function twentyAsk(){
   const input = document.getElementById('twentyInput');
   const q = input.value.trim(); if(!q)return;
   input.value = ''; s.questions++;
-  s.log = s.log || [];
-  s.log.push(`你问：${q}`);
+  s.log = s.log || []; s.log.push(`你问：${q}`);
   document.getElementById('twentyLog').textContent = s.log.join('\n');
   try{
     const reply = await callAI([
@@ -2413,11 +2364,9 @@ async function twentyGuessMode(){
   if(!s.item)return;
   const guess = prompt('你觉得他想的什么？');
   if(!guess)return;
-  s.log = s.log || [];
-  s.log.push(`你猜：${guess}`);
+  s.log = s.log || []; s.log.push(`你猜：${guess}`);
   if(guess.trim() === s.item || s.item.includes(guess.trim()) || guess.trim().includes(s.item)){
-    s.log.push(`🎉 猜对了！就是「${s.item}」。`);
-    addRelationValue(3); saveGame();
+    s.log.push(`🎉 猜对了！就是「${s.item}」。`); addRelationValue(3); saveGame();
   }else{ s.log.push(`❌ 不对。他想的是「${s.item}」。`); }
   document.getElementById('twentyLog').textContent = s.log.join('\n');
   s.item = null;
@@ -2430,14 +2379,8 @@ async function initStoryGame(){
     <div class="game-panel">
       <div class="g-status">你一句，他一句，一起编一个故事</div>
       <div class="g-log" id="storyLog" style="min-height:150px;"></div>
-      <div class="g-input-row">
-        <input id="storyInput" placeholder="你写第一句…">
-        <button onclick="storySend()">发</button>
-      </div>
-      <div class="g-btn-row">
-        <button onclick="storyEnd()">结束并查看全篇</button>
-        <button onclick="closeGame()">退出</button>
-      </div>
+      <div class="g-input-row"><input id="storyInput" placeholder="你写第一句…"><button onclick="storySend()">发</button></div>
+      <div class="g-btn-row"><button onclick="storyEnd()">结束并查看全篇</button><button onclick="closeGame()">退出</button></div>
     </div>
   `;
   openModal();
@@ -2478,10 +2421,7 @@ function openCharSwitch(){
       const img = (c.outfits&&c.outfits[c.currentOutfitIndex]) ? c.outfits[c.currentOutfitIndex].img : c.image;
       return `<div class="char-list-item ${isActive?'active':''}" onclick="switchCharacter('${c.id}')">
         ${img ? `<img src="${img}">` : `<div class="avatar-placeholder">🧑</div>`}
-        <div class="info">
-          <div class="n">${c.name}${isActive?' （当前）':''}</div>
-          <div class="d">${getRelationName(c.relationType)} · 好感 ${Math.round(c.relationValue)}</div>
-        </div>
+        <div class="info"><div class="n">${c.name}${isActive?' （当前）':''}</div><div class="d">${getRelationName(c.relationType)} · 好感 ${Math.round(c.relationValue)}</div></div>
         ${GlobalState.characters.length>1 ? `<button class="del-btn" onclick="event.stopPropagation();deleteCharacter('${c.id}')">删除</button>` : ''}
       </div>`;
     }).join('')}
@@ -2542,62 +2482,37 @@ function openSettings(){
     <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
     <div class="field"><label>他叫什么</label><input id="setName" value="${d.name}" oninput="settingsDraft.name=this.value"></div>
     <div class="field"><label>他叫你什么</label><input id="setCall" value="${d.callYou}" oninput="settingsDraft.callYou=this.value"></div>
-    <div class="field"><label>角色 / 身份</label>
-      <input id="setRole" value="${d.role||''}" placeholder="例：某公司的 CEO" oninput="settingsDraft.role=this.value"></div>
-    <div class="field"><label>性格（人设最高优先级）</label>
-      <textarea id="setPersonality" oninput="settingsDraft.personality=this.value">${d.personality||''}</textarea></div>
-    <div class="field"><label>背景故事</label>
-      <textarea id="setBackground" oninput="settingsDraft.background=this.value">${d.background||''}</textarea></div>
-    <div class="field"><label>世界观</label>
-      <textarea id="setWorldview" oninput="settingsDraft.worldview=this.value">${d.worldview||''}</textarea></div>
-    <div class="field"><label>说话风格</label>
-      <input id="setStyle" value="${d.style||''}" oninput="settingsDraft.style=this.value"></div>
+    <div class="field"><label>角色 / 身份</label><input id="setRole" value="${d.role||''}" oninput="settingsDraft.role=this.value"></div>
+    <div class="field"><label>性格（人设最高优先级）</label><textarea id="setPersonality" oninput="settingsDraft.personality=this.value">${d.personality||''}</textarea></div>
+    <div class="field"><label>背景故事</label><textarea id="setBackground" oninput="settingsDraft.background=this.value">${d.background||''}</textarea></div>
+    <div class="field"><label>世界观</label><textarea id="setWorldview" oninput="settingsDraft.worldview=this.value">${d.worldview||''}</textarea></div>
+    <div class="field"><label>说话风格</label><input id="setStyle" value="${d.style||''}" oninput="settingsDraft.style=this.value"></div>
     <div class="field"><label>语言</label>
       <select id="setLanguage" onchange="settingsDraft.language=this.value">
         ${['中文','English','日本語','한국어'].map(l=>`<option value="${l}" ${d.language===l?'selected':''}>${l}</option>`).join('')}
       </select>
     </div>
-    <div class="field"><label>开场白</label>
-      <input id="setIntro" value="${d.intro||''}" oninput="settingsDraft.intro=this.value"></div>
+    <div class="field"><label>开场白</label><input id="setIntro" value="${d.intro||''}" oninput="settingsDraft.intro=this.value"></div>
     <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
-    <div class="field"><label>我们的关系（只能选一个）</label>
+    <div class="field"><label>关系</label>
       <select id="setRelation" onchange="settingsDraft.relationType=this.value">
         ${REL_TYPES.map(rt=>`<option value="${rt.key}" ${d.relationType===rt.key?'selected':''}>${rt.name}</option>`).join('')}
       </select>
     </div>
-    <div class="field"><label>关系好感度（0-100）</label>
-      <input type="number" id="setRelationValue" min="0" max="100" value="${Math.round(d.relationValue)}" oninput="settingsDraft.relationValue=parseInt(this.value)||0">
-    </div>
+    <div class="field"><label>好感度</label><input type="number" id="setRelationValue" min="0" max="100" value="${Math.round(d.relationValue)}" oninput="settingsDraft.relationValue=parseInt(this.value)||0"></div>
     <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
-    <div class="field"><label>天气城市（留空 = 自动定位）</label>
+    <div class="field"><label>天气城市</label>
       <input id="setWeatherCity" value="${d.weatherManualCity||''}" oninput="settingsDraft.weatherManualCity=this.value">
-      <p style="font-size:11px;color:var(--text-soft);margin-top:6px;">当前：${GlobalState.weatherCity||'未知'} · ${GlobalState.weather}</p>
-      <button class="btn ghost" onclick="collectSettingsDraft();updateWeatherReal(true).then(()=>openSettings())">🔄 立即刷新天气</button>
+      <button class="btn ghost" onclick="collectSettingsDraft();updateWeatherReal(true).then(()=>openSettings())">🔄 刷新天气</button>
     </div>
-    <button class="btn ghost" onclick="collectSettingsDraft();openLorebook()">📖 编辑世界书（${(d.lorebook||[]).length} 条）</button>
+    <button class="btn ghost" onclick="collectSettingsDraft();openLorebook()">📖 世界书（${(d.lorebook||[]).length}）</button>
     <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
     <div class="field"><label>表情图</label>
-      <div>${(d.images||[]).map((im,i)=>`
-          <div class="face-item">
-            <img src="${im.img}">
-            <input value="${im.label||''}" placeholder="备注，如：开心" onchange="settingsDraft.images[${i}].label=this.value.trim()">
-            <button onclick="collectSettingsDraft();removeFace(${i})">删除</button>
-          </div>`).join('')}
-        ${(d.images||[]).length===0?'<p style="color:var(--text-soft);font-size:12px;">还没有表情图。</p>':''}
-      </div>
+      <div>${(d.images||[]).map((im,i)=>`<div class="face-item"><img src="${im.img}"><input value="${im.label||''}" placeholder="备注" onchange="settingsDraft.images[${i}].label=this.value.trim()"><button onclick="collectSettingsDraft();removeFace(${i})">删除</button></div>`).join('')}</div>
       <input type="file" id="faceUpload" accept="image/*" multiple onchange="handleFaceUpload(event)">
     </div>
-    <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
-    <div class="field"><label>服装（每次打开随机一套）</label>
-      <div>${(d.outfits||[]).map((o,i)=>`
-          <div class="face-item">
-            <img src="${o.img}">
-            <input value="${o.label||''}" placeholder="备注，如：睡衣" onchange="settingsDraft.outfits[${i}].label=this.value.trim()">
-            ${d.currentOutfitIndex === i ? '<span class="tag-preview">当前</span>' : ''}
-            <button onclick="collectSettingsDraft();removeOutfit(${i})">删除</button>
-          </div>`).join('')}
-        ${(d.outfits||[]).length===0?'<p style="color:var(--text-soft);font-size:12px;">还没有服装图。</p>':''}
-      </div>
+    <div class="field"><label>服装</label>
+      <div>${(d.outfits||[]).map((o,i)=>`<div class="face-item"><img src="${o.img}"><input value="${o.label||''}" placeholder="备注" onchange="settingsDraft.outfits[${i}].label=this.value.trim()">${d.currentOutfitIndex === i ? '<span class="tag-preview">当前</span>' : ''}<button onclick="collectSettingsDraft();removeOutfit(${i})">删除</button></div>`).join('')}</div>
       <input type="file" id="outfitUpload" accept="image/*" multiple onchange="handleOutfitUpload(event)">
     </div>
     <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
@@ -2610,12 +2525,8 @@ function openSettings(){
       ${d.userImage?'<button class="btn ghost" onclick="collectSettingsDraft();removeUserImage()">删除我的形象</button>':''}
     </div>
     <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
-    <div class="field"><label>API 地址</label>
-      <input id="setApiUrl" value="${d.apiUrl}" oninput="settingsDraft.apiUrl=this.value">
-    </div>
-    <div class="field"><label>API Key</label>
-      <input id="setApiKey" value="${d.apiKey}" oninput="settingsDraft.apiKey=this.value">
-    </div>
+    <div class="field"><label>API 地址</label><input id="setApiUrl" value="${d.apiUrl}" oninput="settingsDraft.apiUrl=this.value"></div>
+    <div class="field"><label>API Key</label><input id="setApiKey" value="${d.apiKey}" oninput="settingsDraft.apiKey=this.value"></div>
     <div class="field"><label>模型</label>
       <select id="setApiModelSelect" onchange="onModelChange()">
         ${KNOWN_MODELS.map(m=>`<option value="${m.id}" ${d.apiModel===m.id?'selected':''}>${m.label}</option>`).join('')}
@@ -2635,24 +2546,16 @@ function openSettings(){
     <div id="testBox"></div>
     <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
     <div class="field"><label>主题色</label>
-      <div class="main-palette">
-        ${MAIN_PALETTE.map(cl=>`<div class="main-swatch ${d.mainColor===cl?'active':''}"
-          style="background:${cl}" onclick="pickMainColor('${cl}')"></div>`).join('')}
-      </div>
-      <input type="color" value="${d.mainColor||'#ff8fab'}" onchange="pickMainColor(this.value)"
-             style="width:100%;height:48px;cursor:pointer;border-radius:12px;">
+      <div class="main-palette">${MAIN_PALETTE.map(cl=>`<div class="main-swatch ${d.mainColor===cl?'active':''}" style="background:${cl}" onclick="pickMainColor('${cl}')"></div>`).join('')}</div>
+      <input type="color" value="${d.mainColor||'#ff8fab'}" onchange="pickMainColor(this.value)" style="width:100%;height:48px;cursor:pointer;border-radius:12px;">
     </div>
     <div class="field"><label>背景色</label>
-      <div class="bg-palette">
-        ${['#ffe0e8','#fff5cc','#d8ecff','#d8f0dc','#e8d8ff','#f0e0d0','#ffd8d8','#d8f0f0','#ffd8f0','#d8ffe0','#f0e8d8','#d8d8ff'].map(cl=>`<div class="bg-swatch ${d.bgColor===cl?'active':''}"
-          style="background:${cl}" onclick="setBgColor('${cl}')"></div>`).join('')}
-      </div>
-      <input type="color" value="${d.bgColor||'#ffe0e8'}" onchange="setBgColor(this.value)"
-             style="width:100%;height:48px;cursor:pointer;border-radius:12px;">
+      <div class="bg-palette">${['#ffe0e8','#fff5cc','#d8ecff','#d8f0dc','#e8d8ff','#f0e0d0','#ffd8d8','#d8f0f0','#ffd8f0','#d8ffe0','#f0e8d8','#d8d8ff'].map(cl=>`<div class="bg-swatch ${d.bgColor===cl?'active':''}" style="background:${cl}" onclick="setBgColor('${cl}')"></div>`).join('')}</div>
+      <input type="color" value="${d.bgColor||'#ffe0e8'}" onchange="setBgColor(this.value)" style="width:100%;height:48px;cursor:pointer;border-radius:12px;">
     </div>
     <button class="btn" onclick="saveSettings()">保存设置</button>
     <button class="btn ghost" onclick="collectSettingsDraft();openPetSetup()">宠物</button>
-    <button class="btn ghost" onclick="collectSettingsDraft();openNotice(true)">📢 查看公告</button>
+    <button class="btn ghost" onclick="collectSettingsDraft();openNotice()">📢 查看公告</button>
     <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
     <button class="btn ghost" onclick="exportSave()">📤 导出存档</button>
     <input type="file" id="importFile" style="display:none" onchange="importSave(event)">
@@ -2684,17 +2587,12 @@ function saveSettings(){
   Current.worldview=d.worldview; Current.style=d.style; Current.language=d.language;
   Current.intro=d.intro; Current.relationType=d.relationType;
   Current.relationValue=Math.max(0,Math.min(100,parseInt(d.relationValue)||0));
-  Current.image = d.image;
-  Current.images = d.images;
-  Current.outfits = d.outfits;
+  Current.image = d.image; Current.images = d.images; Current.outfits = d.outfits;
   Current.currentOutfitIndex = d.currentOutfitIndex;
-  Current.pet = d.pet;
-  Current.lorebook = d.lorebook;
+  Current.pet = d.pet; Current.lorebook = d.lorebook;
   GlobalState.background = d.background_img;
-  GlobalState.userImage = d.userImage;
-  GlobalState.userShow = d.userShow;
-  GlobalState.mainColor = d.mainColor;
-  GlobalState.bgColor = d.bgColor;
+  GlobalState.userImage = d.userImage; GlobalState.userShow = d.userShow;
+  GlobalState.mainColor = d.mainColor; GlobalState.bgColor = d.bgColor;
   const newCity = (d.weatherManualCity || '').trim();
   if(newCity !== GlobalState.weatherManualCity){
     GlobalState.weatherManualCity = newCity;
@@ -2736,16 +2634,9 @@ function openLorebook(){
   const lb = (settingsDraft ? settingsDraft.lorebook : (Current.lorebook || []));
   modal.innerHTML=`
     <h2>世界书 <span class="close" onclick="collectSettingsDraft();openSettings()">×</span></h2>
-    <p style="font-size:12px;color:var(--text-soft);margin-bottom:12px;">当聊天里出现关键词时，会自动把对应内容加入设定。</p>
     <div>
       ${lb.length===0?'<p style="color:var(--text-soft);font-size:13px;">还没有条目。</p>':
-        lb.map((e,i)=>`
-          <div class="lore-item">
-            <input placeholder="关键词（多个用逗号分隔）" value="${e.key||''}" onchange="settingsDraft.lorebook[${i}].key=this.value">
-            <input placeholder="对应设定内容" value="${e.text||''}" onchange="settingsDraft.lorebook[${i}].text=this.value">
-            <div class="actions"><button class="del" onclick="deleteLore(${i})">删除</button></div>
-          </div>
-        `).join('')}
+        lb.map((e,i)=>`<div class="lore-item"><input placeholder="关键词" value="${e.key||''}" onchange="settingsDraft.lorebook[${i}].key=this.value"><input placeholder="内容" value="${e.text||''}" onchange="settingsDraft.lorebook[${i}].text=this.value"><div class="actions"><button class="del" onclick="deleteLore(${i})">删除</button></div></div>`).join('')}
     </div>
     <button class="btn ghost" onclick="addLore()">+ 添加条目</button>
     <button class="btn" onclick="collectSettingsDraft();openSettings()">保存并返回</button>
@@ -2763,18 +2654,10 @@ function openPetSetup(){
     <h2>宠物 <span class="close" onclick="collectSettingsDraft();openSettings()">×</span></h2>
     ${p.has?`
       <p style="font-size:13px;color:var(--text-soft);margin-bottom:12px;">当前宠物：${p.name}（${p.type}）</p>
-      <div class="field"><label>上传宠物图片</label>
-        <input type="file" id="petUpload" accept="image/*" onchange="handlePetUpload(event)">
-        ${p.image?'<button class="btn ghost" onclick="collectSettingsDraft();removePetImage()">删除宠物图</button>':''}
-      </div>
+      <div class="field"><label>上传宠物图片</label><input type="file" id="petUpload" accept="image/*" onchange="handlePetUpload(event)">${p.image?'<button class="btn ghost" onclick="collectSettingsDraft();removePetImage()">删除宠物图</button>':''}</div>
       <button class="btn ghost" onclick="collectSettingsDraft();removePet()">送走宠物</button>
     `:`
-      <div class="field"><label>种类</label>
-        <select id="petType">
-          <option value="cat">猫</option><option value="dog">狗</option>
-          <option value="rabbit">兔</option><option value="bird">鸟</option>
-        </select>
-      </div>
+      <div class="field"><label>种类</label><select id="petType"><option value="cat">猫</option><option value="dog">狗</option><option value="rabbit">兔</option><option value="bird">鸟</option></select></div>
       <div class="field"><label>名字</label><input id="petName" value="小家伙"></div>
       <button class="btn" onclick="createPet()">领养</button>
     `}
@@ -2812,14 +2695,8 @@ function markNoticeSeen(){
 }
 function openNotice(){
   const modal=document.getElementById('modalContent');
-  let html = NOTICE_TEXT
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/(1473727478@qq\.com)/g, '<span class="notice-email">$1</span>');
-  modal.innerHTML=`
-    <h2>📢 公告 <span class="close" onclick="closeNotice()">×</span></h2>
-    <div class="notice-body">${html}</div>
-    <button class="btn" onclick="closeNotice()">知道了</button>
-  `;
+  let html = NOTICE_TEXT.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/(1473727478@qq\.com)/g, '<span class="notice-email">$1</span>');
+  modal.innerHTML=`<h2>📢 公告 <span class="close" onclick="closeNotice()">×</span></h2><div class="notice-body">${html}</div><button class="btn" onclick="closeNotice()">知道了</button>`;
   openModal();
 }
 function closeNotice(){ markNoticeSeen(); closeModal(); }
@@ -2863,8 +2740,7 @@ function bindChat(){
 }
 const QUICK_TOPICS=['今天过得怎么样？','我有点累','想你了','在做什么？','陪我聊聊天','今天发生了一件小事'];
 function renderQuick(){
-  document.getElementById('quick').innerHTML=QUICK_TOPICS.map(t=>
-    `<button onclick="quickSend('${t}')">${t}</button>`).join('');
+  document.getElementById('quick').innerHTML=QUICK_TOPICS.map(t=>`<button onclick="quickSend('${t}')">${t}</button>`).join('');
 }
 function quickSend(t){
   if(!API.ready){ needApiTip(); return; }
@@ -2907,7 +2783,6 @@ function applySaveObject(d){
   GlobalState.characters = Array.isArray(d.characters) ? d.characters : [];
   GlobalState.currentCharId = d.currentCharId || null;
   if(d.lastTick) lastTick = d.lastTick;
-  // 字段补全
   GlobalState.characters = GlobalState.characters.map(raw=>{
     const c = newCharacterData(raw.id || ('c_'+Math.random().toString(36).slice(2,8)));
     for(const k in raw){ if(k in c) c[k] = raw[k]; }
@@ -2922,8 +2797,6 @@ function applySaveObject(d){
     if(!c.diary || typeof c.diary !== 'object') c.diary = { yours:[], his:[] };
     if(!c.period || typeof c.period !== 'object') c.period = { lastStart:null, cycle:28, duration:5, manualOn:false };
     if(!c.chatLog || !Array.isArray(c.chatLog)) c.chatLog = [];
-    if(typeof c.focusMode !== 'boolean') c.focusMode = false;
-    if(typeof c.focusUntil !== 'number') c.focusUntil = null;
     return c;
   });
   if(!GlobalState.characters.length){
@@ -2973,12 +2846,51 @@ function exportSave(){
       lastTick: lastTick,
     }
   };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = `yunqi_save_${todayStr()}.json`;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  const str = JSON.stringify(payload, null, 2);
+  const filename = `yunqi_save_${todayStr()}.json`;
+
+  // 方式1：尝试触发浏览器下载
+  try{
+    const blob = new Blob([str], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 3000);
+  }catch(e){}
+
+  // 方式2：弹出文本框 + 分享按钮兜底
+  setTimeout(()=>{
+    const modal = document.getElementById('modalContent');
+    const masked = str.length > 60000 ? str.slice(0,60000) + '\n...(太长已截断，建议用分享按钮)' : str;
+    modal.innerHTML=`
+      <h2>导出存档 <span class="close" onclick="closeSettings()">×</span></h2>
+      <p style="font-size:12px;color:var(--text-soft);margin-bottom:10px;">
+        已尝试下载文件到手机「下载」文件夹。<br>
+        如果没找到，可以点下方「分享」，或用文本框手动复制。
+      </p>
+      <button class="btn" onclick="shareSave('${filename}', \`${str.replace(/`/g,'\\`').replace(/\$/g,'\\$')}\`)">📤 分享到微信/QQ</button>
+      <textarea readonly style="min-height:180px;font-size:11px;margin-top:10px;" onclick="this.select()">${masked.replace(/</g,'&lt;')}</textarea>
+      <p style="font-size:11px;color:var(--text-soft);margin-top:6px;text-align:center;">长按文本框全选复制</p>
+      <button class="btn ghost" onclick="closeSettings()">返回设置</button>
+    `;
+    openModal();
+  }, 400);
+}
+function shareSave(filename, content){
+  try{
+    if(navigator.share){
+      const blob = new Blob([content], {type:'application/json'});
+      const file = new File([blob], filename, {type:'application/json'});
+      if(navigator.canShare && navigator.canShare({files:[file]})){
+        navigator.share({ files:[file], title:'云栖阁存档', text:'云栖阁存档' }).catch(()=>{});
+        return;
+      }
+      navigator.share({ title:'云栖阁存档', text: content.slice(0,3000) }).catch(()=>{});
+    } else {
+      alert('这个浏览器不支持分享，请长按文本框全选复制。');
+    }
+  }catch(e){ alert('分享失败：' + e.message); }
 }
 function importSave(e){
   const file = e.target.files[0]; if(!file)return;
