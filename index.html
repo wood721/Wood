@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -79,10 +79,11 @@ body{
 
 #petWrap{position:absolute;z-index:8;cursor:pointer;user-select:none;touch-action:none;
   width:70px;height:70px;filter:drop-shadow(0 3px 5px rgba(0,0,0,.15));
-  transition:left .5s ease, top .5s ease;display:none;align-items:center;justify-content:center;
+  transition:left 1s linear, top 1s linear;display:none;align-items:center;justify-content:center;
   font-size:38px;line-height:1;will-change:left, top;}
 #petWrap.dragging{transition:none;cursor:grabbing}
-#petWrap img{width:100%;height:100%;object-fit:contain;pointer-events:none;}
+#petWrap img{width:100%;height:100%;object-fit:contain;pointer-events:none;transform-origin:center;transition:transform .3s;}
+#petWrap.flipH img{transform:scaleX(-1);}
 #petWrap .zzz{position:absolute;top:-12px;right:-6px;font-size:14px;color:#aab;animation:breathe 3s infinite;}
 
 #awayNoteBtn{position:absolute;z-index:7;left:50%;top:50%;transform:translate(-50%,-50%);
@@ -156,6 +157,11 @@ body{
 .bg-palette{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
 .bg-swatch{aspect-ratio:1;border-radius:12px;cursor:pointer;border:3px solid transparent;box-shadow:0 2px 6px rgba(0,0,0,.06);}
 .bg-swatch.active{border-color:var(--text)}
+.pos-palette{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+.pos-swatch{aspect-ratio:2/1;border-radius:10px;cursor:pointer;border:3px solid transparent;
+  background:var(--accent);display:flex;align-items:center;justify-content:center;
+  font-size:12px;color:var(--text);font-weight:600;transition:transform .15s;}
+.pos-swatch.active{border-color:var(--text);background:var(--main);color:#fff;}
 
 .log-item{margin-bottom:12px;font-size:13px;line-height:1.5}
 .log-item .who{font-size:11px;color:var(--text-soft);margin-bottom:2px}
@@ -220,6 +226,12 @@ body{
 .pet-stat .lab{display:flex;justify-content:space-between;font-size:12px;color:var(--text-soft);margin-bottom:4px;}
 .pet-stat .bar{height:8px;background:var(--accent);border-radius:4px;overflow:hidden;}
 .pet-stat .bar>i{display:block;height:100%;background:var(--main);border-radius:4px;transition:width .4s;}
+.outfit-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px;}
+.outfit-cell{background:var(--card);border-radius:14px;padding:8px;box-shadow:0 2px 8px rgba(229,107,140,.06);
+  cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;border:3px solid transparent;}
+.outfit-cell.active{border-color:var(--main);}
+.outfit-cell img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:10px;}
+.outfit-cell .lbl{font-size:11px;color:var(--text-soft);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .notice-body{font-size:14px;line-height:1.8;color:var(--text);background:var(--card);border-radius:16px;padding:16px;white-space:pre-wrap;box-shadow:0 2px 8px rgba(229,107,140,.06);}
 .notice-email{color:var(--main-dark);font-weight:600;}
 </style>
@@ -289,6 +301,7 @@ body{
   <div class="toolbar">
     <div class="tool" data-panel="gift"><span class="ico">🎁</span>送礼物</div>
     <div class="tool" data-panel="touch"><span class="ico">✋</span>互动</div>
+    <div class="tool" data-panel="outfit"><span class="ico">👗</span>换装</div>
     <div class="tool" data-panel="game"><span class="ico">🎮</span>小游戏</div>
     <div class="tool" data-panel="shop"><span class="ico">🛒</span>商城</div>
     <div class="tool" data-panel="diary"><span class="ico">📔</span>日记</div>
@@ -329,11 +342,6 @@ function showInAppNotif(text){
   box.classList.add('show');
   if(notifTimer) clearTimeout(notifTimer);
   notifTimer = setTimeout(()=>{ box.classList.remove('show'); }, 4000);
-  try {
-    if('Notification' in window && Notification.permission === 'granted'){
-      new Notification(Current ? Current.name : '他', { body: text });
-    }
-  } catch(e){}
 }
 document.getElementById('inAppNotif').addEventListener('click', ()=>{
   document.getElementById('inAppNotif').classList.remove('show');
@@ -353,9 +361,10 @@ const NOTICE_TEXT = "游戏反馈和bug修复可以投稿至 1473727478@qq.com\n
 
 /* ============ 全局 ============ */
 const GlobalState = {
-  version: 15,
+  version: 16,
   mainColor: '#ff8fab', bgColor: '#ffe0e8',
   background: null, userImage: null, userShow: false, userX: 0.5, userY: 0.88,
+  userBubblePos: 'center',
   fallbackModels: [], useFallback: true,
   weather: '晴', weatherDate: null, weatherCity: '',
   weatherLat: null, weatherLon: null, weatherManualCity: '', weatherUpdatedAt: 0,
@@ -378,9 +387,12 @@ function newCharacterData(id){
     lastSurpriseDate:null, lastMeal:null, emoUntil:null,
     isSleeping:false, isAway:false, awayUntil:null, awayNote:null,
     customShopItems:[],
-    pet:{ has:false, type:'cat', name:'小家伙', image:null, x:0.78, y:0.82, food:80, clean:80, mood:80, lastTick:Date.now() },
+    pet:{ has:false, type:'cat', name:'小家伙', image:null, x:0.78, y:0.82, food:80, clean:80, mood:80, lastTick:Date.now(), flip:false, nextWalkAt:0 },
     lastProactiveAt:0, lastProactiveText:'', recentTopics:[],
     pomoHistory:[], focusMode:false, focusUntil:null,
+    pomoGoalMin: 120,
+    lastPomoNudge: 0,
+    recentGames: [],
   };
 }
 let Current = null;
@@ -401,10 +413,13 @@ function initSettingsDraft(){
     pet:deepCloneSafe(c.pet || { has:false, type:'cat', name:'小家伙', image:null, x:0.78, y:0.82, food:80, clean:80, mood:80, lastTick:Date.now() }),
     lorebook:deepCloneSafe(c.lorebook||[]),
     background_img:GlobalState.background||null, userImage:GlobalState.userImage||null,
-    userShow:!!GlobalState.userShow, mainColor:GlobalState.mainColor||'#ff8fab',
+    userShow:!!GlobalState.userShow,
+    userBubblePos: GlobalState.userBubblePos || 'center',
+    mainColor:GlobalState.mainColor||'#ff8fab',
     bgColor:GlobalState.bgColor||'#ffe0e8', weatherManualCity:GlobalState.weatherManualCity||'',
     apiUrl:API.baseUrl||'', apiKey:API.key||'', apiModel:API.model||'',
     useFallback:!!GlobalState.useFallback, fallbackModels:(GlobalState.fallbackModels||[]).slice(),
+    pomoGoalMin: (typeof c.pomoGoalMin === 'number') ? c.pomoGoalMin : 120,
   };
 }
 function collectSettingsDraft(){
@@ -429,6 +444,8 @@ function collectSettingsDraft(){
   if(g('useFallbackChk')) settingsDraft.useFallback = g('useFallbackChk').checked;
   if(g('setFallback')) settingsDraft.fallbackModels = g('setFallback').value.split(',').map(s=>s.trim()).filter(Boolean);
   if(g('userShowChk')) settingsDraft.userShow = g('userShowChk').checked;
+  if(g('petNameInput')) settingsDraft.pet.name = g('petNameInput').value.trim() || '小家伙';
+  if(g('pomoGoalInput')) settingsDraft.pomoGoalMin = Math.max(0, parseInt(g('pomoGoalInput').value)||0);
 }
 
 /* ============ 图片压缩 ============ */
@@ -892,13 +909,15 @@ function buildSystemPrompt(userInput){
     `- 默认回复 1~3 句。`,
     `- 默认语气：${love>=75?'温柔亲昵':love>=50?'亲近关心':love>=25?'轻松开玩笑':'平淡有点距离'}。`,
     `- 默认不用颜文字，偶尔可以。默认用口语。`,
-    c.language ? `- 默认用${c.language}回复。` : '',
+    c.language ? `- 必须用${c.language}回复。不管你之前用什么语言，从这一句开始全部用${c.language}。` : '',
     '',
     '========== 你现在的情况 ==========',
     `关系：${getRelationName(c.relationType)}（好感 ${Math.round(c.relationValue)}/100）`,
     `心情：${moodHint()}（心情值 ${Math.round(c.stats.mood)}/100）`,
+    `精力：${c.stats.energy>=70?'精神不错':c.stats.energy>=40?'还好':c.stats.energy>=15?'有点累了':'非常疲惫'}（${Math.round(c.stats.energy)}/100）`,
     `天气：${GlobalState.weather}${GlobalState.weatherCity?'（'+GlobalState.weatherCity+'）':''}`,
   ];
+  if(c.stats.energy < 30) parts.push('（你现在很累了，说话会简短、有点困。）');
   if(c.emoUntil && Date.now() < c.emoUntil) parts.push('（你今天心情有点低，说话会稍微安静一点。人设不变。）');
   if(c.fightUntil && Date.now() < c.fightUntil) parts.push('（你在闹别扭，说话会有点冷淡，但底色还是在意她的。人设不变。）');
   if(c.isSleeping) parts.push('（现在是深夜，你在睡觉。被叫醒时说话含糊、困困的。人设不变。）');
@@ -994,6 +1013,18 @@ function applyEmotion(emo,label){
 /* ============ 气泡 ============ */
 const BUBBLE_LINE_HEIGHT = 54;
 const BUBBLE_MAX = 8;
+function getBubbleLeftFor(pos, stageW, bubbleW){
+  const margin = 8;
+  if(pos === 'left') return margin;
+  if(pos === 'right') return Math.max(margin, stageW - bubbleW - margin);
+  if(pos === 'random'){
+    const r = Math.random();
+    if(r < 0.33) return margin;
+    if(r < 0.66) return Math.max(margin, (stageW - bubbleW)/2);
+    return Math.max(margin, stageW - bubbleW - margin);
+  }
+  return Math.max(margin, (stageW - bubbleW)/2);
+}
 function repositionAllBubbles(){
   const box=document.getElementById('bubbles'), stage=document.getElementById('stage'), wrap=document.getElementById('charWrap'), userWrap=document.getElementById('userWrap');
   if(!box||!stage||!wrap) return;
@@ -1016,9 +1047,10 @@ function repositionAllBubbles(){
     el.style.left = left + 'px'; el.style.top = top + 'px';
   });
   const youBubbles = Array.from(box.children).filter(c=>c.classList.contains('you'));
+  const pos = GlobalState.userBubblePos || 'center';
   youBubbles.forEach((el, i)=>{
     const w = el.offsetWidth || 150, h = el.offsetHeight || 40;
-    const left = Math.max(4, Math.min(stageRect.width - w - 4, userCenterX - w/2));
+    const left = getBubbleLeftFor(pos, stageRect.width, w);
     const fromBottom = (youBubbles.length - 1 - i);
     const top = Math.max(4, userTopY - 8 - fromBottom * BUBBLE_LINE_HEIGHT - h);
     el.style.left = left + 'px'; el.style.top = top + 'px';
@@ -1117,6 +1149,7 @@ function renderPet(){
   if(Current.pet.image){ const i=document.createElement('img'); i.src=Current.pet.image; el.appendChild(i); }
   else { const icons={cat:'🐱',dog:'🐶',rabbit:'🐰',bird:'🐦'}; el.textContent=icons[Current.pet.type]||'🐾'; }
   if(isNightTime()){ const z=document.createElement('div'); z.className='zzz'; z.textContent='zZ'; el.appendChild(z); }
+  el.classList.toggle('flipH', !!Current.pet.flip);
   positionPet();
 }
 function positionPet(){
@@ -1143,6 +1176,28 @@ function dropToGround(){
   const step=()=>{ Current.y=Math.min(target, Current.y+0.012); positionCharacter(); if(Current.y<target-0.005)setTimeout(step,30); };
   step();
 }
+
+/* ============ 宠物乱走 ============ */
+function scheduleNextPetWalk(){
+  if(!Current) return;
+  const delay = 30000 + Math.random() * 150000;
+  Current.pet.nextWalkAt = Date.now() + delay;
+}
+function petWalkTick(){
+  if(!Current || !Current.pet.has) return;
+  if(Current.pet.nextWalkAt && Date.now() < Current.pet.nextWalkAt) return;
+  if(isNightTime()){ scheduleNextPetWalk(); return; }
+  const nx = 0.1 + Math.random() * 0.8;
+  const ny = 0.3 + Math.random() * 0.55;
+  const oldX = Current.pet.x;
+  Current.pet.x = nx;
+  Current.pet.y = ny;
+  Current.pet.flip = nx < oldX;
+  renderPet();
+  scheduleNextPetWalk();
+  saveGameDebounced();
+}
+setInterval(petWalkTick, 5000);
 
 /* ============ 上传 ============ */
 async function handleCharUpload(e){
@@ -1219,6 +1274,40 @@ function removeOutfit(i){
   openSettings(); renderCharacter();
 }
 
+/* ============ 换装面板 ============ */
+function openOutfitPicker(){
+  if(!Current) return;
+  const list = Current.outfits || [];
+  const modal=document.getElementById('modalContent');
+  if(!list.length){
+    modal.innerHTML=`<h2>换装 <span class="close" onclick="closeModal()">×</span></h2>
+      <p style="color:var(--text-soft);font-size:13px;">还没有上传服装图。去设置里上传吧。</p>
+      <button class="btn ghost" onclick="closeModal();openSettings()">去设置</button>`;
+    openModal();
+    return;
+  }
+  modal.innerHTML=`
+    <h2>换装 <span class="close" onclick="closeModal()">×</span></h2>
+    <p style="font-size:12px;color:var(--text-soft);margin-bottom:8px;">点一套穿它。</p>
+    <div class="outfit-grid">
+      ${list.map((o,i)=>`
+        <div class="outfit-cell ${Current.currentOutfitIndex===i?'active':''}" onclick="pickOutfit(${i})">
+          <img src="${o.img}">
+          <div class="lbl">${o.label || ('服装 '+(i+1))}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  openModal();
+}
+function pickOutfit(i){
+  if(!Current) return;
+  Current.currentOutfitIndex = i;
+  saveGame(); renderCharacter();
+  closeModal();
+  say('换好衣服啦～','tip');
+}
+
 /* ============ 触碰角色 ============ */
 let charPressTimer = null, charPressed = false, charDownY = 0, lastDragEnd=0;
 function bindCharTouch(wrap){
@@ -1283,10 +1372,19 @@ function bindCharTouch(wrap){
   }
   wrap.addEventListener('pointerdown',onDown);
 }
+function energyTooLowBlock(){
+  if(!Current) return false;
+  if(Current.stats.energy < 15){
+    say('（他太累了，没力气回应你。）','action');
+    return true;
+  }
+  return false;
+}
 async function triggerTouchAction(action){
   if(!Current) return;
   if(Current.isAway){ say('他不在家。','tip'); return; }
   if(Current.focusMode){ say('专注中，先专心。','tip'); return; }
+  if(energyTooLowBlock()) return;
   if(!API.ready){ needApiTip(); return; }
   const map = {
     head:  { text:'（你伸手摸了摸他的头。）', scene:'对方刚刚伸手摸了摸你的头。' },
@@ -1354,7 +1452,6 @@ function bindStage(){
       saveGameDebounced();
     }
   }
-  // 宠物：只用 pointerdown 记录起点，pointermove 判断，pointerup 判定是否点击
   if(petEl){
     let petDragging=false, petMoved=false, psx=0, psy=0, pox=0, poy=0;
     petEl.addEventListener('pointerdown',e=>{
@@ -1383,10 +1480,7 @@ function bindStage(){
       document.removeEventListener('pointermove',petMove);
       document.removeEventListener('pointerup',petUp);
       document.removeEventListener('pointercancel',petUp);
-      if(!petMoved){
-        // 用 setTimeout 绕开 WebView 的事件顺序问题
-        setTimeout(()=>{ openPetPanel(); }, 0);
-      }
+      if(!petMoved){ setTimeout(()=>{ openPetPanel(); }, 0); }
       saveGameDebounced();
     }
   }
@@ -1519,6 +1613,9 @@ function tickStats(){
   s.mood=Math.max(0,s.mood-DECAY_PER_HOUR.mood*hours);
   if(hours>6)s.mood=Math.max(0,s.mood-(hours-6)*2);
   if(s.food < 30){ s.mood = Math.max(0, s.mood - 3*hours); }
+  const hour=new Date().getHours();
+  if(hour >= 23 || hour < 6){ s.energy = Math.min(100, s.energy + 8*hours); }
+  else if(s.food > 60){ s.energy = Math.min(100, s.energy + 1*hours); }
   if(Current.lastInteract){
     const away = (now-Current.lastInteract)/3600000;
     if(away > 12 && !Current.fightUntil){ Current.fightUntil = now + 30*60000; s.mood = Math.max(0, s.mood - 5); say('他似乎有点失落，不太想说话。','them'); }
@@ -1591,6 +1688,53 @@ function tryWork(){
 }
 setInterval(tryWork,5*60000);
 
+/* ============ 番茄钟催学习 ============ */
+function getTodayPomoMin(){
+  if(!Current || !Current.pomoHistory) return 0;
+  const today = todayStr();
+  return Current.pomoHistory.filter(h=>h.date===today).reduce((a,b)=>a+(b.min||0),0);
+}
+function nudgeStudy(){
+  if(!API.ready || !Current) return;
+  if(Current.isAway || Current.isSleeping || Current.focusMode) return;
+  const goal = Current.pomoGoalMin || 0;
+  if(goal <= 0) return;
+  const done = getTodayPomoMin();
+  if(done >= goal) return;
+  const h = new Date().getHours();
+  if(h >= 22) return;
+  const remain = goal - done;
+  const remainTxt = remain >= 60 ? `${Math.floor(remain/60)} 小时 ${remain%60} 分钟` : `${remain} 分钟`;
+  const promptMap = h < 12 ? '现在是早上，提醒对方今天的学习目标还没完成。'
+    : h < 18 ? '现在是下午，提醒对方今天的学习目标还有一部分没完成。'
+    : '现在是晚上，提醒对方今天的学习目标快接近尾声了。';
+  const sys = buildSystemPrompt('') + '\n\n【场景】' + promptMap + '对方今天的目标是 ' + goal + ' 分钟，已经完成 ' + done + ' 分钟，还差 ' + remainTxt + '。\n【要求】根据你的性格，自然地催一下对方去学习/专注，1~2句。不要提到"设定""规则"，不要用括号写动作。';
+  callAI([
+    {role:'system',content:sys},
+    ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
+    {role:'user',content:'【系统触发】'},
+  ]).then(reply=>{
+    if(reply){
+      let{clean,emo,label}=parseEmotion(reply);
+      const bg=parseBgColor(clean); clean=bg.clean;
+      const km=parseKaomoji(clean); clean=km.clean;
+      if(bg.color)applyBgColor(bg.color);
+      say(clean,'them',{kaomoji:km.kaomoji});
+      applyEmotion(emo,label);
+      Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
+      showInAppNotif(clean);
+      Current.lastPomoNudge = Date.now();
+      saveGameDebounced();
+    }
+  }).catch(()=>{});
+}
+setInterval(()=>{
+  if(!Current) return;
+  if(Current.lastPomoNudge && Date.now() - Current.lastPomoNudge < 2*3600000) return;
+  if(Current.lastProactiveAt && Date.now() - Current.lastProactiveAt < 30*60*1000) return;
+  nudgeStudy();
+}, 10*60*1000);
+
 /* ============ 小惊喜 / emo ============ */
 function checkSurprise(){
   if(!Current) return;
@@ -1619,12 +1763,12 @@ setInterval(checkEmo, 600000);
 
 /* ============ 商城 ============ */
 const SHOP_ITEMS=[
-  {id:'tea',name:'热茶',price:5,type:'food',effect:{food:15,mood:5},desc:'暖暖的，喝了心情好'},
-  {id:'cake',name:'小蛋糕',price:8,type:'food',effect:{food:25,mood:10},desc:'甜甜的，他喜欢'},
+  {id:'tea',name:'热茶',price:5,type:'food',effect:{food:15,mood:5,energy:8},desc:'暖暖的，喝了精神好'},
+  {id:'cake',name:'小蛋糕',price:8,type:'food',effect:{food:25,mood:10,energy:10},desc:'甜甜的，他喜欢'},
   {id:'book',name:'一本书',price:12,type:'gift',effect:{mood:15},desc:'安静地看一会'},
   {id:'flower',name:'一束花',price:15,type:'gift',effect:{mood:20,rel:3},desc:'放在桌上很好看'},
   {id:'cloth',name:'新衣服',price:30,type:'cloth',effect:{mood:25,rel:5},desc:'换上新衣服'},
-  {id:'food',name:'食材',price:6,type:'food',effect:{food:20},desc:'可以做饭'},
+  {id:'food',name:'食材',price:6,type:'food',effect:{food:20,energy:5},desc:'可以做饭'},
   {id:'medicine',name:'药',price:10,type:'cure',effect:{sick:true},desc:'生病时用'},
   {id:'petfood',name:'宠物粮',price:5,type:'pet',effect:{petFood:30},desc:'给宠物吃'},
 ];
@@ -1694,6 +1838,7 @@ function useItem(id){
   if(it.effect){
     if(it.effect.food)Current.stats.food=Math.min(100,Current.stats.food+it.effect.food);
     if(it.effect.mood)Current.stats.mood=Math.min(100,Current.stats.mood+it.effect.mood);
+    if(it.effect.energy)Current.stats.energy=Math.min(100,Current.stats.energy+it.effect.energy);
     if(it.effect.rel)addRelationValue(it.effect.rel);
     if(it.effect.sick&&Current.sick)Current.sick=false;
     if(it.effect.petFood&&Current.pet.has)Current.pet.food=Math.min(100,(Current.pet.food||80)+it.effect.petFood);
@@ -1821,6 +1966,7 @@ async function doTouch(type){
   if(!API.ready){ needApiTip(); return; }
   if(Current.isAway){ say('他在外面。','tip'); return; }
   if(Current.focusMode){ say('专注中。','tip'); return; }
+  if(energyTooLowBlock()) return;
   const map={
     head:  { text:'（你摸了摸他的头。）', scene:'对方刚刚摸了摸你的头。' },
     face:  { text:'（你戳了戳他的脸。）', scene:'对方刚刚戳了戳你的脸。' },
@@ -1913,6 +2059,7 @@ function openTimer(){
   const hist = (Current && Current.pomoHistory) ? Current.pomoHistory.slice(-7).reverse() : [];
   const todayCount = hist.filter(h => h.date === todayStr()).length;
   const todayMin = hist.filter(h => h.date === todayStr()).reduce((a,b)=>a+b.min,0);
+  const goal = Current ? (Current.pomoGoalMin || 120) : 120;
   modal.innerHTML=`
     <h2>番茄钟 <span class="close" onclick="closeModal()">×</span></h2>
     <div class="timer-display" id="pomoDisplay">25:00</div>
@@ -1926,11 +2073,22 @@ function openTimer(){
       </select>
       <input type="number" id="pomoMin" value="25" min="1" max="180" style="margin-top:6px;">
     </div>
-    <p style="font-size:12px;color:var(--text-soft);margin-bottom:12px;">今天已完成 ${todayCount} 次 · 累计 ${todayMin} 分钟</p>
+    <div class="field"><label>今日目标（分钟）</label>
+      <input type="number" id="pomoGoalInput" value="${goal}" min="0" max="600">
+    </div>
+    <p style="font-size:12px;color:var(--text-soft);margin-bottom:12px;">今天已完成 ${todayCount} 次 · 累计 ${todayMin} / ${goal} 分钟</p>
     <button class="btn" id="pomoBtn" onclick="togglePomo()">开始专注</button>
+    <button class="btn ghost" onclick="savePomoGoal()">保存目标</button>
     ${hist.length?'<hr style="margin:16px 0;border:none;border-top:1px solid #00000011;"><label style="font-size:13px;color:var(--text-soft);">最近专注</label>'+hist.map(h=>`<div class="log-item"><div class="who">${h.date}</div><div class="txt">${h.min} 分钟</div></div>`).join(''):''}
   `;
   openModal();updatePomoDisplay();
+}
+function savePomoGoal(){
+  if(!Current) return;
+  const v = parseInt(document.getElementById('pomoGoalInput').value)||0;
+  Current.pomoGoalMin = Math.max(0, v);
+  saveGame();
+  say('今日目标已更新。','tip');
 }
 function togglePomo(){
   if(pomo.running){
@@ -1962,7 +2120,12 @@ function togglePomo(){
       lockChat(false);
       updateStats();saveGame();
       if(API.ready && Current){
-        const sys = buildSystemPrompt('') + '\n\n【场景】对方刚完成一次专注，用了 ' + pomo.min + ' 分钟。\n【要求】根据你的性格，说一句关心或夸奖的话，1~2句。不要提到"设定""规则"，不要用括号写动作。';
+        const done = getTodayPomoMin();
+        const goal = Current.pomoGoalMin || 0;
+        let scene = '对方刚完成一次专注，用了 ' + pomo.min + ' 分钟。';
+        if(goal > 0 && done >= goal) scene += ' 今天的目标已经完成了！';
+        else if(goal > 0) scene += ' 今天还差 ' + (goal-done) + ' 分钟才达标。';
+        const sys = buildSystemPrompt('') + '\n\n【场景】' + scene + '\n【要求】根据你的性格，说一句关心或夸奖的话，1~2句。不要提到"设定""规则"，不要用括号写动作。';
         callAI([
           {role:'system',content:sys},
           ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
@@ -1980,6 +2143,15 @@ function togglePomo(){
             saveGameDebounced();
           }
         }).catch(()=>{});
+        if(goal > 0 && done >= goal){
+          setTimeout(()=>{
+            const m2 = document.getElementById('modalContent');
+            m2.innerHTML=`<h2>🎉 今日目标完成 <span class="close" onclick="closeModal()">×</span></h2>
+              <p style="font-size:14px;color:var(--text);line-height:1.7;">今天你已经专注了 <b>${done}</b> 分钟，达成了 <b>${goal}</b> 分钟的目标！<br>${Current.name} 为你感到骄傲。</p>
+              <button class="btn" onclick="closeModal()">好耶</button>`;
+            openModal();
+          }, 800);
+        }
       }
     }
   },1000);
@@ -2060,6 +2232,8 @@ function endSleep(){
   if(wrap)wrap.classList.remove('sleeping');
   document.getElementById('sleepMask').classList.remove('show');
   addRelationValue(1);saveGame();
+  if(Current) Current.stats.energy = Math.min(100, Current.stats.energy + 30);
+  updateStats();saveGameDebounced();
   if(API.ready && Current){
     setTimeout(()=>{
       const sys = buildSystemPrompt('') + '\n\n【场景】对方刚醒来。\n【要求】根据你的性格，轻声问一句「睡得好吗」之类，1~2句。不要提到"设定""规则"，不要用括号写动作。';
@@ -2200,6 +2374,16 @@ function startGame(type){
   else if(type==='twenty') initTwentyGame();
   else if(type==='story') initStoryGame();
 }
+function getRecentGamesHint(){
+  if(!Current || !Current.recentGames || !Current.recentGames.length) return '';
+  return '【不要重复】最近已经出过这些题目，这次必须换新的，不要重复：' + Current.recentGames.slice(-10).join('、') + '。';
+}
+function rememberGame(text){
+  if(!Current) return;
+  if(!Current.recentGames) Current.recentGames = [];
+  Current.recentGames.push(text);
+  if(Current.recentGames.length > 15) Current.recentGames = Current.recentGames.slice(-15);
+}
 async function initTurtleGame(){
   const modal=document.getElementById('modalContent');
   modal.innerHTML=`
@@ -2214,12 +2398,14 @@ async function initTurtleGame(){
   `;
   openModal();
   try{
+    const hint = getRecentGamesHint();
     const reply = await callAI([
       {role:'system',content:'你是一个海龟汤游戏主持人。只输出JSON，不要别的文字。'},
-      {role:'user',content:'请生成一个海龟汤谜题。输出 JSON：{"story":"故事开头（1-2句，诡异但不恐怖，适合情侣玩）","answer":"真相（1-2句）"}。'}
-    ], {maxTokens:300, temperature:0.9});
+      {role:'user',content:'请生成一个海龟汤谜题。要求：故事必须原创，不要用"酒吧点水"、"一个人走进酒吧"、"电梯里的女人"这类常见例子。要有点新意。输出 JSON：{"story":"故事开头（1-2句，诡异但不恐怖，适合情侣玩）","answer":"真相（1-2句）"}。' + hint}
+    ], {maxTokens:300, temperature:1.0});
     let story='', answer='';
     try{ const j = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); story=j.story||'一个人走进酒吧，点了一杯水，酒保却拔出了一把枪。'; answer=j.answer||'他打嗝，酒保用枪吓他。'; }catch(e){ story='一个人走进酒吧，点了一杯水，酒保却拔出了一把枪。'; answer='他打嗝，酒保用枪吓他。'; }
+    rememberGame(story.slice(0,30));
     Current.game.subState.story = story; Current.game.subState.answer = answer; Current.game.subState.log = [];
     document.getElementById('turtleStory').textContent = story;
     document.getElementById('turtleLog').textContent = '';
@@ -2312,12 +2498,14 @@ async function initTwentyGame(){
   `;
   openModal();
   try{
+    const hint = getRecentGamesHint();
     const reply = await callAI([
       {role:'system',content:'你是一个 20 问游戏主持人。只输出 JSON。'},
-      {role:'user',content:'请想一个常见的物品。输出 JSON：{"item":"物品名"}。'}
-    ], {maxTokens:50, temperature:1.0});
+      {role:'user',content:'请想一个常见的物品。要求：不要用"苹果"、"手机"、"书"这类烂大街的，换点有新意的日常物品。输出 JSON：{"item":"物品名"}。' + hint}
+    ], {maxTokens:50, temperature:1.1});
     let item='苹果';
     try{ const j = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); item = j.item || '苹果'; }catch(e){}
+    rememberGame(item);
     Current.game.subState.item = item;
     document.getElementById('twentyStatus').textContent = '他已经想好了。开始问吧（还剩 20 个问题）';
   }catch(e){ document.getElementById('twentyStatus').textContent = '生成失败：'+e.message; }
@@ -2453,6 +2641,7 @@ function openSettings(){
   const d = settingsDraft;
   const modal=document.getElementById('modalContent');
   const isKnown = KNOWN_MODELS.some(m=>m.id === d.apiModel);
+  const bubblePos = d.userBubblePos || 'center';
   modal.innerHTML=`
     <h2>设置 <span class="close" onclick="closeSettings()">×</span></h2>
     <div class="field"><label>上传他的图片</label>
@@ -2485,6 +2674,14 @@ function openSettings(){
     </div>
     <div class="field"><label>好感度</label><input type="number" id="setRelationValue" min="0" max="100" value="${Math.round(d.relationValue)}" oninput="settingsDraft.relationValue=parseInt(this.value)||0"></div>
     <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
+    <div class="field"><label>你说的气泡显示位置</label>
+      <div class="pos-palette">
+        <div class="pos-swatch ${bubblePos==='left'?'active':''}" onclick="setBubblePos('left')">左</div>
+        <div class="pos-swatch ${bubblePos==='center'?'active':''}" onclick="setBubblePos('center')">中</div>
+        <div class="pos-swatch ${bubblePos==='right'?'active':''}" onclick="setBubblePos('right')">右</div>
+        <div class="pos-swatch ${bubblePos==='random'?'active':''}" onclick="setBubblePos('random')">随机</div>
+      </div>
+    </div>
     <div class="field"><label>天气城市</label>
       <input id="setWeatherCity" value="${d.weatherManualCity||''}" oninput="settingsDraft.weatherManualCity=this.value">
       <button class="btn ghost" onclick="collectSettingsDraft();updateWeatherReal(true).then(()=>openSettings())">🔄 刷新天气</button>
@@ -2548,6 +2745,12 @@ function openSettings(){
   `;
   openModal();
 }
+function setBubblePos(pos){
+  collectSettingsDraft();
+  settingsDraft.userBubblePos = pos;
+  GlobalState.userBubblePos = pos;
+  openSettings();
+}
 function onModelChange(){
   collectSettingsDraft();
   const sel=document.getElementById('setApiModelSelect');
@@ -2574,8 +2777,10 @@ function saveSettings(){
   Current.image = d.image; Current.images = d.images; Current.outfits = d.outfits;
   Current.currentOutfitIndex = d.currentOutfitIndex;
   Current.pet = d.pet; Current.lorebook = d.lorebook;
+  Current.pomoGoalMin = d.pomoGoalMin || 120;
   GlobalState.background = d.background_img;
   GlobalState.userImage = d.userImage; GlobalState.userShow = d.userShow;
+  GlobalState.userBubblePos = d.userBubblePos || 'center';
   GlobalState.mainColor = d.mainColor; GlobalState.bgColor = d.bgColor;
   const newCity = (d.weatherManualCity || '').trim();
   if(newCity !== GlobalState.weatherManualCity){
@@ -2638,7 +2843,9 @@ function openPetSetup(){
     <h2>宠物 <span class="close" onclick="collectSettingsDraft();openSettings()">×</span></h2>
     ${p.has?`
       <p style="font-size:13px;color:var(--text-soft);margin-bottom:12px;">当前宠物：${p.name}（${p.type}）</p>
+      <div class="field"><label>宠物名字</label><input id="petNameInput" value="${p.name||'小家伙'}" placeholder="给它取个名字"></div>
       <div class="field"><label>上传宠物图片</label><input type="file" id="petUpload" accept="image/*" onchange="handlePetUpload(event)">${p.image?'<button class="btn ghost" onclick="collectSettingsDraft();removePetImage()">删除宠物图</button>':''}</div>
+      <button class="btn" onclick="collectSettingsDraft();settingsDraft.pet.name=(document.getElementById('petNameInput').value.trim()||'小家伙');if(Current)Current.pet.name=settingsDraft.pet.name;saveGame();openSettings();">保存名字</button>
       <button class="btn ghost" onclick="collectSettingsDraft();removePet()">送走宠物</button>
     `:`
       <div class="field"><label>种类</label><select id="petType"><option value="cat">猫</option><option value="dog">狗</option><option value="rabbit">兔</option><option value="bird">鸟</option></select></div>
@@ -2652,13 +2859,13 @@ function createPet(){
   if(!settingsDraft) initSettingsDraft();
   const type=document.getElementById('petType').value;
   const name=document.getElementById('petName').value.trim()||'小家伙';
-  settingsDraft.pet = { has:true, type, name, image:null, x:0.78, y:0.82, food:80, clean:80, mood:80, lastTick:Date.now() };
+  settingsDraft.pet = { has:true, type, name, image:null, x:0.78, y:0.82, food:80, clean:80, mood:80, lastTick:Date.now(), flip:false, nextWalkAt:0 };
   if(Current) Current.pet = deepCloneSafe(settingsDraft.pet);
   renderPet(); openSettings();
 }
 function removePet(){
   if(!settingsDraft) return;
-  settingsDraft.pet = { has:false, type:'cat', name:'小家伙', image:null, x:0.78, y:0.82, food:80, clean:80, mood:80, lastTick:Date.now() };
+  settingsDraft.pet = { has:false, type:'cat', name:'小家伙', image:null, x:0.78, y:0.82, food:80, clean:80, mood:80, lastTick:Date.now(), flip:false, nextWalkAt:0 };
   if(Current) Current.pet = deepCloneSafe(settingsDraft.pet);
   renderPet(); openSettings();
 }
@@ -2697,6 +2904,7 @@ function bindToolbar(){
       const p=t.dataset.panel;
       if(p==='gift')openGift();
       else if(p==='touch')openTouch();
+      else if(p==='outfit')openOutfitPicker();
       else if(p==='game')openGameMenu();
       else if(p==='shop')openShop();
       else if(p==='settings')openSettings();
@@ -2740,6 +2948,7 @@ function buildSaveObject(){
     mainColor: GlobalState.mainColor, bgColor: GlobalState.bgColor,
     background: GlobalState.background, userImage: GlobalState.userImage,
     userShow: GlobalState.userShow, userX: GlobalState.userX, userY: GlobalState.userY,
+    userBubblePos: GlobalState.userBubblePos,
     weather: GlobalState.weather, weatherDate: GlobalState.weatherDate,
     weatherCity: GlobalState.weatherCity, weatherLat: GlobalState.weatherLat, weatherLon: GlobalState.weatherLon,
     weatherManualCity: GlobalState.weatherManualCity, weatherUpdatedAt: GlobalState.weatherUpdatedAt,
@@ -2749,7 +2958,7 @@ function buildSaveObject(){
 }
 function applySaveObject(d){
   if(!d)return;
-  GlobalState.version = d.version || 15;
+  GlobalState.version = d.version || 16;
   GlobalState.mainColor = d.mainColor || '#ff8fab';
   GlobalState.bgColor = d.bgColor || '#ffe0e8';
   GlobalState.background = d.background || null;
@@ -2757,6 +2966,7 @@ function applySaveObject(d){
   GlobalState.userShow = !!d.userShow;
   GlobalState.userX = typeof d.userX === 'number' ? d.userX : 0.5;
   GlobalState.userY = typeof d.userY === 'number' ? d.userY : 0.88;
+  GlobalState.userBubblePos = d.userBubblePos || 'center';
   GlobalState.weather = d.weather || '晴';
   GlobalState.weatherDate = d.weatherDate || null;
   GlobalState.weatherCity = d.weatherCity || '';
@@ -2770,17 +2980,22 @@ function applySaveObject(d){
   GlobalState.characters = GlobalState.characters.map(raw=>{
     const c = newCharacterData(raw.id || ('c_'+Math.random().toString(36).slice(2,8)));
     for(const k in raw){ if(k in c) c[k] = raw[k]; }
-    if(!c.pet || typeof c.pet !== 'object') c.pet = { has:false, type:'cat', name:'小家伙', image:null, x:0.78, y:0.82, food:80, clean:80, mood:80, lastTick:Date.now() };
+    if(!c.pet || typeof c.pet !== 'object') c.pet = { has:false, type:'cat', name:'小家伙', image:null, x:0.78, y:0.82, food:80, clean:80, mood:80, lastTick:Date.now(), flip:false, nextWalkAt:0 };
     if(typeof c.pet.food !== 'number') c.pet.food = 80;
     if(typeof c.pet.clean !== 'number') c.pet.clean = 80;
     if(typeof c.pet.mood !== 'number') c.pet.mood = 80;
     if(!c.pet.lastTick) c.pet.lastTick = Date.now();
+    if(typeof c.pet.flip !== 'boolean') c.pet.flip = false;
+    if(!c.pet.nextWalkAt) c.pet.nextWalkAt = 0;
     if(!c.stats || typeof c.stats !== 'object') c.stats = { mood:80, food:80, energy:80 };
-    ['images','outfits','lorebook','track','anniversaries','customShopItems','recentTopics','pomoHistory'].forEach(k=>{ if(!Array.isArray(c[k])) c[k] = []; });
+    if(typeof c.stats.energy !== 'number') c.stats.energy = 80;
+    ['images','outfits','lorebook','track','anniversaries','customShopItems','recentTopics','pomoHistory','recentGames'].forEach(k=>{ if(!Array.isArray(c[k])) c[k] = []; });
     if(!c.inventory || typeof c.inventory !== 'object') c.inventory = {};
     if(!c.diary || typeof c.diary !== 'object') c.diary = { yours:[], his:[] };
     if(!c.period || typeof c.period !== 'object') c.period = { lastStart:null, cycle:28, duration:5, manualOn:false };
     if(!c.chatLog || !Array.isArray(c.chatLog)) c.chatLog = [];
+    if(typeof c.pomoGoalMin !== 'number') c.pomoGoalMin = 120;
+    if(typeof c.lastPomoNudge !== 'number') c.lastPomoNudge = 0;
     return c;
   });
   if(!GlobalState.characters.length){
@@ -2825,6 +3040,7 @@ function exportSave(){
       mainColor: GlobalState.mainColor, bgColor: GlobalState.bgColor,
       background: GlobalState.background, userImage: GlobalState.userImage,
       userShow: GlobalState.userShow, userX: GlobalState.userX, userY: GlobalState.userY,
+      userBubblePos: GlobalState.userBubblePos,
       weather: GlobalState.weather, weatherManualCity: GlobalState.weatherManualCity,
       currentCharId: GlobalState.currentCharId, characters: GlobalState.characters,
       lastTick: lastTick,
@@ -2832,12 +3048,29 @@ function exportSave(){
   };
   const str = JSON.stringify(payload, null, 2);
   const filename = `yunqi_save_${todayStr()}.json`;
-
-  // 保存到全局变量，供复制/分享用（避免把超长字符串写进 onclick 属性里）
   window.__lastExportFilename = filename;
   window.__lastExportContent = str;
-
-  // 尝试触发浏览器下载
+  const modal = document.getElementById('modalContent');
+  const preview = str.length > 8000 ? str.slice(0, 8000) + '\n...(太长已截断，完整内容已保存，请用「复制」按钮)' : str;
+  modal.innerHTML=`
+    <h2>导出存档 <span class="close" onclick="closeSettings()">×</span></h2>
+    <p style="font-size:12px;color:var(--text-soft);margin-bottom:10px;">
+      点下面「下载 json 文件」，会保存到手机的「下载」文件夹。<br>
+      如果没反应，用「复制」按钮。
+    </p>
+    <button class="btn" onclick="downloadSaveFile()">📥 下载 .json 文件</button>
+    <button class="btn ghost" onclick="copyExportToClipboard()" style="margin-top:8px;">📋 复制全部内容到剪贴板</button>
+    <div style="margin-top:12px;font-size:12px;color:var(--text-soft);">预览（前 8000 字）：</div>
+    <textarea readonly id="exportPreview" style="min-height:160px;font-size:11px;margin-top:6px;font-family:monospace;" onclick="this.select()">${preview.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</textarea>
+    <p style="font-size:11px;color:var(--text-soft);margin-top:6px;text-align:center;">长按文本框可全选</p>
+    <button class="btn ghost" onclick="closeSettings()">返回设置</button>
+  `;
+  openModal();
+}
+function downloadSaveFile(){
+  const str = window.__lastExportContent || '';
+  const filename = window.__lastExportFilename || `yunqi_save_${todayStr()}.json`;
+  if(!str){ alert('没有内容可下载'); return; }
   try{
     const blob = new Blob([str], {type:'application/json'});
     const url = URL.createObjectURL(blob);
@@ -2845,24 +3078,8 @@ function exportSave(){
     a.href = url; a.download = filename;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(()=>URL.revokeObjectURL(url), 3000);
-  }catch(e){}
-
-  const modal = document.getElementById('modalContent');
-  const preview = str.length > 8000 ? str.slice(0, 8000) + '\n...(太长已截断，完整内容已保存，请用「复制」按钮)' : str;
-  modal.innerHTML=`
-    <h2>导出存档 <span class="close" onclick="closeSettings()">×</span></h2>
-    <p style="font-size:12px;color:var(--text-soft);margin-bottom:10px;">
-      已尝试下载到手机「下载」文件夹。<br>
-      如果没找到，用下面两个按钮之一：复制，或分享。
-    </p>
-    <button class="btn" onclick="copyExportToClipboard()">📋 复制全部内容到剪贴板</button>
-    <button class="btn ghost" onclick="shareExport()" style="margin-top:8px;">📤 分享到微信/QQ/文件</button>
-    <div style="margin-top:12px;font-size:12px;color:var(--text-soft);">预览（前 8000 字）：</div>
-    <textarea readonly id="exportPreview" style="min-height:160px;font-size:11px;margin-top:6px;font-family:monospace;" onclick="this.select()">${preview.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</textarea>
-    <p style="font-size:11px;color:var(--text-soft);margin-top:6px;text-align:center;">长按文本框可全选</p>
-    <button class="btn ghost" onclick="closeSettings()">返回设置</button>
-  `;
-  openModal();
+    alert('已触发下载，请到手机「下载」文件夹查看。如果没看到，用「复制」按钮。');
+  }catch(e){ alert('下载失败：' + e.message + '，请用「复制」按钮。'); }
 }
 function copyExportToClipboard(){
   const str = window.__lastExportContent || '';
@@ -2890,27 +3107,6 @@ function fallbackCopy(str){
   }catch(e){ alert('复制失败，请长按上方文本框全选复制。'); }
   document.body.removeChild(ta);
 }
-function shareExport(){
-  const str = window.__lastExportContent || '';
-  const filename = window.__lastExportFilename || `yunqi_save_${todayStr()}.json`;
-  if(!str){ alert('没有内容可分享'); return; }
-  try{
-    if(navigator.share && navigator.canShare){
-      const blob = new Blob([str], {type:'application/json'});
-      const file = new File([blob], filename, {type:'application/json'});
-      if(navigator.canShare({files:[file]})){
-        navigator.share({ files:[file], title:'云栖阁存档' }).catch(()=>{});
-        return;
-      }
-    }
-    // 不支持分享文件就复制
-    fallbackCopy(str);
-    alert('当前环境不支持分享文件，已复制到剪贴板，请粘贴到备忘录/微信。');
-  }catch(e){
-    fallbackCopy(str);
-    alert('分享失败，已复制到剪贴板。');
-  }
-}
 function importSave(e){
   const file = e.target.files[0]; if(!file)return;
   const reader = new FileReader();
@@ -2933,6 +3129,7 @@ function importSave(e){
         GlobalState.userShow = !!data.global.userShow;
         GlobalState.userX = typeof data.global.userX === 'number' ? data.global.userX : 0.5;
         GlobalState.userY = typeof data.global.userY === 'number' ? data.global.userY : 0.88;
+        GlobalState.userBubblePos = data.global.userBubblePos || 'center';
         GlobalState.weather = data.global.weather || '晴';
         GlobalState.weatherManualCity = data.global.weatherManualCity || '';
         GlobalState.currentCharId = data.global.currentCharId || null;
@@ -2982,6 +3179,9 @@ async function boot(){
   Current = GlobalState.characters.find(c=>c.id===GlobalState.currentCharId);
   applyMainColor(GlobalState.mainColor || '#ff8fab');
   pickRandomOutfit();
+  if(Current && Current.pet && Current.pet.has && !Current.pet.nextWalkAt){
+    scheduleNextPetWalk();
+  }
   saveGame();
   renderBackground(); renderCharacter(); renderUser(); renderPet();
   renderWeather(); updateStats(); updateRelationUI(); renderQuick();
@@ -2992,6 +3192,7 @@ async function boot(){
   setInterval(()=>{ updateWeatherReal(true); checkMeal(); checkSleepState(); updateTrackBar(); }, 3600000);
   setInterval(()=>{ checkMeal(); checkSleepState(); updateTrackBar(); }, 60000);
   if(!isNoticeSeen()) setTimeout(()=>{ openNotice(); }, 500);
+  setTimeout(()=>{ nudgeStudy(); }, 3000);
   if(!hasSave){
     setTimeout(()=>{ if(API.ready)proactiveTalk('greet').catch(()=>{}); else say('先去设置里填 API 和上传图片吧。','tip'); },1200);
     setTimeout(firstTimeSetup,2500);
