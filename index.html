@@ -77,7 +77,7 @@ body{
 #userWrap.dragging{transition:none;cursor:grabbing}
 #userWrap img{width:100%;display:block;pointer-events:none;filter:drop-shadow(0 5px 8px rgba(0,0,0,.12))}
 
-#petWrap{position:absolute;z-index:2;cursor:pointer;user-select:none;touch-action:none;
+#petWrap{position:absolute;z-index:8;cursor:pointer;user-select:none;touch-action:none;
   width:70px;height:70px;filter:drop-shadow(0 3px 5px rgba(0,0,0,.15));
   transition:left .5s ease, top .5s ease;display:none;align-items:center;justify-content:center;
   font-size:38px;line-height:1;will-change:left, top;}
@@ -119,7 +119,6 @@ body{
 .tool:hover{background:var(--accent);color:#fff}
 .tool .ico{font-size:18px}
 
-/* App 内通知 */
 #inAppNotif{
   position:fixed;top:10px;left:50%;transform:translate(-50%,-120%);
   z-index:9999;max-width:92%;width:380px;
@@ -316,11 +315,10 @@ body{
 let notifTimer = null;
 function showInAppNotif(text){
   const box = document.getElementById('inAppNotif');
+  if(!box) return;
   const title = document.getElementById('inAppNotifTitle');
   const msg = document.getElementById('inAppNotifMsg');
   const icon = document.getElementById('inAppNotifIcon');
-  if(!box) return;
-  // 头像
   if(Current){
     const img = getBaseCharImage();
     if(img) icon.innerHTML = `<img src="${img}">`;
@@ -331,12 +329,9 @@ function showInAppNotif(text){
   box.classList.add('show');
   if(notifTimer) clearTimeout(notifTimer);
   notifTimer = setTimeout(()=>{ box.classList.remove('show'); }, 4000);
-  // 顺便尝试系统通知
   try {
     if('Notification' in window && Notification.permission === 'granted'){
       new Notification(Current ? Current.name : '他', { body: text });
-    } else if('Notification' in window && Notification.permission === 'default'){
-      Notification.requestPermission();
     }
   } catch(e){}
 }
@@ -934,7 +929,7 @@ function buildSystemPrompt(userInput){
     '',
     '========== 防念稿规则（最重要）==========',
     '1. 绝对不要复述系统提示里给你的任何内容。',
-    '2. 如果看到【场景】标签，那是系统给你的背景信息，不是对方对你说的话，不要复述。',
+    '2. 如果看到【场景】【系统触发】标签，那是系统给你的背景信息或提醒，不是对方说的话，不要复述。',
     '3. 不要提到"人设""规则""要求""设定""提示"这些词。',
     '4. 直接以角色身份说话，用口语。不要用括号（）写动作或情绪。',
   );
@@ -1012,7 +1007,6 @@ function repositionAllBubbles(){
     userCenterX = ur.left + ur.width/2 - stageRect.left;
     userTopY = ur.top - stageRect.top;
   }
-  // them 和 action 都放在角色头顶
   const charBubbles = Array.from(box.children).filter(c=>c.classList.contains('them') || c.classList.contains('action'));
   charBubbles.forEach((el, i)=>{
     const w = el.offsetWidth || 150, h = el.offsetHeight || 40;
@@ -1044,7 +1038,6 @@ function say(text,who='them',opts={}){
   if(opts.kaomoji){ const k=document.createElement('div'); k.className='kaomoji'; k.textContent=opts.kaomoji; div.appendChild(k); }
   div.style.left = '-9999px'; div.style.top = '-9999px';
   box.appendChild(div);
-  // 按 who 分别计数
   const sameType = Array.from(box.children).filter(c=>c.classList.contains(who));
   if(sameType.length > BUBBLE_MAX){
     const removeCount = sameType.length - BUBBLE_MAX;
@@ -1226,7 +1219,7 @@ function removeOutfit(i){
   openSettings(); renderCharacter();
 }
 
-/* ============ 触碰角色（独立气泡 + AI不带动作） ============ */
+/* ============ 触碰角色 ============ */
 let charPressTimer = null, charPressed = false, charDownY = 0, lastDragEnd=0;
 function bindCharTouch(wrap){
   let dragging=false, moved=false;
@@ -1304,28 +1297,17 @@ async function triggerTouchAction(action){
     hold:  { text:'（你伸手碰了碰他。）', scene:'对方刚刚伸手碰了碰你。' },
   };
   const a = map[action] || map.hold;
-
-  // ① 先弹一个"你的动作"独立气泡（灰色斜体）
   say(a.text, 'action');
-
-  // ② 动画
   const anim=document.getElementById('charAnim');
-  if(anim){
-    anim.style.transition='transform .3s';
-    anim.style.transform = 'scale(1.03)';
-    setTimeout(()=>{ anim.style.transform='scale(1)'; }, 500);
-  }
-
+  if(anim){ anim.style.transition='transform .3s'; anim.style.transform = 'scale(1.03)'; setTimeout(()=>{ anim.style.transform='scale(1)'; }, 500); }
   addRelationValue(1);
   updateStats(); saveGameDebounced();
-
-  // ③ 调 AI，但 prompt 里只写【场景】，不带括号、不带"（根据你的性格…）"
   try {
     const sys = buildSystemPrompt('') + '\n\n【场景】' + a.scene + '\n【要求】这是已经发生的事，不是对方对你说的话。请直接以你的身份回应，1~2句。不要复述【场景】，不要提到"设定""规则""人设"，不要用括号写动作。';
     const reply = await callAI([
       {role:'system',content: sys},
       ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
-      {role:'user',content:'嗯。'},
+      {role:'user',content:'【系统触发】'},
     ]);
     if(reply){
       let{clean,emo,label}=parseEmotion(reply);
@@ -1372,23 +1354,24 @@ function bindStage(){
       saveGameDebounced();
     }
   }
-  // 宠物：拖动移动 / 点击弹面板
+  // 宠物：只用 pointerdown 记录起点，pointermove 判断，pointerup 判定是否点击
   if(petEl){
     let petDragging=false, petMoved=false, psx=0, psy=0, pox=0, poy=0;
     petEl.addEventListener('pointerdown',e=>{
-      e.preventDefault();e.stopPropagation();
-      petDragging=true;petMoved=false;
+      e.stopPropagation();
+      petDragging=true; petMoved=false;
       petEl.classList.add('dragging');
-      psx=e.clientX;psy=e.clientY;pox=Current.pet.x;poy=Current.pet.y;
+      psx=e.clientX; psy=e.clientY; pox=Current.pet.x; poy=Current.pet.y;
       document.addEventListener('pointermove',petMove,{passive:false});
       document.addEventListener('pointerup',petUp);
+      document.addEventListener('pointercancel',petUp);
     });
     function petMove(e){
       if(!petDragging)return;
       e.preventDefault();
       const rect=stage.getBoundingClientRect();
       const dx=(e.clientX-psx)/rect.width, dy=(e.clientY-psy)/rect.height;
-      if(Math.abs(dx)>0.01||Math.abs(dy)>0.01)petMoved=true;
+      if(Math.abs(dx)>0.015||Math.abs(dy)>0.015)petMoved=true;
       Current.pet.x=Math.max(0.05,Math.min(0.95,pox+dx));
       Current.pet.y=Math.max(0.3,Math.min(0.92,poy+dy));
       positionPet();
@@ -1399,9 +1382,10 @@ function bindStage(){
       petEl.classList.remove('dragging');
       document.removeEventListener('pointermove',petMove);
       document.removeEventListener('pointerup',petUp);
+      document.removeEventListener('pointercancel',petUp);
       if(!petMoved){
-        e.stopPropagation();
-        openPetPanel();
+        // 用 setTimeout 绕开 WebView 的事件顺序问题
+        setTimeout(()=>{ openPetPanel(); }, 0);
       }
       saveGameDebounced();
     }
@@ -1484,7 +1468,7 @@ async function petAIReply(scene){
     const reply = await callAI([
       {role:'system',content: sys},
       ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
-      {role:'user',content:'嗯。'},
+      {role:'user',content:'【系统触发】'},
     ]);
     if(reply){
       let{clean,emo,label}=parseEmotion(reply);
@@ -1583,7 +1567,7 @@ function tryWork(){
           callAI([
             {role:'system',content:sys},
             ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
-            {role:'user',content:'嗯。'},
+            {role:'user',content:'【系统触发】'},
           ]).then(reply=>{
             if(reply){
               let{clean,emo,label}=parseEmotion(reply);
@@ -1787,7 +1771,7 @@ async function proactiveTalk(type='idle'){
     const reply=await callAI([
       {role:'system',content:sys},
       ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
-      {role:'user',content:'嗯。'},
+      {role:'user',content:'【系统触发】'},
     ]);
     if(reply){
       let{clean,emo,label}=parseEmotion(reply);
@@ -1862,7 +1846,7 @@ async function doTouch(type){
     const reply=await callAI([
       {role:'system',content:sys},
       ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
-      {role:'user',content:'嗯。'},
+      {role:'user',content:'【系统触发】'},
     ]);
     if(reply){
       let{clean,emo,label}=parseEmotion(reply);
@@ -1910,7 +1894,7 @@ async function saveDiary(){
     const sys = buildSystemPrompt('') + '\n\n【场景】你看到了对方今天写的日记，内容是：' + text + '\n【要求】请以' + Current.name + '的身份，写一篇今天的日记来回应，1~3句，口语，不要加情绪标签，不要提AI，不要用括号写动作。';
     const reply=await callAI([
       {role:'system',content:sys},
-      {role:'user',content:'嗯。'},
+      {role:'user',content:'【系统触发】'},
     ]);
     if(reply){
       const clean = parseEmotion(reply).clean;
@@ -1982,7 +1966,7 @@ function togglePomo(){
         callAI([
           {role:'system',content:sys},
           ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
-          {role:'user',content:'嗯。'},
+          {role:'user',content:'【系统触发】'},
         ]).then(reply=>{
           if(reply){
             let{clean,emo,label}=parseEmotion(reply);
@@ -2032,8 +2016,8 @@ async function startSleep(){
   if(API.ready){
     try {
       const reply=await callAI([
-        {role:'system',content:buildSystemPrompt('')+'\n\n【场景】对方要睡了。\n【要求】轻声说一句晚安，1句，温柔一点。'},
-        {role:'user',content:'嗯。'},
+        {role:'system',content:buildSystemPrompt('')+'\n\n【场景】对方要睡了。\n【要求】轻声说一句晚安，1句，温柔一点。不要用括号写动作。'},
+        {role:'user',content:'【系统触发】'},
       ]);
       if(reply)text.textContent=parseEmotion(reply).clean;
     } catch(e) {}
@@ -2063,7 +2047,7 @@ async function tellSleepStory(){
   try {
     const reply=await callAI([
       {role:'system',content:buildSystemPrompt('')+'\n\n【场景】对方想听你讲一个晚安故事。\n【要求】用 3~5 句话讲一个温柔的、安静的、适合睡前听的小故事。不要加情绪标签，不要用括号写动作。'},
-      {role:'user',content:'嗯。'},
+      {role:'user',content:'【系统触发】'},
     ]);
     if(reply) text.textContent = parseEmotion(reply).clean;
   } catch(e){ text.textContent = '（故事讲不出来，网络有点卡。）'; }
@@ -2082,7 +2066,7 @@ function endSleep(){
       callAI([
         {role:'system',content:sys},
         ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
-        {role:'user',content:'嗯。'},
+        {role:'user',content:'【系统触发】'},
       ]).then(reply=>{
         if(reply){
           let{clean,emo,label}=parseEmotion(reply);
@@ -2849,7 +2833,11 @@ function exportSave(){
   const str = JSON.stringify(payload, null, 2);
   const filename = `yunqi_save_${todayStr()}.json`;
 
-  // 方式1：尝试触发浏览器下载
+  // 保存到全局变量，供复制/分享用（避免把超长字符串写进 onclick 属性里）
+  window.__lastExportFilename = filename;
+  window.__lastExportContent = str;
+
+  // 尝试触发浏览器下载
   try{
     const blob = new Blob([str], {type:'application/json'});
     const url = URL.createObjectURL(blob);
@@ -2859,38 +2847,69 @@ function exportSave(){
     setTimeout(()=>URL.revokeObjectURL(url), 3000);
   }catch(e){}
 
-  // 方式2：弹出文本框 + 分享按钮兜底
-  setTimeout(()=>{
-    const modal = document.getElementById('modalContent');
-    const masked = str.length > 60000 ? str.slice(0,60000) + '\n...(太长已截断，建议用分享按钮)' : str;
-    modal.innerHTML=`
-      <h2>导出存档 <span class="close" onclick="closeSettings()">×</span></h2>
-      <p style="font-size:12px;color:var(--text-soft);margin-bottom:10px;">
-        已尝试下载文件到手机「下载」文件夹。<br>
-        如果没找到，可以点下方「分享」，或用文本框手动复制。
-      </p>
-      <button class="btn" onclick="shareSave('${filename}', \`${str.replace(/`/g,'\\`').replace(/\$/g,'\\$')}\`)">📤 分享到微信/QQ</button>
-      <textarea readonly style="min-height:180px;font-size:11px;margin-top:10px;" onclick="this.select()">${masked.replace(/</g,'&lt;')}</textarea>
-      <p style="font-size:11px;color:var(--text-soft);margin-top:6px;text-align:center;">长按文本框全选复制</p>
-      <button class="btn ghost" onclick="closeSettings()">返回设置</button>
-    `;
-    openModal();
-  }, 400);
+  const modal = document.getElementById('modalContent');
+  const preview = str.length > 8000 ? str.slice(0, 8000) + '\n...(太长已截断，完整内容已保存，请用「复制」按钮)' : str;
+  modal.innerHTML=`
+    <h2>导出存档 <span class="close" onclick="closeSettings()">×</span></h2>
+    <p style="font-size:12px;color:var(--text-soft);margin-bottom:10px;">
+      已尝试下载到手机「下载」文件夹。<br>
+      如果没找到，用下面两个按钮之一：复制，或分享。
+    </p>
+    <button class="btn" onclick="copyExportToClipboard()">📋 复制全部内容到剪贴板</button>
+    <button class="btn ghost" onclick="shareExport()" style="margin-top:8px;">📤 分享到微信/QQ/文件</button>
+    <div style="margin-top:12px;font-size:12px;color:var(--text-soft);">预览（前 8000 字）：</div>
+    <textarea readonly id="exportPreview" style="min-height:160px;font-size:11px;margin-top:6px;font-family:monospace;" onclick="this.select()">${preview.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</textarea>
+    <p style="font-size:11px;color:var(--text-soft);margin-top:6px;text-align:center;">长按文本框可全选</p>
+    <button class="btn ghost" onclick="closeSettings()">返回设置</button>
+  `;
+  openModal();
 }
-function shareSave(filename, content){
+function copyExportToClipboard(){
+  const str = window.__lastExportContent || '';
+  if(!str){ alert('没有内容可复制'); return; }
   try{
-    if(navigator.share){
-      const blob = new Blob([content], {type:'application/json'});
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(str).then(()=>{
+        alert('已复制到剪贴板，可以粘贴到备忘录或微信里保存。');
+      }).catch(()=>{ fallbackCopy(str); });
+    } else {
+      fallbackCopy(str);
+    }
+  }catch(e){ fallbackCopy(str); }
+}
+function fallbackCopy(str){
+  const ta = document.createElement('textarea');
+  ta.value = str;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  try{
+    const ok = document.execCommand('copy');
+    alert(ok ? '已复制到剪贴板。' : '复制失败，请长按上方文本框全选复制。');
+  }catch(e){ alert('复制失败，请长按上方文本框全选复制。'); }
+  document.body.removeChild(ta);
+}
+function shareExport(){
+  const str = window.__lastExportContent || '';
+  const filename = window.__lastExportFilename || `yunqi_save_${todayStr()}.json`;
+  if(!str){ alert('没有内容可分享'); return; }
+  try{
+    if(navigator.share && navigator.canShare){
+      const blob = new Blob([str], {type:'application/json'});
       const file = new File([blob], filename, {type:'application/json'});
-      if(navigator.canShare && navigator.canShare({files:[file]})){
-        navigator.share({ files:[file], title:'云栖阁存档', text:'云栖阁存档' }).catch(()=>{});
+      if(navigator.canShare({files:[file]})){
+        navigator.share({ files:[file], title:'云栖阁存档' }).catch(()=>{});
         return;
       }
-      navigator.share({ title:'云栖阁存档', text: content.slice(0,3000) }).catch(()=>{});
-    } else {
-      alert('这个浏览器不支持分享，请长按文本框全选复制。');
     }
-  }catch(e){ alert('分享失败：' + e.message); }
+    // 不支持分享文件就复制
+    fallbackCopy(str);
+    alert('当前环境不支持分享文件，已复制到剪贴板，请粘贴到备忘录/微信。');
+  }catch(e){
+    fallbackCopy(str);
+    alert('分享失败，已复制到剪贴板。');
+  }
 }
 function importSave(e){
   const file = e.target.files[0]; if(!file)return;
