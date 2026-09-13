@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -55,7 +55,7 @@ body{
 #charWrap{position:absolute;z-index:4;cursor:grab;user-select:none;touch-action:none;transition:left .5s ease, top .5s ease, opacity .6s ease;will-change:left, top, opacity;}
 #charWrap.dragging{transition:none;cursor:grabbing}
 #charWrap.away{opacity:0;pointer-events:none;}
-#charWrap.sleeping{filter:brightness(.7) saturate(.7);}
+#charWrap.sleeping{filter:none;}
 #charFlip{width:100%;transition:transform .3s ease}
 #charAnim{width:100%;transition:transform .3s ease;will-change:transform}
 #charAnim.walking{animation:walkBob .5s ease-in-out 3}
@@ -66,7 +66,7 @@ body{
 #charAnim .placeholder{width:100%;aspect-ratio:1/1;border-radius:16px;border:2px dashed var(--accent);
   display:flex;align-items:center;justify-content:center;color:var(--text-soft);font-size:12px;
   text-align:center;padding:12px;background:var(--card);line-height:1.6;}
-#charAnim.sleeping{filter:drop-shadow(0 6px 10px rgba(0,0,0,.08)) brightness(.85);transition:filter .5s;}
+#charAnim.sleeping{transition:filter .5s;}
 #charShadow{position:absolute;z-index:3;pointer-events:none;
   background:radial-gradient(ellipse at center, rgba(200,140,160,.28), rgba(0,0,0,0) 70%);
   border-radius:50%;transition:left .5s ease, top .5s ease, opacity .6s;}
