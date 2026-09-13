@@ -324,6 +324,43 @@ body{
 </div>
 
 <script>
+/* ============ 农历节日对照表（2026-2036） ============ */
+const LUNAR_FESTIVALS = {
+  2026: { chunjie:'2026-02-17', yuanxiao:'2026-03-03', qixi:'2026-08-19', zhongqiu:'2026-09-25' },
+  2027: { chunjie:'2027-02-06', yuanxiao:'2027-02-20', qixi:'2027-08-08', zhongqiu:'2027-09-15' },
+  2028: { chunjie:'2028-01-26', yuanxiao:'2028-02-09', qixi:'2028-08-26', zhongqiu:'2028-10-03' },
+  2029: { chunjie:'2029-02-13', yuanxiao:'2029-02-27', qixi:'2029-08-16', zhongqiu:'2029-09-22' },
+  2030: { chunjie:'2030-02-03', yuanxiao:'2030-02-17', qixi:'2030-08-05', zhongqiu:'2030-09-12' },
+  2031: { chunjie:'2031-01-23', yuanxiao:'2031-02-06', qixi:'2031-08-24', zhongqiu:'2031-10-01' },
+  2032: { chunjie:'2032-02-11', yuanxiao:'2032-02-25', qixi:'2032-08-12', zhongqiu:'2032-09-19' },
+  2033: { chunjie:'2033-01-31', yuanxiao:'2033-02-14', qixi:'2033-08-02', zhongqiu:'2033-09-08' },
+  2034: { chunjie:'2034-02-19', yuanxiao:'2034-03-05', qixi:'2034-08-21', zhongqiu:'2034-09-27' },
+  2035: { chunjie:'2035-02-08', yuanxiao:'2035-02-22', qixi:'2035-08-10', zhongqiu:'2035-09-16' },
+  2036: { chunjie:'2036-01-28', yuanxiao:'2036-02-11', qixi:'2036-07-30', zhongqiu:'2036-09-05' },
+};
+function getTodayFestival(){
+  const d = new Date();
+  const y = d.getFullYear();
+  const md = `${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const full = `${y}-${md}`;
+  // 公历
+  if(md === '01-01') return { name:'元旦', emoji:'🎊', type:'solar' };
+  if(md === '02-14') return { name:'情人节', emoji:'💘', type:'solar' };
+  if(md === '05-01') return { name:'劳动节', emoji:'💪', type:'solar' };
+  if(md === '06-01') return { name:'儿童节', emoji:'🎈', type:'solar' };
+  if(md === '10-01') return { name:'国庆节', emoji:'🇨🇳', type:'solar' };
+  if(md === '12-25') return { name:'圣诞节', emoji:'🎄', type:'solar' };
+  // 农历
+  const lunar = LUNAR_FESTIVALS[y];
+  if(lunar){
+    if(lunar.chunjie === full) return { name:'春节', emoji:'🧧', type:'lunar' };
+    if(lunar.yuanxiao === full) return { name:'元宵节', emoji:'🏮', type:'lunar' };
+    if(lunar.qixi === full) return { name:'七夕', emoji:'💕', type:'lunar' };
+    if(lunar.zhongqiu === full) return { name:'中秋节', emoji:'🌕', type:'lunar' };
+  }
+  return null;
+}
+
 /* ============ App 内通知 ============ */
 let notifTimer = null;
 function showInAppNotif(text){
@@ -361,7 +398,7 @@ const NOTICE_TEXT = "游戏反馈和bug修复可以投稿至 1473727478@qq.com\n
 
 /* ============ 全局 ============ */
 const GlobalState = {
-  version: 16,
+  version: 17,
   mainColor: '#ff8fab', bgColor: '#ffe0e8',
   background: null, userImage: null, userShow: false, userX: 0.5, userY: 0.88,
   userBubblePos: 'center',
@@ -375,6 +412,7 @@ function newCharacterData(id){
     id, name:'他', callYou:'你',
     role:'', personality:'', background:'', worldview:'',
     language:'中文', style:'', intro:'',
+    birthday: '',
     image:null, images:[], outfits:[], currentOutfitIndex:-1,
     x:0.5, y:0.72, flip:false,
     relationType:'friend', relationValue:10,
@@ -393,6 +431,8 @@ function newCharacterData(id){
     pomoGoalMin: 120,
     lastPomoNudge: 0,
     recentGames: [],
+    lastSelfDiaryDate: null,
+    lastFestivalDate: null,
   };
 }
 let Current = null;
@@ -407,6 +447,7 @@ function initSettingsDraft(){
     name:c.name||'他', callYou:c.callYou||'你', role:c.role||'',
     personality:c.personality||'', background:c.background||'', worldview:c.worldview||'',
     style:c.style||'', language:c.language||'中文', intro:c.intro||'',
+    birthday: c.birthday || '',
     relationType:c.relationType||'friend', relationValue:(typeof c.relationValue==='number')?c.relationValue:10,
     image:c.image||null, images:deepCloneSafe(c.images||[]), outfits:deepCloneSafe(c.outfits||[]),
     currentOutfitIndex:(typeof c.currentOutfitIndex==='number')?c.currentOutfitIndex:-1,
@@ -434,6 +475,7 @@ function collectSettingsDraft(){
   if(g('setStyle')) settingsDraft.style = g('setStyle').value.trim();
   if(g('setLanguage')) settingsDraft.language = g('setLanguage').value;
   if(g('setIntro')) settingsDraft.intro = g('setIntro').value.trim();
+  if(g('setBirthday')) settingsDraft.birthday = g('setBirthday').value;
   if(g('setRelation')) settingsDraft.relationType = g('setRelation').value;
   if(g('setRelationValue')) settingsDraft.relationValue = Math.max(0,Math.min(100,parseInt(g('setRelationValue').value)||0));
   if(g('setWeatherCity')) settingsDraft.weatherManualCity = g('setWeatherCity').value.trim();
@@ -645,6 +687,24 @@ async function updateWeatherReal(force=false){
 }
 function applyBgColor(hex){ if(hex) GlobalState.bgColor=hex; }
 
+/* ============ 天气影响 ============ */
+function getWeatherMoodDelta(){
+  const w = GlobalState.weather;
+  if(w === '大雨' || w === '雷雨' || w === '阴') return -3;
+  if(w === '小雨' || w === '中雨' || w === '阵雨' || w === '冻雨') return -1;
+  if(w === '雪' || w === '小雪' || w === '中雪' || w === '大雪' || w === '阵雪') return +4;
+  if(w === '晴') return +2;
+  return 0;
+}
+function getWeatherBehaviorHint(){
+  const w = GlobalState.weather;
+  if(w === '大雨' || w === '雷雨') return '（外面下着大雨/雷雨，今天想待在家里，说话有点安静。）';
+  if(w === '小雨' || w === '中雨' || w === '阵雨' || w === '冻雨') return '（外面下着雨，今天可能不太想出门。）';
+  if(w === '雪' || w === '小雪' || w === '中雪' || w === '大雪' || w === '阵雪') return '（外面下着雪，今天心情还不错，有点想和你一起看。）';
+  if(w === '晴') return '（今天天气很好，阳光不错。）';
+  return '';
+}
+
 /* ============ 服装 ============ */
 function pickRandomOutfit(){
   if(!Current) return;
@@ -761,6 +821,10 @@ function checkMeal(){
 /* ============ 行踪 ============ */
 function todayStr(){
   const d=new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function yesterdayStr(){
+  const d = new Date(Date.now() - 86400000);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 function nowHM(){
@@ -923,6 +987,8 @@ function buildSystemPrompt(userInput){
   if(c.isSleeping) parts.push('（现在是深夜，你在睡觉。被叫醒时说话含糊、困困的。人设不变。）');
   if(c.isAway) parts.push('（你现在在外面，不在家。）');
   if(c.pet && c.pet.has) parts.push(`（你有一只宠物叫「${c.pet.name}」，你平时会照顾它、逗它。）`);
+  const wbh = getWeatherBehaviorHint();
+  if(wbh) parts.push(wbh);
   const meal=getMealTime();
   if(meal && c.lastMeal !== (todayStr()+'|'+meal)) parts.push(`（现在是${meal}时间。）`);
   if(isPeriodNow())parts.push('（对方现在是生理期，身体不舒服，要温柔关心她。）');
@@ -1616,6 +1682,9 @@ function tickStats(){
   const hour=new Date().getHours();
   if(hour >= 23 || hour < 6){ s.energy = Math.min(100, s.energy + 8*hours); }
   else if(s.food > 60){ s.energy = Math.min(100, s.energy + 1*hours); }
+  // 天气影响心情
+  const wd = getWeatherMoodDelta();
+  if(wd) s.mood = Math.max(0, Math.min(100, s.mood + wd*0.3*hours));
   if(Current.lastInteract){
     const away = (now-Current.lastInteract)/3600000;
     if(away > 12 && !Current.fightUntil){ Current.fightUntil = now + 30*60000; s.mood = Math.max(0, s.mood - 5); say('他似乎有点失落，不太想说话。','them'); }
@@ -1734,6 +1803,81 @@ setInterval(()=>{
   if(Current.lastProactiveAt && Date.now() - Current.lastProactiveAt < 30*60*1000) return;
   nudgeStudy();
 }, 10*60*1000);
+
+/* ============ 节日 / 生日彩蛋 ============ */
+function checkFestival(){
+  if(!API.ready || !Current) return;
+  const today = todayStr();
+  if(Current.lastFestivalDate === today) return;
+  const festival = getTodayFestival();
+  const isBirthday = Current.birthday && Current.birthday === today;
+  if(!festival && !isBirthday) return;
+  Current.lastFestivalDate = today;
+  let scene = '';
+  if(festival && isBirthday){
+    scene = `今天是「${festival.name}」，同时也是你的生日（${festival.emoji}）。请以你的身份，主动说一句生日快乐和节日祝福，1~2句。`;
+  } else if(festival){
+    scene = `今天是「${festival.name}」${festival.emoji}。请以你的身份，主动说一句节日祝福，1~2句。`;
+  } else {
+    scene = `今天是你的生日🎂。请以你的身份，主动说一句生日相关的、开心的话，1~2句。`;
+  }
+  setTimeout(()=>{
+    const sys = buildSystemPrompt('') + '\n\n【场景】' + scene + '\n【要求】这是已经发生的事，请直接以你的身份说出来，1~2句。不要复述【场景】，不要提到"设定""规则"，不要用括号写动作。';
+    callAI([
+      {role:'system',content:sys},
+      ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
+      {role:'user',content:'【系统触发】'},
+    ]).then(reply=>{
+      if(reply){
+        let{clean,emo,label}=parseEmotion(reply);
+        const bg=parseBgColor(clean); clean=bg.clean;
+        const km=parseKaomoji(clean); clean=km.clean;
+        if(bg.color)applyBgColor(bg.color);
+        say(clean,'them',{kaomoji:km.kaomoji});
+        applyEmotion(emo,label);
+        Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
+        showInAppNotif(clean);
+        Current.stats.mood = Math.min(100, Current.stats.mood + 10);
+        updateStats();
+        saveGameDebounced();
+      }
+    }).catch(()=>{});
+  }, 2500);
+}
+
+/* ============ 角色自写日记 ============ */
+function checkSelfDiary(){
+  if(!API.ready || !Current) return;
+  const y = yesterdayStr();
+  if(Current.lastSelfDiaryDate === y) return;
+  // 昨天有没有聊过什么
+  const yChats = Current.chatLog.filter(m => {
+    const d = new Date(m.time);
+    const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    return ds === y;
+  });
+  Current.lastSelfDiaryDate = y;
+  let scene;
+  if(yChats.length === 0){
+    scene = `请以你的身份，写一篇昨天的日记，1~3句。昨天你们没怎么聊天，可以随便写点日常（天气、吃饭、看书、发呆等）。不要加情绪标签，不要提AI，不要用括号写动作。`;
+  } else {
+    const summary = yChats.slice(-20).map(m => (m.role==='user'?'对方':'你') + '：' + m.text).join('\n');
+    scene = `请以你的身份，写一篇昨天的日记，1~3句，根据以下对话内容，记录你昨天的心情或想法。不要加情绪标签，不要提AI，不要用括号写动作。\n\n【昨天的对话】\n${summary}`;
+  }
+  setTimeout(()=>{
+    const sys = buildSystemPrompt('') + '\n\n【场景】' + scene;
+    callAI([
+      {role:'system',content:sys},
+      {role:'user',content:'【系统触发】'},
+    ]).then(reply=>{
+      if(reply){
+        const clean = parseEmotion(reply).clean;
+        Current.diary.his.push({date:y, text:clean, selfWritten:true});
+        saveGameDebounced();
+      }
+    }).catch(()=>{});
+  }, 5000);
+}
 
 /* ============ 小惊喜 / emo ============ */
 function checkSurprise(){
@@ -2013,6 +2157,7 @@ function openDiary(){
   const modal=document.getElementById('modalContent');
   const today=todayStr();
   const yourToday=Current.diary.yours.find(d=>d.date===today);
+  const hisList = Current.diary.his.slice().reverse();
   modal.innerHTML=`
     <h2>交换日记 <span class="close" onclick="closeModal()">×</span></h2>
     <div class="field">
@@ -2022,8 +2167,8 @@ function openDiary(){
     <button class="btn" onclick="saveDiary()">保存</button>
     <hr style="margin:18px 0;border:none;border-top:1px solid #00000011;">
     <label style="display:block;font-size:13px;color:var(--text-soft);margin-bottom:8px;">他的日记</label>
-    ${Current.diary.his.length===0?'<p style="color:var(--text-soft);font-size:13px;">他还没有写日记。</p>'
-      :Current.diary.his.slice(-5).reverse().map(d=>`<div class="log-item"><div class="who">${d.date}</div><div class="txt">${d.text}</div></div>`).join('')}
+    ${hisList.length===0?'<p style="color:var(--text-soft);font-size:13px;">他还没有写日记。</p>'
+      :hisList.slice(0, 10).map(d=>`<div class="log-item"><div class="who">${d.date}${d.selfWritten?' · 他写的':''}</div><div class="txt">${d.text}</div></div>`).join('')}
   `;
   openModal();
 }
@@ -2660,6 +2805,7 @@ function openSettings(){
     <div class="field"><label>背景故事</label><textarea id="setBackground" oninput="settingsDraft.background=this.value">${d.background||''}</textarea></div>
     <div class="field"><label>世界观</label><textarea id="setWorldview" oninput="settingsDraft.worldview=this.value">${d.worldview||''}</textarea></div>
     <div class="field"><label>说话风格</label><input id="setStyle" value="${d.style||''}" oninput="settingsDraft.style=this.value"></div>
+    <div class="field"><label>生日（角色生日，格式 2024-05-20）</label><input id="setBirthday" type="date" value="${d.birthday||''}" oninput="settingsDraft.birthday=this.value"></div>
     <div class="field"><label>语言</label>
       <select id="setLanguage" onchange="settingsDraft.language=this.value">
         ${['中文','English','日本語','한국어'].map(l=>`<option value="${l}" ${d.language===l?'selected':''}>${l}</option>`).join('')}
@@ -2773,6 +2919,7 @@ function saveSettings(){
   Current.role=d.role; Current.personality=d.personality; Current.background=d.background;
   Current.worldview=d.worldview; Current.style=d.style; Current.language=d.language;
   Current.intro=d.intro; Current.relationType=d.relationType;
+  Current.birthday = d.birthday || '';
   Current.relationValue=Math.max(0,Math.min(100,parseInt(d.relationValue)||0));
   Current.image = d.image; Current.images = d.images; Current.outfits = d.outfits;
   Current.currentOutfitIndex = d.currentOutfitIndex;
@@ -2958,7 +3105,7 @@ function buildSaveObject(){
 }
 function applySaveObject(d){
   if(!d)return;
-  GlobalState.version = d.version || 16;
+  GlobalState.version = d.version || 17;
   GlobalState.mainColor = d.mainColor || '#ff8fab';
   GlobalState.bgColor = d.bgColor || '#ffe0e8';
   GlobalState.background = d.background || null;
@@ -2996,6 +3143,9 @@ function applySaveObject(d){
     if(!c.chatLog || !Array.isArray(c.chatLog)) c.chatLog = [];
     if(typeof c.pomoGoalMin !== 'number') c.pomoGoalMin = 120;
     if(typeof c.lastPomoNudge !== 'number') c.lastPomoNudge = 0;
+    if(typeof c.birthday !== 'string') c.birthday = '';
+    if(!c.lastSelfDiaryDate) c.lastSelfDiaryDate = null;
+    if(!c.lastFestivalDate) c.lastFestivalDate = null;
     return c;
   });
   if(!GlobalState.characters.length){
@@ -3193,6 +3343,8 @@ async function boot(){
   setInterval(()=>{ checkMeal(); checkSleepState(); updateTrackBar(); }, 60000);
   if(!isNoticeSeen()) setTimeout(()=>{ openNotice(); }, 500);
   setTimeout(()=>{ nudgeStudy(); }, 3000);
+  setTimeout(()=>{ checkFestival(); }, 4000);
+  setTimeout(()=>{ checkSelfDiary(); }, 6000);
   if(!hasSave){
     setTimeout(()=>{ if(API.ready)proactiveTalk('greet').catch(()=>{}); else say('先去设置里填 API 和上传图片吧。','tip'); },1200);
     setTimeout(firstTimeSetup,2500);
