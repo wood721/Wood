@@ -1,4 +1,4 @@
-<!DOCTYPE html>    
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -343,14 +343,12 @@ function getTodayFestival(){
   const y = d.getFullYear();
   const md = `${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   const full = `${y}-${md}`;
-  // 公历
   if(md === '01-01') return { name:'元旦', emoji:'🎊', type:'solar' };
   if(md === '02-14') return { name:'情人节', emoji:'💘', type:'solar' };
   if(md === '05-01') return { name:'劳动节', emoji:'💪', type:'solar' };
   if(md === '06-01') return { name:'儿童节', emoji:'🎈', type:'solar' };
   if(md === '10-01') return { name:'国庆节', emoji:'🇨🇳', type:'solar' };
   if(md === '12-25') return { name:'圣诞节', emoji:'🎄', type:'solar' };
-  // 农历
   const lunar = LUNAR_FESTIVALS[y];
   if(lunar){
     if(lunar.chunjie === full) return { name:'春节', emoji:'🧧', type:'lunar' };
@@ -359,6 +357,54 @@ function getTodayFestival(){
     if(lunar.zhongqiu === full) return { name:'中秋节', emoji:'🌕', type:'lunar' };
   }
   return null;
+}
+
+/* ============ Capacitor 插件安全获取 ============ */
+function getCapPlugin(name){
+  try{
+    if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins[name]){
+      return window.Capacitor.Plugins[name];
+    }
+  }catch(e){}
+  return null;
+}
+async function requestNotifPermission(){
+  const LN = getCapPlugin('LocalNotifications');
+  if(!LN) return false;
+  try{
+    const r = await LN.requestPermissions();
+    return r.display === 'granted';
+  }catch(e){ return false; }
+}
+async function pushNativeNotif(title, body){
+  const LN = getCapPlugin('LocalNotifications');
+  if(!LN) return;
+  try{
+    await LN.schedule({
+      notifications: [{
+        id: Math.floor(Math.random()*100000),
+        title: title || '他',
+        body: body,
+        schedule: { at: new Date(Date.now() + 500) },
+      }]
+    });
+  }catch(e){}
+}
+async function saveFileToLocal(filename, content){
+  const FS = getCapPlugin('Filesystem');
+  if(!FS) return null;
+  try{
+    // 写入公共下载目录
+    const res = await FS.writeFile({
+      path: filename,
+      data: content,
+      directory: 'DOCUMENTS',
+      encoding: 'utf8',
+    });
+    return res;
+  }catch(e){
+    return null;
+  }
 }
 
 /* ============ App 内通知 ============ */
@@ -398,7 +444,7 @@ const NOTICE_TEXT = "游戏反馈和bug修复可以投稿至 1473727478@qq.com\n
 
 /* ============ 全局 ============ */
 const GlobalState = {
-  version: 17,
+  version: 18,
   mainColor: '#ff8fab', bgColor: '#ffe0e8',
   background: null, userImage: null, userShow: false, userX: 0.5, userY: 0.88,
   userBubblePos: 'center',
@@ -406,6 +452,7 @@ const GlobalState = {
   weather: '晴', weatherDate: null, weatherCity: '',
   weatherLat: null, weatherLon: null, weatherManualCity: '', weatherUpdatedAt: 0,
   currentCharId: null, characters: [],
+  lastBackgroundAt: 0, // 上次切后台时间
 };
 function newCharacterData(id){
   return {
@@ -433,6 +480,7 @@ function newCharacterData(id){
     recentGames: [],
     lastSelfDiaryDate: null,
     lastFestivalDate: null,
+    lastBackgroundNotifAt: 0,
   };
 }
 let Current = null;
@@ -1682,7 +1730,6 @@ function tickStats(){
   const hour=new Date().getHours();
   if(hour >= 23 || hour < 6){ s.energy = Math.min(100, s.energy + 8*hours); }
   else if(s.food > 60){ s.energy = Math.min(100, s.energy + 1*hours); }
-  // 天气影响心情
   const wd = getWeatherMoodDelta();
   if(wd) s.mood = Math.max(0, Math.min(100, s.mood + wd*0.3*hours));
   if(Current.lastInteract){
@@ -1837,6 +1884,7 @@ function checkFestival(){
         applyEmotion(emo,label);
         Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
         showInAppNotif(clean);
+        pushNativeNotif(Current.name, clean);
         Current.stats.mood = Math.min(100, Current.stats.mood + 10);
         updateStats();
         saveGameDebounced();
@@ -1850,7 +1898,6 @@ function checkSelfDiary(){
   if(!API.ready || !Current) return;
   const y = yesterdayStr();
   if(Current.lastSelfDiaryDate === y) return;
-  // 昨天有没有聊过什么
   const yChats = Current.chatLog.filter(m => {
     const d = new Date(m.time);
     const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -1877,6 +1924,39 @@ function checkSelfDiary(){
       }
     }).catch(()=>{});
   }, 5000);
+}
+
+/* ============ 后台 AI 通知 ============ */
+function tryBackgroundAINotification(){
+  if(!API.ready || !Current) return;
+  if(Current.isAway || Current.isSleeping || Current.focusMode) return;
+  if(Current.lastBackgroundNotifAt && Date.now() - Current.lastBackgroundNotifAt < 30*60*1000) return;
+  const h = new Date().getHours();
+  if(h >= 23 || h < 6) return;
+  let promptMap;
+  if(h < 11) promptMap = '现在是早上，主动给对方说一句话（问候或者分享你刚做的事）。';
+  else if(h < 14) promptMap = '现在是中午，主动给对方说一句话（比如吃饭了吗）。';
+  else if(h < 18) promptMap = '现在是下午，主动给对方说一句话（比如在做什么）。';
+  else if(h < 22) promptMap = '现在是晚上，主动给对方说一句话（比如今天过得怎么样）。';
+  else return;
+  const sys = buildSystemPrompt('') + '\n\n【场景】' + promptMap + '\n【要求】直接以你的身份说 1~2 句话。不要复述【场景】，不要提到"设定""规则"，不要用括号写动作。';
+  callAI([
+    {role:'system',content:sys},
+    ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
+    {role:'user',content:'【系统触发】'},
+  ]).then(reply=>{
+    if(reply){
+      let{clean,emo,label}=parseEmotion(reply);
+      clean = clean.trim();
+      if(clean){
+        Current.lastBackgroundNotifAt = Date.now();
+        pushNativeNotif(Current.name, clean);
+        // 存起来，下次打开 App 能看到
+        Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
+        saveGameDebounced();
+      }
+    }
+  }).catch(()=>{});
 }
 
 /* ============ 小惊喜 / emo ============ */
@@ -2805,7 +2885,7 @@ function openSettings(){
     <div class="field"><label>背景故事</label><textarea id="setBackground" oninput="settingsDraft.background=this.value">${d.background||''}</textarea></div>
     <div class="field"><label>世界观</label><textarea id="setWorldview" oninput="settingsDraft.worldview=this.value">${d.worldview||''}</textarea></div>
     <div class="field"><label>说话风格</label><input id="setStyle" value="${d.style||''}" oninput="settingsDraft.style=this.value"></div>
-    <div class="field"><label>生日（角色生日，格式 2024-05-20）</label><input id="setBirthday" type="date" value="${d.birthday||''}" oninput="settingsDraft.birthday=this.value"></div>
+    <div class="field"><label>生日（角色生日）</label><input id="setBirthday" type="date" value="${d.birthday||''}" oninput="settingsDraft.birthday=this.value"></div>
     <div class="field"><label>语言</label>
       <select id="setLanguage" onchange="settingsDraft.language=this.value">
         ${['中文','English','日本語','한국어'].map(l=>`<option value="${l}" ${d.language===l?'selected':''}>${l}</option>`).join('')}
@@ -3105,7 +3185,7 @@ function buildSaveObject(){
 }
 function applySaveObject(d){
   if(!d)return;
-  GlobalState.version = d.version || 17;
+  GlobalState.version = d.version || 18;
   GlobalState.mainColor = d.mainColor || '#ff8fab';
   GlobalState.bgColor = d.bgColor || '#ffe0e8';
   GlobalState.background = d.background || null;
@@ -3146,6 +3226,7 @@ function applySaveObject(d){
     if(typeof c.birthday !== 'string') c.birthday = '';
     if(!c.lastSelfDiaryDate) c.lastSelfDiaryDate = null;
     if(!c.lastFestivalDate) c.lastFestivalDate = null;
+    if(typeof c.lastBackgroundNotifAt !== 'number') c.lastBackgroundNotifAt = 0;
     return c;
   });
   if(!GlobalState.characters.length){
@@ -3205,7 +3286,7 @@ function exportSave(){
   modal.innerHTML=`
     <h2>导出存档 <span class="close" onclick="closeSettings()">×</span></h2>
     <p style="font-size:12px;color:var(--text-soft);margin-bottom:10px;">
-      点下面「下载 json 文件」，会保存到手机的「下载」文件夹。<br>
+      点下面「下载 json 文件」，会保存到手机的「文档」文件夹。<br>
       如果没反应，用「复制」按钮。
     </p>
     <button class="btn" onclick="downloadSaveFile()">📥 下载 .json 文件</button>
@@ -3217,10 +3298,17 @@ function exportSave(){
   `;
   openModal();
 }
-function downloadSaveFile(){
+async function downloadSaveFile(){
   const str = window.__lastExportContent || '';
   const filename = window.__lastExportFilename || `yunqi_save_${todayStr()}.json`;
   if(!str){ alert('没有内容可下载'); return; }
+  // 优先用 Capacitor Filesystem 写到公共目录
+  const res = await saveFileToLocal(filename, str);
+  if(res){
+    alert('已保存到手机的「文档」文件夹（或下载文件夹），文件名：' + filename);
+    return;
+  }
+  // 退回浏览器下载
   try{
     const blob = new Blob([str], {type:'application/json'});
     const url = URL.createObjectURL(blob);
@@ -3332,6 +3420,8 @@ async function boot(){
   if(Current && Current.pet && Current.pet.has && !Current.pet.nextWalkAt){
     scheduleNextPetWalk();
   }
+  // 请求通知权限
+  setTimeout(()=>{ requestNotifPermission(); }, 2000);
   saveGame();
   renderBackground(); renderCharacter(); renderUser(); renderPet();
   renderWeather(); updateStats(); updateRelationUI(); renderQuick();
@@ -3352,6 +3442,28 @@ async function boot(){
     setTimeout(()=>{ if(Current.sick)say(`${Current.name}还病着，需要照顾。`,'them'); else timeGreeting(); },1000);
   }
 }
+
+// 切后台时，尝试生成一条 AI 通知
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden){
+    // 记录时间
+    GlobalState.lastBackgroundAt = Date.now();
+    // 尝试生成通知（如果 App 还没被系统冻结）
+    setTimeout(()=>{ tryBackgroundAINotification(); }, 3000);
+  }else{
+    // 回到前台
+    if(GlobalState.lastBackgroundAt && Date.now() - GlobalState.lastBackgroundAt > 60*1000){
+      // 离开超过 1 分钟，刷新一下
+      updateTrackBar();
+      updateStats();
+    }
+  }
+});
+window.addEventListener('blur', ()=>{
+  GlobalState.lastBackgroundAt = Date.now();
+  setTimeout(()=>{ tryBackgroundAINotification(); }, 3000);
+});
+
 function startIdleWalk(){
   setInterval(()=>{
     const wrap=document.getElementById('charWrap');
