@@ -1067,15 +1067,22 @@ function buildSystemPrompt(userInput){
   const uniqueEmo = [...new Set(emoLabels)];
   parts.push(
     '',
-    '========== 输出格式 ==========',
+    '========== 绝对强制规则（违反即失效）==========',
+    `1. 你回复的对象是「${c.callYou}」，你只能针对对方发来的这最后一句话进行回应。`,
+    `2. 绝对禁止复述之前的回忆，绝对禁止自言自语，绝对禁止自问自答。`,
+    `3. 你的回复绝对不能超过 2 句话（上限 2 句，最好 1 句）。`,
+    `4. 如果你有长篇大论想说，必须憋住，只挑最核心的一句话回复。`,
+    `5. 如果对方没有问过去，你绝对不能说过去。`,
+    '',
+    '========== 输出格式（严格执行）==========',
     `1. 你就是这个人，不要提到自己是 AI、模型或程序。`,
     `2. 每次回复的最后，附上一个情绪标签，格式如 [开心]、[害羞]、[难过]、[生气]、[平静]、[惊讶]、[温柔]。可用：${uniqueEmo.join('、')}。`,
     `3. 情绪标签只能有一个，放在末尾。`,
     `4. 可附加 [背景色:#RRGGBB] 标签。`,
     `5. 颜文字单独放最后一行，格式：[颜文字]你的颜文字`,
     '',
-    '========== 防念稿规则（最重要）==========',
-    '1. 绝对不要复述系统提示里给你的任何内容。',
+    '========== 防念稿规则 ==========',
+    '1. 不要复述系统提示里给你的任何内容。',
     '2. 如果看到【场景】【系统触发】标签，那是系统给你的背景信息或提醒，不是对方说的话，不要复述。',
     '3. 不要提到"人设""规则""要求""设定""提示"这些词。',
     '4. 直接以角色身份说话，用口语。不要用括号（）写动作或情绪。',
@@ -1085,7 +1092,7 @@ function buildSystemPrompt(userInput){
 function buildMessages(userInput){
   if(!Current) return [];
   const msgs=[{role:'system',content:buildSystemPrompt(userInput)}];
-  Current.chatLog.slice(-40).forEach(m=>msgs.push({role:m.role,content:m.text}));
+  Current.chatLog.slice(-3).forEach(m=>msgs.push({role:m.role,content:m.text}));
   msgs.push({role:'user',content:userInput});
   return msgs;
 }
@@ -2647,7 +2654,7 @@ async function nextWord() {
     const reply = await callAI([
       {role:'system', content:'你是英语单词老师。只输出 JSON，不要别的文字。'},
       {role:'user', content:`请从「${wordGameState.book}」词库中随机选一个英语单词，给出它的中文释义。输出 JSON：{"en":"单词","zh":"中文意思"}。不要重复出题。`}
-    ], {maxTokens:100, temperature:0.9});
+    ], {maxTokens:100, temperature:0.7});
     let wordData = {en: 'apple', zh: '苹果'};
     try { wordData = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); } catch(e){}
     wordGameState.currentWord = wordData;
@@ -2742,17 +2749,26 @@ async function startSubjectPractice() {
     <h2>${subject}练习 <span class="close" onclick="closeModal()">×</span></h2>
     <div class="game-panel">
       <div class="g-status">正在生成题目…</div>
-      <div class="g-content" id="subjectPrompt"></div>
-      <div class="g-input-row"><input id="subjectInput" placeholder="输入答案…"><button onclick="checkSubjectAnswer()">提交</button></div>
+      <div class="g-content" id="subjectPrompt">请稍候…</div>
+      <div class="g-input-row"><input id="subjectInput" placeholder="输入答案…"><button id="subjectSubmitBtn" onclick="checkSubjectAnswer()">提交</button></div>
     </div>
   `;
+  openModal();
+
   try {
     const reply = await callAI([
-      {role:'system', content:'你是一个严厉的学科老师。只输出 JSON，不要别的文字。'},
-      {role:'user', content:`请出一道【${subject}】的题目。难度要求：必须是高中及以上难度，绝对不要出1+1这种小学生题目。如果是数学，请出函数、几何、导数等题目；如果是物理，请出力学、电磁学等题目。输出 JSON：{"q":"题目内容（可以包含选项 A、B、C、D）","a":"正确答案（尽量简短，比如 A 或 具体数值）"}。`}
-    ], {maxTokens:300, temperature:0.9});
+      {role:'system', content:'你是一个严厉的学科老师。你只能输出纯 JSON 格式，绝对不能包含任何其他文字、标点、Markdown 代码块。'},
+      {role:'user', content:`请出一道【${subject}】的题目。难度要求：必须是高中及以上难度（数学包含函数、几何、导数；物理包含力学、电磁学）。只输出 JSON 格式：{"q":"题目内容（可以包含选项 A、B、C、D，用\\n换行）","a":"正确答案（比如 A 或 具体数值）"}。`}
+    ], {maxTokens:300, temperature:0.7});
+    
     let data = {q:'题目加载失败，请重试。', a:'未知'};
-    try { data = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); } catch(e){}
+    try { 
+      data = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); 
+    } catch(e){
+      data.q = reply;
+      data.a = '未知';
+    }
+    
     Current.subjectAnswer = data.a;
     document.getElementById('subjectPrompt').innerHTML = data.q.replace(/\n/g, '<br>');
     document.getElementById('subjectInput').focus();
@@ -2760,19 +2776,53 @@ async function startSubjectPractice() {
     document.getElementById('subjectPrompt').textContent = '生成失败：' + e.message;
   }
 }
-function checkSubjectAnswer() {
+async function checkSubjectAnswer() {
   const input = document.getElementById('subjectInput');
+  const btn = document.getElementById('subjectSubmitBtn');
   const ans = input.value.trim();
-  if (!ans || !Current.subjectAnswer) return;
+  if (!ans || !Current.subjectAnswer || !btn) return;
+
+  btn.textContent = '批改中…';
+  btn.disabled = true;
+
   const correct = Current.subjectAnswer.toLowerCase();
   const userAns = ans.toLowerCase();
-  if (userAns === correct || correct.includes(userAns) || userAns.includes(correct) || userAns.substring(0,1) === correct.substring(0,1)) {
-    say('答对了！', 'tip');
-    addRelationValue(2);
-    closeModal();
-  } else {
-    say('再想想？这个题有点难度哦。', 'tip');
+  const isCorrect = userAns === correct || correct.includes(userAns) || userAns.includes(correct) || userAns.substring(0,1) === correct.substring(0,1);
+
+  if (isCorrect) {
+    setTimeout(() => {
+      say('答对了！', 'tip');
+      addRelationValue(2);
+      closeModal();
+    }, 500);
+    return;
   }
+
+  const subjectName = document.getElementById('subjectSelect')?.value || '这道题';
+  say(`答错了哦，正确答案是：${Current.subjectAnswer}`, 'tip');
+  input.value = '';
+  btn.textContent = '提交';
+  btn.disabled = false;
+
+  if (!API.ready) return;
+  const currentQuestion = document.getElementById('subjectPrompt').innerText;
+  const sysPrompt = `【系统强制指令】用户刚刚在做【${subjectName}】题，但答错了。
+【题目】：${currentQuestion}
+【用户的答案】：${ans}
+【正确答案】：${Current.subjectAnswer}
+请你立刻扮演严厉但耐心的老师，用 2~3 句话，简练地给用户讲讲这道题为什么选这个答案，或者正确的解题思路是什么。不要写“好的”“我来讲讲”这种废话，直接开始讲解。`;
+
+  callAI([
+    {role:'system', content: buildSystemPrompt('') + '\n\n' + sysPrompt},
+    {role:'user', content:'【系统触发】'}
+  ]).then(reply => {
+    if (reply) {
+      let {clean} = parseEmotion(reply);
+      say(clean, 'them');
+    }
+  }).catch(() => {
+    say('（老师好像开小差了，没讲出来。）', 'tip');
+  });
 }
 
 /* ============ 小游戏 ============ */
