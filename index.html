@@ -108,8 +108,9 @@ body{
   background:var(--card);color:var(--text);font-size:14px;box-shadow:var(--shadow)}
 .inputbar input:disabled{opacity:.5}
 .inputbar button{border:none;width:44px;height:44px;border-radius:50%;background:var(--main);
-  color:#fff;font-size:18px;cursor:pointer;box-shadow:var(--shadow);transition:transform .15s}
+  color:#fff;font-size:18px;cursor:pointer;box-shadow:var(--shadow);transition:transform .15s;flex-shrink:0;}
 .inputbar button:active{transform:scale(.9)}
+.inputbar button.new-topic-btn{background:var(--accent);color:var(--text);font-size:20px;}
 .quick{display:flex;gap:6px;margin-top:8px;overflow-x:auto;padding-bottom:4px}
 .quick button{flex-shrink:0;border:none;padding:7px 14px;border-radius:999px;
   background:var(--card);color:var(--text);font-size:12px;cursor:pointer;box-shadow:var(--shadow)}
@@ -232,26 +233,6 @@ body{
 .outfit-cell.active{border-color:var(--main);}
 .outfit-cell img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:10px;}
 .outfit-cell .lbl{font-size:11px;color:var(--text-soft);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-
-/* 背单词样式 */
-.word-book-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px;}
-.word-book-cell{background:var(--card);border-radius:14px;padding:14px;cursor:pointer;
-  border:3px solid transparent;display:flex;flex-direction:column;align-items:center;gap:6px;}
-.word-book-cell.active{border-color:var(--main);}
-.word-book-cell .wb-ico{font-size:32px;}
-.word-book-cell .wb-name{font-size:13px;font-weight:600;color:var(--text);}
-.word-book-cell .wb-desc{font-size:11px;color:var(--text-soft);}
-.word-card{background:var(--card);border-radius:18px;padding:24px 20px;text-align:center;
-  box-shadow:var(--shadow);margin:12px 0;}
-.word-card .word-en{font-size:28px;font-weight:600;color:var(--text);letter-spacing:1px;word-break:break-word;}
-.word-card .word-pos{font-size:12px;color:var(--text-soft);margin-top:6px;}
-.word-stat{display:flex;justify-content:space-around;margin:12px 0;font-size:12px;color:var(--text-soft);}
-.word-stat b{color:var(--main-dark);font-size:16px;}
-.word-result-ok{background:#e8f8ec;color:#2a7a3a;padding:12px;border-radius:12px;
-  font-size:13px;line-height:1.6;margin-top:8px;}
-.word-result-fail{background:#fdeaea;color:#a04040;padding:12px;border-radius:12px;
-  font-size:13px;line-height:1.6;margin-top:8px;}
-
 .notice-body{font-size:14px;line-height:1.8;color:var(--text);background:var(--card);border-radius:16px;padding:16px;white-space:pre-wrap;box-shadow:0 2px 8px rgba(229,107,140,.06);}
 .notice-email{color:var(--main-dark);font-weight:600;}
 </style>
@@ -315,6 +296,7 @@ body{
 
   <div class="inputbar">
     <input id="chatInput" placeholder="和他说点什么…" />
+    <button id="newTopicBtn" class="new-topic-btn" title="开启新话题">🔄</button>
     <button id="sendBtn">↑</button>
   </div>
 
@@ -322,11 +304,11 @@ body{
     <div class="tool" data-panel="gift"><span class="ico">🎁</span>送礼物</div>
     <div class="tool" data-panel="touch"><span class="ico">✋</span>互动</div>
     <div class="tool" data-panel="outfit"><span class="ico">👗</span>换装</div>
-    <div class="tool" data-panel="word"><span class="ico">📚</span>背单词</div>
+    <div class="tool" data-panel="study"><span class="ico">📚</span>学习</div>
     <div class="tool" data-panel="game"><span class="ico">🎮</span>小游戏</div>
     <div class="tool" data-panel="shop"><span class="ico">🛒</span>商城</div>
+    <div class="tool" data-panel="money"><span class="ico">💰</span>记账</div>
     <div class="tool" data-panel="diary"><span class="ico">📔</span>日记</div>
-    <div class="tool" data-panel="timer"><span class="ico">⏱️</span>番茄钟</div>
     <div class="tool" data-panel="sleep"><span class="ico">🌙</span>陪睡</div>
     <div class="tool" data-panel="period"><span class="ico">🩸</span>生理期</div>
     <div class="tool" data-panel="anniv"><span class="ico">💍</span>纪念日</div>
@@ -343,7 +325,6 @@ body{
   <div class="story-btn" id="sleepStoryBtn" onclick="tellSleepStory()">📖 讲个晚安故事</div>
   <div class="exit" id="sleepExit">轻触结束陪睡</div>
 </div>
-
 <script>
 /* ============ 农历节日对照表（2026-2036） ============ */
 const LUNAR_FESTIVALS = {
@@ -422,7 +403,9 @@ async function saveFileToLocal(filename, content){
       encoding: 'utf8',
     });
     return res;
-  }catch(e){ return null; }
+  }catch(e){
+    return null;
+  }
 }
 
 /* ============ App 内通知 ============ */
@@ -460,1700 +443,9 @@ const REL_TYPES = [
 ];
 const NOTICE_TEXT = "游戏反馈和bug修复可以投稿至 1473727478@qq.com\n祝你和你的爱人游玩愉快！";
 
-/* ============ 词库 ============ */
-const WORD_BOOKS = {
-  cet4: {
-    name: '四级 CET-4',
-    desc: '约 4500 词',
-    words: [
-      {w:'abandon', zh:'v. 放弃，抛弃'},
-      {w:'absolute', zh:'adj. 绝对的，完全的'},
-      {w:'absorb', zh:'v. 吸收，吸引'},
-      {w:'abstract', zh:'adj. 抽象的 n. 摘要'},
-      {w:'abundant', zh:'adj. 丰富的，充裕的'},
-      {w:'academic', zh:'adj. 学术的 n. 学者'},
-      {w:'accelerate', zh:'v. 加速，促进'},
-      {w:'accent', zh:'n. 口音，重音'},
-      {w:'accompany', zh:'v. 陪伴，伴随'},
-      {w:'accomplish', zh:'v. 完成，实现'},
-      {w:'accurate', zh:'adj. 准确的，精确的'},
-      {w:'accuse', zh:'v. 指责，控告'},
-      {w:'achieve', zh:'v. 达到，实现'},
-      {w:'acknowledge', zh:'v. 承认，感谢'},
-      {w:'acquire', zh:'v. 获得，学到'},
-      {w:'adapt', zh:'v. 适应，改编'},
-      {w:'adequate', zh:'adj. 足够的，适当的'},
-      {w:'adjust', zh:'v. 调整，适应'},
-      {w:'admire', zh:'v. 钦佩，欣赏'},
-      {w:'adopt', zh:'v. 采用，收养'},
-      {w:'advocate', zh:'v. 提倡 n. 拥护者'},
-      {w:'affect', zh:'v. 影响，感动'},
-      {w:'affection', zh:'n. 喜爱，感情'},
-      {w:'aggressive', zh:'adj. 好斗的，有进取心的'},
-      {w:'alter', zh:'v. 改变，修改'},
-      {w:'ambitious', zh:'adj. 有雄心的，野心勃勃的'},
-      {w:'analyze', zh:'v. 分析'},
-      {w:'ancient', zh:'adj. 古代的，古老的'},
-      {w:'announce', zh:'v. 宣布，通告'},
-      {w:'annual', zh:'adj. 每年的 n. 年刊'},
-      {w:'anticipate', zh:'v. 预期，期望'},
-      {w:'anxiety', zh:'n. 焦虑，担忧'},
-      {w:'apparent', zh:'adj. 明显的，表面的'},
-      {w:'appeal', zh:'v./n. 呼吁，吸引力'},
-      {w:'appreciate', zh:'v. 欣赏，感激'},
-      {w:'approach', zh:'v. 接近 n. 方法'},
-      {w:'appropriate', zh:'adj. 适当的，恰当的'},
-      {w:'approve', zh:'v. 赞成，批准'},
-      {w:'approximate', zh:'adj. 近似的 v. 接近'},
-      {w:'arbitrary', zh:'adj. 任意的，武断的'},
-      {w:'architecture', zh:'n. 建筑学，架构'},
-      {w:'arrange', zh:'v. 安排，整理'},
-      {w:'articulate', zh:'v. 清晰表达 adj. 表达清晰的'},
-      {w:'assemble', zh:'v. 集合，装配'},
-      {w:'assess', zh:'v. 评估，评定'},
-      {w:'assign', zh:'v. 分配，指派'},
-      {w:'assist', zh:'v. 帮助，协助'},
-      {w:'associate', zh:'v. 联系，联想 n. 同事'},
-      {w:'assume', zh:'v. 假定，承担'},
-      {w:'assure', zh:'v. 保证，使确信'},
-      {w:'attach', zh:'v. 附上，系上'},
-      {w:'attain', zh:'v. 达到，获得'},
-      {w:'attempt', zh:'v./n. 尝试，企图'},
-      {w:'attitude', zh:'n. 态度，看法'},
-      {w:'attribute', zh:'v. 归因于 n. 属性'},
-      {w:'authority', zh:'n. 权威，当局'},
-      {w:'available', zh:'adj. 可用的，可获得的'},
-      {w:'avoid', zh:'v. 避免，回避'},
-      {w:'aware', zh:'adj. 意识到的，知道的'},
-      {w:'awkward', zh:'adj. 尴尬的，笨拙的'},
-      {w:'balance', zh:'n./v. 平衡，余额'},
-      {w:'barrier', zh:'n. 障碍，屏障'},
-      {w:'benefit', zh:'n. 利益 v. 有益于'},
-      {w:'bias', zh:'n. 偏见，偏差'},
-      {w:'brief', zh:'adj. 简短的 n. 摘要'},
-      {w:'brilliant', zh:'adj. 杰出的，明亮的'},
-      {w:'budget', zh:'n. 预算 v. 编制预算'},
-      {w:'campaign', zh:'n. 运动，战役'},
-      {w:'capable', zh:'adj. 有能力的，能干的'},
-      {w:'capacity', zh:'n. 容量，能力'},
-      {w:'career', zh:'n. 职业，生涯'},
-      {w:'category', zh:'n. 类别，种类'},
-      {w:'cease', zh:'v. 停止，终止'},
-      {w:'challenge', zh:'n./v. 挑战'},
-      {w:'characteristic', zh:'n. 特征 adj. 典型的'},
-      {w:'charge', zh:'v. 收费，指控 n. 费用'},
-      {w:'circumstance', zh:'n. 情况，环境'},
-      {w:'cite', zh:'v. 引用，举例'},
-      {w:'civilization', zh:'n. 文明，文化'},
-      {w:'claim', zh:'v. 声称，要求 n. 主张'},
-      {w:'clarify', zh:'v. 澄清，阐明'},
-      {w:'classify', zh:'v. 分类，归类'},
-      {w:'client', zh:'n. 客户，委托人'},
-      {w:'climate', zh:'n. 气候，气氛'},
-      {w:'collapse', zh:'v./n. 崩溃，倒塌'},
-      {w:'colleague', zh:'n. 同事，同僚'},
-      {w:'commit', zh:'v. 犯（罪），承诺'},
-      {w:'commodity', zh:'n. 商品，日用品'},
-      {w:'communicate', zh:'v. 交流，沟通'},
-      {w:'compete', zh:'v. 竞争，比赛'},
-      {w:'complex', zh:'adj. 复杂的 n. 综合体'},
-      {w:'component', zh:'n. 组成部分，部件'},
-      {w:'compose', zh:'v. 组成，创作'},
-      {w:'comprehensive', zh:'adj. 综合的，全面的'},
-      {w:'compromise', zh:'n./v. 妥协，折中'},
-      {w:'conceal', zh:'v. 隐藏，隐瞒'},
-      {w:'concentrate', zh:'v. 集中，专心'},
-      {w:'concept', zh:'n. 概念，观念'},
-      {w:'conclude', zh:'v. 得出结论，结束'},
-      {w:'confident', zh:'adj. 自信的，确信的'},
-      {w:'confirm', zh:'v. 确认，证实'},
-      {w:'conflict', zh:'n./v. 冲突，矛盾'},
-      {w:'confuse', zh:'v. 使困惑，混淆'},
-      {w:'consequence', zh:'n. 结果，后果'},
-      {w:'conservative', zh:'adj. 保守的 n. 保守派'},
-      {w:'considerable', zh:'adj. 相当大的，可观的'},
-      {w:'consist', zh:'v. 由……组成，一致'},
-      {w:'constant', zh:'adj. 不断的，恒定的'},
-      {w:'constitute', zh:'v. 构成，组成'},
-      {w:'construct', zh:'v. 建造，构造'},
-      {w:'consult', zh:'v. 咨询，商议'},
-      {w:'consume', zh:'v. 消耗，消费'},
-      {w:'contain', zh:'v. 包含，容纳'},
-      {w:'contemporary', zh:'adj. 当代的 n. 同代人'},
-      {w:'context', zh:'n. 上下文，背景'},
-      {w:'contract', zh:'n. 合同 v. 收缩'},
-      {w:'contrary', zh:'adj. 相反的 n. 相反'},
-      {w:'contrast', zh:'n./v. 对比，对照'},
-      {w:'contribute', zh:'v. 贡献，捐赠'},
-      {w:'controversial', zh:'adj. 有争议的'},
-      {w:'convenient', zh:'adj. 方便的，便利的'},
-      {w:'convince', zh:'v. 使确信，说服'},
-      {w:'cooperate', zh:'v. 合作，协作'},
-      {w:'correspond', zh:'v. 符合，相当于，通信'},
-      {w:'counsel', zh:'n./v. 劝告，建议'},
-      {w:'crisis', zh:'n. 危机，紧要关头'},
-      {w:'criterion', zh:'n. 标准，准则'},
-      {w:'crucial', zh:'adj. 至关重要的'},
-      {w:'cultivate', zh:'v. 培养，耕作'},
-      {w:'curious', zh:'adj. 好奇的，奇怪的'},
-      {w:'currency', zh:'n. 货币，通货'},
-      {w:'current', zh:'adj. 当前的 n. 水流，电流'},
-      {w:'decline', zh:'v./n. 下降，衰退，拒绝'},
-      {w:'decorate', zh:'v. 装饰，布置'},
-      {w:'dedicate', zh:'v. 献身，致力于'},
-      {w:'defeat', zh:'v./n. 击败，失败'},
-      {w:'defend', zh:'v. 保卫，辩护'},
-      {w:'definite', zh:'adj. 明确的，确定的'},
-      {w:'delay', zh:'v./n. 延迟，耽误'},
-      {w:'delicate', zh:'adj. 精致的，微妙的'},
-      {w:'deliver', zh:'v. 递送，发表'},
-      {w:'demand', zh:'n./v. 要求，需求'},
-      {w:'demonstrate', zh:'v. 证明，演示'},
-      {w:'deny', zh:'v. 否认，拒绝'},
-      {w:'depend', zh:'v. 依赖，取决于'},
-      {w:'deposit', zh:'n. 存款，押金 v. 存放'},
-      {w:'depress', zh:'v. 使沮丧，压低'},
-      {w:'derive', zh:'v. 源于，得到'},
-      {w:'describe', zh:'v. 描述，形容'},
-      {w:'deserve', zh:'v. 值得，应得'},
-      {w:'desire', zh:'n./v. 渴望，欲望'},
-      {w:'desperate', zh:'adj. 绝望的，拼命的'},
-      {w:'despite', zh:'prep. 尽管，不顾'},
-      {w:'destroy', zh:'v. 破坏，毁灭'},
-      {w:'detect', zh:'v. 察觉，侦查'},
-      {w:'determine', zh:'v. 决定，确定'},
-      {w:'develop', zh:'v. 发展，开发'},
-      {w:'device', zh:'n. 装置，设备'},
-      {w:'devote', zh:'v. 献身，致力于'},
-      {w:'dictate', zh:'v. 命令，口述'},
-      {w:'differentiate', zh:'v. 区分，区别'},
-      {w:'diminish', zh:'v. 减少，缩小'},
-      {w:'discipline', zh:'n. 纪律，学科'},
-      {w:'discount', zh:'n. 折扣 v. 打折'},
-      {w:'discourage', zh:'v. 使泄气，阻碍'},
-      {w:'discover', zh:'v. 发现，发觉'},
-      {w:'discuss', zh:'v. 讨论，商议'},
-      {w:'display', zh:'v./n. 展示，显示'},
-      {w:'dispose', zh:'v. 处理，处置'},
-      {w:'dispute', zh:'n./v. 争论，争端'},
-      {w:'distinguish', zh:'v. 区分，辨别'},
-      {w:'distribute', zh:'v. 分配，分发'},
-      {w:'disturb', zh:'v. 打扰，扰乱'},
-      {w:'diverse', zh:'adj. 多样的，不同的'},
-      {w:'domestic', zh:'adj. 国内的，家庭的'},
-      {w:'dominate', zh:'v. 支配，占优势'},
-      {w:'dramatic', zh:'adj. 戏剧性的，引人注目的'},
-      {w:'duty', zh:'n. 责任，义务，税'},
-      {w:'eager', zh:'adj. 渴望的，热切的'},
-      {w:'earnest', zh:'adj. 认真的，诚挚的'},
-      {w:'economy', zh:'n. 经济，节约'},
-      {w:'edit', zh:'v. 编辑，剪辑'},
-      {w:'efficient', zh:'adj. 高效的，能干的'},
-      {w:'elaborate', zh:'adj. 精心的 v. 详细说明'},
-      {w:'eliminate', zh:'v. 消除，淘汰'},
-      {w:'emerge', zh:'v. 出现，浮现'},
-      {w:'emphasize', zh:'v. 强调，着重'},
-      {w:'employ', zh:'v. 雇用，使用'},
-      {w:'enable', zh:'v. 使能够，使成为可能'},
-      {w:'encounter', zh:'v./n. 遭遇，相遇'},
-      {w:'encourage', zh:'v. 鼓励，促进'},
-      {w:'endure', zh:'v. 忍耐，持续'},
-      {w:'enhance', zh:'v. 提高，增强'},
-      {w:'enormous', zh:'adj. 巨大的，庞大的'},
-      {w:'ensure', zh:'v. 确保，保证'},
-      {w:'entertain', zh:'v. 娱乐，招待'},
-      {w:'enthusiasm', zh:'n. 热情，热心'},
-      {w:'entire', zh:'adj. 全部的，整个的'},
-      {w:'environment', zh:'n. 环境，周围状况'},
-      {w:'equip', zh:'v. 装备，配备'},
-      {w:'equivalent', zh:'adj. 相等的 n. 等价物'},
-      {w:'essential', zh:'adj. 必要的，本质的'},
-      {w:'establish', zh:'v. 建立，确立'},
-      {w:'estimate', zh:'v./n. 估计，评估'},
-      {w:'evaluate', zh:'v. 评价，评估'},
-      {w:'eventually', zh:'adv. 最终，终于'},
-      {w:'evidence', zh:'n. 证据，证明'},
-      {w:'evolve', zh:'v. 进化，发展'},
-      {w:'exaggerate', zh:'v. 夸大，夸张'},
-      {w:'examine', zh:'v. 检查，审查'},
-      {w:'exceed', zh:'v. 超过，超越'},
-      {w:'exchange', zh:'v./n. 交换，交流'},
-      {w:'exclude', zh:'v. 排除，不包括'},
-      {w:'exhibit', zh:'v. 展出，显示 n. 展览'},
-      {w:'expand', zh:'v. 扩展，膨胀'},
-      {w:'expect', zh:'v. 期待，预料'},
-      {w:'expense', zh:'n. 花费，费用'},
-      {w:'explore', zh:'v. 探索，勘探'},
-      {w:'expose', zh:'v. 暴露，揭露'},
-      {w:'express', zh:'v. 表达 adj. 快速的'},
-      {w:'extend', zh:'v. 延伸，扩展'},
-      {w:'external', zh:'adj. 外部的，外面的'},
-      {w:'extract', zh:'v. 提取，拔出 n. 提取物'},
-      {w:'extreme', zh:'adj. 极端的 n. 极端'},
-      {w:'fascinate', zh:'v. 迷住，使着迷'},
-      {w:'fatal', zh:'adj. 致命的，重大的'},
-      {w:'favor', zh:'n. 恩惠，赞成 v. 支持'},
-      {w:'feature', zh:'n. 特征，特色 v. 以……为特色'},
-      {w:'federal', zh:'adj. 联邦的，联合的'},
-      {w:'feedback', zh:'n. 反馈，反应'},
-      {w:'fertile', zh:'adj. 肥沃的，多产的'},
-      {w:'figure', zh:'n. 数字，人物 v. 认为'},
-      {w:'finance', zh:'n. 财政，金融 v. 资助'},
-      {w:'flexible', zh:'adj. 灵活的，柔韧的'},
-      {w:'fluent', zh:'adj. 流利的，流畅的'},
-      {w:'focus', zh:'v./n. 集中，焦点'},
-      {w:'forbid', zh:'v. 禁止，不许'},
-      {w:'formal', zh:'adj. 正式的，正规的'},
-      {w:'former', zh:'adj. 以前的 n. 前者'},
-      {w:'formula', zh:'n. 公式，配方'},
-      {w:'fortune', zh:'n. 运气，财富'},
-      {w:'foundation', zh:'n. 基础，基金会'},
-      {w:'frequent', zh:'adj. 频繁的，经常的'},
-      {w:'frustrate', zh:'v. 使沮丧，挫败'},
-      {w:'function', zh:'n. 功能 v. 运作'},
-      {w:'fundamental', zh:'adj. 基本的，根本的'},
-      {w:'furnish', zh:'v. 布置，提供'},
-      {w:'generate', zh:'v. 产生，生成'},
-      {w:'generous', zh:'adj. 慷慨的，大方的'},
-      {w:'genuine', zh:'adj. 真正的，真诚的'},
-      {w:'gesture', zh:'n. 手势，姿态'},
-      {w:'glance', zh:'v./n. 一瞥，扫视'},
-      {w:'govern', zh:'v. 统治，管理'},
-      {w:'gradual', zh:'adj. 逐渐的，渐进的'},
-      {w:'grasp', zh:'v. 抓住，理解 n. 掌握'},
-      {w:'grateful', zh:'adj. 感激的，感谢的'},
-      {w:'guarantee', zh:'v./n. 保证，担保'},
-      {w:'guilty', zh:'adj. 内疚的，有罪的'},
-      {w:'habit', zh:'n. 习惯，习性'},
-      {w:'handle', zh:'v. 处理，操作 n. 把手'},
-      {w:'harbor', zh:'n. 港口 v. 怀有'},
-      {w:'harmony', zh:'n. 和谐，融洽'},
-      {w:'hesitate', zh:'v. 犹豫，踌躇'},
-      {w:'highlight', zh:'v. 突出，强调 n. 亮点'},
-      {w:'horizon', zh:'n. 地平线，眼界'},
-      {w:'hostile', zh:'adj. 敌对的，敌意的'},
-      {w:'humble', zh:'adj. 谦逊的，卑微的'},
-      {w:'hypothesis', zh:'n. 假设，假说'},
-      {w:'identical', zh:'adj. 完全相同的'},
-      {w:'identify', zh:'v. 识别，认出'},
-      {w:'ignore', zh:'v. 忽视，不理'},
-      {w:'illustrate', zh:'v. 说明，举例'},
-      {w:'imagine', zh:'v. 想象，设想'},
-      {w:'imitate', zh:'v. 模仿，仿效'},
-      {w:'immediate', zh:'adj. 立即的，直接的'},
-      {w:'immense', zh:'adj. 巨大的，无边的'},
-      {w:'impact', zh:'n./v. 影响，冲击'},
-      {w:'implement', zh:'v. 实施 n. 工具'},
-      {w:'imply', zh:'v. 暗示，意味着'},
-      {w:'impose', zh:'v. 强加，征税'},
-      {w:'impress', zh:'v. 使印象深刻'},
-      {w:'improve', zh:'v. 改进，提高'},
-      {w:'incident', zh:'n. 事件，事变'},
-      {w:'include', zh:'v. 包括，包含'},
-      {w:'income', zh:'n. 收入，所得'},
-      {w:'increase', zh:'v./n. 增加，增长'},
-      {w:'indicate', zh:'v. 表明，指示'},
-      {w:'individual', zh:'adj. 个别的 n. 个人'},
-      {w:'industry', zh:'n. 工业，行业'},
-      {w:'inevitable', zh:'adj. 不可避免的'},
-      {w:'infer', zh:'v. 推断，推论'},
-      {w:'influence', zh:'n./v. 影响，感化'},
-      {w:'inform', zh:'v. 通知，告知'},
-      {w:'initial', zh:'adj. 最初的 n. 首字母'},
-      {w:'initiative', zh:'n. 主动性，倡议'},
-      {w:'injure', zh:'v. 伤害，损害'},
-      {w:'innocent', zh:'adj. 无辜的，天真的'},
-      {w:'innovate', zh:'v. 创新，革新'},
-      {w:'inquire', zh:'v. 询问，打听'},
-      {w:'insist', zh:'v. 坚持，坚决要求'},
-      {w:'inspect', zh:'v. 检查，视察'},
-      {w:'inspire', zh:'v. 激励，启发'},
-      {w:'install', zh:'v. 安装，任命'},
-      {w:'instance', zh:'n. 例子，实例'},
-      {w:'instant', zh:'adj. 立即的 n. 瞬间'},
-      {w:'institute', zh:'n. 学院，研究所'},
-      {w:'instruct', zh:'v. 指导，命令'},
-      {w:'insurance', zh:'n. 保险，保险费'},
-      {w:'intellectual', zh:'adj. 智力的 n. 知识分子'},
-      {w:'intend', zh:'v. 打算，意图'},
-      {w:'intense', zh:'adj. 强烈的，紧张的'},
-      {w:'interpret', zh:'v. 解释，口译'},
-      {w:'interrupt', zh:'v. 中断，打断'},
-      {w:'introduce', zh:'v. 介绍，引进'},
-      {w:'invade', zh:'v. 入侵，侵犯'},
-      {w:'invest', zh:'v. 投资，投入'},
-      {w:'investigate', zh:'v. 调查，研究'},
-      {w:'involve', zh:'v. 涉及，包含'},
-      {w:'isolate', zh:'v. 隔离，孤立'},
-      {w:'issue', zh:'n. 问题，期号 v. 发布'},
-      {w:'journal', zh:'n. 期刊，日记'},
-      {w:'justify', zh:'v. 证明……正当'},
-      {w:'labor', zh:'n. 劳动，劳工'},
-      {w:'launch', zh:'v. 发射，发起 n. 发布'},
-      {w:'legal', zh:'adj. 合法的，法律的'},
-      {w:'liberal', zh:'adj. 自由的，开明的'},
-      {w:'license', zh:'n. 许可证 v. 许可'},
-      {w:'limit', zh:'n. 限制 v. 限制'},
-      {w:'literature', zh:'n. 文学，文献'},
-      {w:'locate', zh:'v. 位于，定位'},
-      {w:'logic', zh:'n. 逻辑，推理'},
-      {w:'loyal', zh:'adj. 忠诚的，忠实的'},
-      {w:'luxury', zh:'n. 奢侈，奢侈品'},
-      {w:'maintain', zh:'v. 维持，维修，主张'},
-      {w:'majority', zh:'n. 大多数，多数'},
-      {w:'manage', zh:'v. 管理，设法做到'},
-      {w:'mature', zh:'adj. 成熟的 v. 成熟'},
-      {w:'means', zh:'n. 方法，手段'},
-      {w:'measure', zh:'v. 测量 n. 措施'},
-      {w:'mechanism', zh:'n. 机制，机械装置'},
-      {w:'mental', zh:'adj. 精神的，智力的'},
-      {w:'mention', zh:'v./n. 提及，说起'},
-      {w:'merely', zh:'adv. 仅仅，只不过'},
-      {w:'method', zh:'n. 方法，办法'},
-      {w:'minimum', zh:'n./adj. 最小（的），最低（的）'},
-      {w:'minority', zh:'n. 少数，少数民族'},
-      {w:'mission', zh:'n. 任务，使命'},
-      {w:'modify', zh:'v. 修改，调整'},
-      {w:'monitor', zh:'v. 监控 n. 监视器'},
-      {w:'motivate', zh:'v. 激发，激励'},
-      {w:'mutual', zh:'adj. 相互的，共同的'},
-      {w:'negative', zh:'adj. 消极的，否定的'},
-      {w:'neglect', zh:'v./n. 忽视，疏忽'},
-      {w:'negotiate', zh:'v. 谈判，协商'},
-      {w:'nevertheless', zh:'adv. 然而，不过'},
-      {w:'normal', zh:'adj. 正常的，标准的'},
-      {w:'notice', zh:'v. 注意到 n. 通知'},
-      {w:'obey', zh:'v. 服从，遵守'},
-      {w:'object', zh:'n. 物体，目标 v. 反对'},
-      {w:'observe', zh:'v. 观察，遵守'},
-      {w:'obtain', zh:'v. 获得，得到'},
-      {w:'obvious', zh:'adj. 明显的，显然的'},
-      {w:'occasion', zh:'n. 场合，时机'},
-      {w:'occupy', zh:'v. 占据，占用'},
-      {w:'occur', zh:'v. 发生，出现'},
-      {w:'offend', zh:'v. 冒犯，得罪'},
-      {w:'operate', zh:'v. 操作，做手术'},
-      {w:'opportunity', zh:'n. 机会，时机'},
-      {w:'oppose', zh:'v. 反对，抵制'},
-      {w:'optimistic', zh:'adj. 乐观的'},
-      {w:'organize', zh:'v. 组织，安排'},
-      {w:'origin', zh:'n. 起源，出身'},
-      {w:'overcome', zh:'v. 克服，战胜'},
-      {w:'participate', zh:'v. 参与，参加'},
-      {w:'particular', zh:'adj. 特别的，特定的'},
-      {w:'passion', zh:'n. 激情，热情'},
-      {w:'patient', zh:'adj. 耐心的 n. 病人'},
-      {w:'perceive', zh:'v. 察觉，理解'},
-      {w:'perform', zh:'v. 表演，执行'},
-      {w:'permanent', zh:'adj. 永久的，长期的'},
-      {w:'permit', zh:'v. 允许 n. 许可证'},
-      {w:'persist', zh:'v. 坚持，持续'},
-      {w:'perspective', zh:'n. 视角，观点'},
-      {w:'persuade', zh:'v. 说服，劝说'},
-      {w:'phenomenon', zh:'n. 现象'},
-      {w:'policy', zh:'n. 政策，方针'},
-      {w:'potential', zh:'adj. 潜在的 n. 潜力'},
-      {w:'practical', zh:'adj. 实际的，实用的'},
-      {w:'precise', zh:'adj. 精确的，准确的'},
-      {w:'predict', zh:'v. 预测，预言'},
-      {w:'prefer', zh:'v. 更喜欢，宁愿'},
-      {w:'prejudice', zh:'n. 偏见，成见'},
-      {w:'prepare', zh:'v. 准备，预备'},
-      {w:'preserve', zh:'v. 保存，保护'},
-      {w:'prevent', zh:'v. 阻止，预防'},
-      {w:'previous', zh:'adj. 以前的，先前的'},
-      {w:'principle', zh:'n. 原则，原理'},
-      {w:'priority', zh:'n. 优先，优先权'},
-      {w:'process', zh:'n. 过程 v. 处理'},
-      {w:'produce', zh:'v. 生产，产生'},
-      {w:'profession', zh:'n. 职业，专业'},
-      {w:'profit', zh:'n. 利润 v. 获益'},
-      {w:'progress', zh:'n./v. 进步，进展'},
-      {w:'prohibit', zh:'v. 禁止，阻止'},
-      {w:'promote', zh:'v. 促进，提升'},
-      {w:'propose', zh:'v. 提议，求婚'},
-      {w:'protect', zh:'v. 保护，防护'},
-      {w:'prove', zh:'v. 证明，证实'},
-      {w:'provide', zh:'v. 提供，供给'},
-      {w:'publish', zh:'v. 出版，发表'},
-      {w:'purchase', zh:'v./n. 购买'},
-      {w:'pursue', zh:'v. 追求，从事'},
-      {w:'qualify', zh:'v. 使合格，限定'},
-      {w:'quantity', zh:'n. 数量，量'},
-      {w:'quote', zh:'v. 引用，引述'},
-      {w:'random', zh:'adj. 随机的，任意的'},
-      {w:'range', zh:'n. 范围 v. 变化'},
-      {w:'reaction', zh:'n. 反应，反作用'},
-      {w:'realize', zh:'v. 意识到，实现'},
-      {w:'reasonable', zh:'adj. 合理的，有道理的'},
-      {w:'recall', zh:'v. 回忆，召回'},
-      {w:'receive', zh:'v. 收到，接待'},
-      {w:'recognize', zh:'v. 认出，承认'},
-      {w:'recommend', zh:'v. 推荐，建议'},
-      {w:'recover', zh:'v. 恢复，康复'},
-      {w:'reduce', zh:'v. 减少，降低'},
-      {w:'refer', zh:'v. 提到，参考'},
-      {w:'reflect', zh:'v. 反映，反射，思考'},
-      {w:'reform', zh:'n./v. 改革，改造'},
-      {w:'refuse', zh:'v. 拒绝，不肯'},
-      {w:'regard', zh:'v. 认为，看待 n. 尊重'},
-      {w:'region', zh:'n. 地区，区域'},
-      {w:'register', zh:'v. 注册，登记'},
-      {w:'regret', zh:'v./n. 后悔，遗憾'},
-      {w:'regular', zh:'adj. 定期的，规律的'},
-      {w:'reject', zh:'v. 拒绝，抵制'},
-      {w:'relate', zh:'v. 关联，叙述'},
-      {w:'release', zh:'v./n. 释放，发布'},
-      {w:'relevant', zh:'adj. 相关的，切题的'},
-      {w:'reliable', zh:'adj. 可靠的，可信赖的'},
-      {w:'relieve', zh:'v. 减轻，缓解'},
-      {w:'remain', zh:'v. 保持，剩下'},
-      {w:'remark', zh:'n./v. 评论，谈论'},
-      {w:'remedy', zh:'n. 治疗方法，补救办法'},
-      {w:'remind', zh:'v. 提醒，使想起'},
-      {w:'remove', zh:'v. 移除，去掉'},
-      {w:'repair', zh:'v./n. 修理，修复'},
-      {w:'replace', zh:'v. 替换，取代'},
-      {w:'represent', zh:'v. 代表，表现'},
-      {w:'reputation', zh:'n. 名声，声誉'},
-      {w:'request', zh:'n./v. 请求，要求'},
-      {w:'require', zh:'v. 需要，要求'},
-      {w:'rescue', zh:'v./n. 营救，救援'},
-      {w:'research', zh:'n./v. 研究，调查'},
-      {w:'resemble', zh:'v. 像，类似于'},
-      {w:'reserve', zh:'v. 预订，保留 n. 储备'},
-      {w:'resist', zh:'v. 抵抗，抗拒'},
-      {w:'resolve', zh:'v. 解决，决心'},
-      {w:'resource', zh:'n. 资源，财力'},
-      {w:'respect', zh:'n./v. 尊敬，尊重'},
-      {w:'respond', zh:'v. 回应，响应'},
-      {w:'responsible', zh:'adj. 负责的，可靠的'},
-      {w:'restore', zh:'v. 恢复，修复'},
-      {w:'restrict', zh:'v. 限制，约束'},
-      {w:'result', zh:'n. 结果 v. 导致'},
-      {w:'retain', zh:'v. 保留，保持'},
-      {w:'retire', zh:'v. 退休，退役'},
-      {w:'reveal', zh:'v. 揭示，透露'},
-      {w:'reverse', zh:'v. 颠倒，反转 n. 相反'},
-      {w:'review', zh:'n./v. 回顾，复习，评论'},
-      {w:'revise', zh:'v. 修改，复习'},
-      {w:'reward', zh:'n./v. 奖励，报酬'},
-      {w:'routine', zh:'n. 常规 adj. 例行的'},
-      {w:'satisfy', zh:'v. 满足，使满意'},
-      {w:'scarce', zh:'adj. 稀少的，不足的'},
-      {w:'schedule', zh:'n. 时间表 v. 安排'},
-      {w:'scheme', zh:'n. 计划，阴谋'},
-      {w:'scope', zh:'n. 范围，余地'},
-      {w:'secure', zh:'adj. 安全的 v. 获得'},
-      {w:'seek', zh:'v. 寻找，追求'},
-      {w:'seize', zh:'v. 抓住，夺取'},
-      {w:'select', zh:'v. 选择，挑选'},
-      {w:'sensitive', zh:'adj. 敏感的，灵敏的'},
-      {w:'separate', zh:'v. 分开 adj. 分开的'},
-      {w:'sequence', zh:'n. 顺序，序列'},
-      {w:'serious', zh:'adj. 严肃的，严重的'},
-      {w:'settle', zh:'v. 解决，安顿'},
-      {w:'severe', zh:'adj. 严重的，严厉的'},
-      {w:'shelter', zh:'n. 庇护所 v. 庇护'},
-      {w:'shift', zh:'v./n. 转移，改变'},
-      {w:'significant', zh:'adj. 重要的，显著的'},
-      {w:'similar', zh:'adj. 相似的，类似的'},
-      {w:'simplify', zh:'v. 简化，使简单'},
-      {w:'situation', zh:'n. 情况，处境'},
-      {w:'skeptical', zh:'adj. 怀疑的，多疑的'},
-      {w:'solve', zh:'v. 解决，解答'},
-      {w:'source', zh:'n. 来源，源头'},
-      {w:'specific', zh:'adj. 具体的，明确的'},
-      {w:'speculate', zh:'v. 推测，投机'},
-      {w:'spread', zh:'v. 传播，展开'},
-      {w:'stable', zh:'adj. 稳定的 n. 马厩'},
-      {w:'standard', zh:'n. 标准 adj. 标准的'},
-      {w:'statistics', zh:'n. 统计，统计学'},
-      {w:'status', zh:'n. 地位，状态'},
-      {w:'strategy', zh:'n. 策略，战略'},
-      {w:'strengthen', zh:'v. 加强，巩固'},
-      {w:'stress', zh:'n. 压力 v. 强调'},
-      {w:'strict', zh:'adj. 严格的，严厉的'},
-      {w:'structure', zh:'n. 结构，构造'},
-      {w:'struggle', zh:'v./n. 挣扎，斗争'},
-      {w:'submit', zh:'v. 提交，服从'},
-      {w:'subsequent', zh:'adj. 随后的，后来的'},
-      {w:'substitute', zh:'n. 替代品 v. 代替'},
-      {w:'subtle', zh:'adj. 微妙的，细微的'},
-      {w:'succeed', zh:'v. 成功，继承'},
-      {w:'sufficient', zh:'adj. 足够的，充分的'},
-      {w:'suggest', zh:'v. 建议，暗示'},
-      {w:'suitable', zh:'adj. 合适的，适宜的'},
-      {w:'supply', zh:'v./n. 供应，供给'},
-      {w:'support', zh:'v./n. 支持，支撑'},
-      {w:'suppose', zh:'v. 假设，认为'},
-      {w:'survive', zh:'v. 幸存，生存'},
-      {w:'suspect', zh:'v. 怀疑 n. 嫌疑人'},
-      {w:'sustain', zh:'v. 维持，支撑'},
-      {w:'switch', zh:'v. 转换 n. 开关'},
-      {w:'symbol', zh:'n. 象征，符号'},
-      {w:'sympathy', zh:'n. 同情，同感'},
-      {w:'technique', zh:'n. 技术，技巧'},
-      {w:'temporary', zh:'adj. 暂时的，临时的'},
-      {w:'tend', zh:'v. 倾向于，照料'},
-      {w:'tense', zh:'adj. 紧张的 n. 时态'},
-      {w:'theory', zh:'n. 理论，学说'},
-      {w:'threaten', zh:'v. 威胁，恐吓'},
-      {w:'tolerate', zh:'v. 容忍，忍受'},
-      {w:'tradition', zh:'n. 传统，惯例'},
-      {w:'transfer', zh:'v. 转移，调动'},
-      {w:'transform', zh:'v. 改变，转化'},
-      {w:'translate', zh:'v. 翻译，转化'},
-      {w:'transport', zh:'v. 运输 n. 交通'},
-      {w:'treat', zh:'v. 对待，治疗'},
-      {w:'tremble', zh:'v. 颤抖，哆嗦'},
-      {w:'trend', zh:'n. 趋势，倾向'},
-      {w:'trial', zh:'n. 试验，审判'},
-      {w:'trust', zh:'v./n. 信任，委托'},
-      {w:'typical', zh:'adj. 典型的，有代表性的'},
-      {w:'ultimate', zh:'adj. 最终的，根本的'},
-      {w:'unique', zh:'adj. 独特的，唯一的'},
-      {w:'urge', zh:'v. 催促，力劝 n. 冲动'},
-      {w:'utilize', zh:'v. 利用，使用'},
-      {w:'vague', zh:'adj. 模糊的，含糊的'},
-      {w:'valid', zh:'adj. 有效的，合理的'},
-      {w:'value', zh:'n. 价值 v. 重视'},
-      {w:'vanish', zh:'v. 消失，不见'},
-      {w:'variety', zh:'n. 多样性，种类'},
-      {w:'various', zh:'adj. 各种各样的'},
-      {w:'vary', zh:'v. 变化，不同'},
-      {w:'vast', zh:'adj. 巨大的，广阔的'},
-      {w:'vehicle', zh:'n. 车辆，工具'},
-      {w:'venture', zh:'n. 冒险 v. 冒险'},
-      {w:'verify', zh:'v. 核实，证明'},
-      {w:'version', zh:'n. 版本，说法'},
-      {w:'victim', zh:'n. 受害者，牺牲品'},
-      {w:'violate', zh:'v. 违反，侵犯'},
-      {w:'virtue', zh:'n. 美德，优点'},
-      {w:'visible', zh:'adj. 可见的，明显的'},
-      {w:'vital', zh:'adj. 至关重要的，有活力的'},
-      {w:'volume', zh:'n. 体积，音量，卷'},
-      {w:'voluntary', zh:'adj. 自愿的，志愿的'},
-      {w:'wander', zh:'v. 漫游，徘徊'},
-      {w:'warn', zh:'v. 警告，告诫'},
-      {w:'weaken', zh:'v. 削弱，变弱'},
-      {w:'wealth', zh:'n. 财富，丰富'},
-      {w:'witness', zh:'n. 目击者 v. 目击'},
-      {w:'worship', zh:'v./n. 崇拜，敬仰'},
-      {w:'yield', zh:'v. 产生，屈服 n. 产量'},
-    ]
-  },
-  cet6: {
-    name: '六级 CET-6',
-    desc: '进阶词汇',
-    words: [
-      {w:'abolish', zh:'v. 废除，取消'},
-      {w:'abrupt', zh:'adj. 突然的，唐突的'},
-      {w:'absurd', zh:'adj. 荒谬的，可笑的'},
-      {w:'accessory', zh:'n. 配件，附件'},
-      {w:'acclaim', zh:'v. 称赞，欢呼'},
-      {w:'accommodate', zh:'v. 容纳，适应'},
-      {w:'accord', zh:'n. 一致 v. 给予'},
-      {w:'accumulate', zh:'v. 积累，堆积'},
-      {w:'acute', zh:'adj. 敏锐的，急性的'},
-      {w:'adhere', zh:'v. 坚持，附着'},
-      {w:'adjacent', zh:'adj. 邻近的，毗连的'},
-      {w:'administer', zh:'v. 管理，实施'},
-      {w:'advent', zh:'n. 出现，到来'},
-      {w:'adverse', zh:'adj. 不利的，相反的'},
-      {w:'aesthetic', zh:'adj. 审美的，美学的'},
-      {w:'affiliate', zh:'v. 使隶属 n. 附属机构'},
-      {w:'aggravate', zh:'v. 加重，恶化'},
-      {w:'agitate', zh:'v. 搅动，煽动'},
-      {w:'alienate', zh:'v. 使疏远，离间'},
-      {w:'allege', zh:'v. 断言，声称'},
-      {w:'alleviate', zh:'v. 减轻，缓和'},
-      {w:'allocate', zh:'v. 分配，分派'},
-      {w:'ally', zh:'n. 同盟者 v. 结盟'},
-      {w:'ambiguous', zh:'adj. 模糊的，歧义的'},
-      {w:'amend', zh:'v. 修正，修改'},
-      {w:'ample', zh:'adj. 充足的，宽敞的'},
-      {w:'analogy', zh:'n. 类比，类似'},
-      {w:'anonymous', zh:'adj. 匿名的，无名的'},
-      {w:'applaud', zh:'v. 鼓掌，称赞'},
-      {w:'appraisal', zh:'n. 评估，鉴定'},
-      {w:'apprehend', zh:'v. 理解，逮捕'},
-      {w:'arrogant', zh:'adj. 傲慢的，自大的'},
-      {w:'ascend', zh:'v. 上升，攀登'},
-      {w:'ascertain', zh:'v. 查明，确定'},
-      {w:'aspire', zh:'v. 渴望，追求'},
-      {w:'assault', zh:'n./v. 袭击，攻击'},
-      {w:'assert', zh:'v. 断言，主张'},
-      {w:'assimilate', zh:'v. 吸收，同化'},
-      {w:'assumption', zh:'n. 假设，假定'},
-      {w:'attorney', zh:'n. 律师，代理人'},
-      {w:'audit', zh:'n./v. 审计，查账'},
-      {w:'authentic', zh:'adj. 真实的，可靠的'},
-      {w:'autonomy', zh:'n. 自治，自主'},
-      {w:'avert', zh:'v. 避免，转移'},
-      {w:'barren', zh:'adj. 贫瘠的，不育的'},
-      {w:'betray', zh:'v. 背叛，泄露'},
-      {w:'bewilder', zh:'v. 使迷惑，使困惑'},
-      {w:'bleak', zh:'adj. 荒凉的，阴冷的'},
-      {w:'blunt', zh:'adj. 钝的，直率的'},
-      {w:'boost', zh:'v. 促进，提高'},
-      {w:'bribe', zh:'n. 贿赂 v. 行贿'},
-      {w:'browse', zh:'v. 浏览，吃草'},
-      {w:'brutal', zh:'adj. 残酷的，野蛮的'},
-      {w:'bulk', zh:'n. 大量，体积'},
-      {w:'bypass', zh:'v. 绕过 n. 旁路'},
-      {w:'cater', zh:'v. 满足，提供饮食'},
-      {w:'caution', zh:'n. 谨慎 v. 警告'},
-      {w:'censorship', zh:'n. 审查，审查制度'},
-      {w:'certify', zh:'v. 证明，认证'},
-      {w:'chronic', zh:'adj. 慢性的，长期的'},
-      {w:'circulate', zh:'v. 循环，流通'},
-      {w:'coincide', zh:'v. 巧合，一致'},
-      {w:'collaborate', zh:'v. 合作，协作'},
-      {w:'commence', zh:'v. 开始，着手'},
-      {w:'commend', zh:'v. 推荐，称赞'},
-      {w:'compact', zh:'adj. 紧凑的 n. 合同'},
-      {w:'compatible', zh:'adj. 兼容的，协调的'},
-      {w:'compel', zh:'v. 强迫，迫使'},
-      {w:'compensate', zh:'v. 补偿，弥补'},
-      {w:'competent', zh:'adj. 有能力的，胜任的'},
-      {w:'compile', zh:'v. 编译，汇编'},
-      {w:'complement', zh:'v. 补充 n. 补语'},
-      {w:'compliment', zh:'n./v. 赞美，恭维'},
-      {w:'comply', zh:'v. 遵守，服从'},
-      {w:'comprehend', zh:'v. 理解，领悟'},
-      {w:'conceive', zh:'v. 构思，怀孕'},
-      {w:'condemn', zh:'v. 谴责，宣判'},
-      {w:'confess', zh:'v. 承认，坦白'},
-      {w:'confidential', zh:'adj. 机密的，保密的'},
-      {w:'configuration', zh:'n. 配置，结构'},
-      {w:'confine', zh:'v. 限制，禁闭'},
-      {w:'conform', zh:'v. 遵守，符合'},
-      {w:'consecutive', zh:'adj. 连续的，连贯的'},
-      {w:'consensus', zh:'n. 共识，一致'},
-      {w:'conserve', zh:'v. 保存，节约'},
-      {w:'consolidate', zh:'v. 巩固，合并'},
-      {w:'conspicuous', zh:'adj. 显眼的，引人注目的'},
-      {w:'contaminate', zh:'v. 污染，弄脏'},
-      {w:'contempt', zh:'n. 轻蔑，鄙视'},
-      {w:'contend', zh:'v. 争斗，主张'},
-      {w:'contradict', zh:'v. 反驳，矛盾'},
-      {w:'contrive', zh:'v. 设法做到，发明'},
-      {w:'converge', zh:'v. 汇聚，聚集'},
-      {w:'convey', zh:'v. 传达，运输'},
-      {w:'correlate', zh:'v. 关联，相关'},
-      {w:'corrupt', zh:'adj. 腐败的 v. 腐蚀'},
-      {w:'counterpart', zh:'n. 对应物，对手方'},
-      {w:'credentials', zh:'n. 证书，资格'},
-      {w:'cripple', zh:'v. 使残疾，削弱'},
-      {w:'culminate', zh:'v. 达到顶点，告终'},
-      {w:'curb', zh:'v. 遏制 n. 路缘'},
-      {w:'cynical', zh:'adj. 愤世嫉俗的'},
-      {w:'deceive', zh:'v. 欺骗，误导'},
-      {w:'decisive', zh:'adj. 决定性的，果断的'},
-      {w:'deem', zh:'v. 认为，视为'},
-      {w:'defy', zh:'v. 违抗，挑战'},
-      {w:'degrade', zh:'v. 降级，贬低'},
-      {w:'delegate', zh:'n. 代表 v. 委派'},
-      {w:'deliberate', zh:'adj. 故意的，深思熟虑的'},
-      {w:'denote', zh:'v. 表示，意味着'},
-      {w:'depict', zh:'v. 描绘，描述'},
-      {w:'deplete', zh:'v. 耗尽，用尽'},
-      {w:'deploy', zh:'v. 部署，展开'},
-      {w:'deprive', zh:'v. 剥夺，使丧失'},
-      {w:'descendant', zh:'n. 后裔，子孙'},
-      {w:'designate', zh:'v. 指定，命名'},
-      {w:'deteriorate', zh:'v. 恶化，变坏'},
-      {w:'deviate', zh:'v. 偏离，背离'},
-      {w:'devise', zh:'v. 设计，想出'},
-      {w:'diagnose', zh:'v. 诊断，判断'},
-      {w:'diffuse', zh:'v. 扩散 adj. 散漫的'},
-      {w:'dilemma', zh:'n. 困境，进退两难'},
-      {w:'discard', zh:'v. 丢弃，抛弃'},
-      {w:'discern', zh:'v. 辨别，察觉'},
-      {w:'disclose', zh:'v. 揭露，透露'},
-      {w:'discourse', zh:'n. 论述，话语'},
-      {w:'discreet', zh:'adj. 谨慎的，小心的'},
-      {w:'discrepancy', zh:'n. 差异，矛盾'},
-      {w:'disperse', zh:'v. 驱散，分散'},
-      {w:'disrupt', zh:'v. 扰乱，中断'},
-      {w:'dissolve', zh:'v. 溶解，解散'},
-      {w:'distort', zh:'v. 扭曲，歪曲'},
-      {w:'divert', zh:'v. 转移，使转向'},
-      {w:'divine', zh:'adj. 神圣的 v. 占卜'},
-      {w:'dubious', zh:'adj. 可疑的，犹豫的'},
-      {w:'duplicate', zh:'v. 复制 n. 副本'},
-      {w:'dwell', zh:'v. 居住，细想'},
-      {w:'eccentric', zh:'adj. 古怪的 n. 怪人'},
-      {w:'eclipse', zh:'n. 食 v. 使黯然失色'},
-      {w:'elaborate', zh:'adj. 精心的 v. 详细说明'},
-      {w:'eligible', zh:'adj. 合格的，有资格的'},
-      {w:'eloquent', zh:'adj. 雄辩的，有说服力的'},
-      {w:'embark', zh:'v. 从事，上船'},
-      {w:'embrace', zh:'v. 拥抱，接纳'},
-      {w:'eminent', zh:'adj. 杰出的，显著的'},
-      {w:'endeavor', zh:'n./v. 努力，尽力'},
-      {w:'endorse', zh:'v. 支持，背书'},
-      {w:'endow', zh:'v. 赋予，捐赠'},
-      {w:'entail', zh:'v. 使必需，涉及'},
-      {w:'entity', zh:'n. 实体，独立存在物'},
-      {w:'envisage', zh:'v. 设想，展望'},
-      {w:'epidemic', zh:'n. 流行病 adj. 流行的'},
-      {w:'erode', zh:'v. 侵蚀，腐蚀'},
-      {w:'erupt', zh:'v. 爆发，喷发'},
-      {w:'escort', zh:'n. 护送者 v. 护送'},
-      {w:'essence', zh:'n. 本质，精髓'},
-      {w:'evade', zh:'v. 逃避，规避'},
-      {w:'evoke', zh:'v. 唤起，引起'},
-      {w:'exempt', zh:'adj. 豁免的 v. 免除'},
-      {w:'exert', zh:'v. 施加，努力'},
-      {w:'exile', zh:'n. 流放 v. 放逐'},
-      {w:'expedition', zh:'n. 探险，远征'},
-      {w:'expel', zh:'v. 驱逐，开除'},
-      {w:'expenditure', zh:'n. 支出，花费'},
-      {w:'expertise', zh:'n. 专业知识，专长'},
-      {w:'explicit', zh:'adj. 明确的，清楚的'},
-      {w:'exploit', zh:'v. 利用，剥削 n. 功绩'},
-      {w:'exquisite', zh:'adj. 精致的，细腻的'},
-      {w:'extinct', zh:'adj. 灭绝的，绝种的'},
-      {w:'extravagant', zh:'adj. 奢侈的，浪费的'},
-      {w:'fabricate', zh:'v. 编造，制造'},
-      {w:'facilitate', zh:'v. 促进，使便利'},
-      {w:'fatigue', zh:'n. 疲劳，劳累'},
-      {w:'feasible', zh:'adj. 可行的，可能的'},
-      {w:'feeble', zh:'adj. 虚弱的，无力的'},
-      {w:'fluctuate', zh:'v. 波动，起伏'},
-      {w:'formulate', zh:'v. 制定，规划'},
-      {w:'fragile', zh:'adj. 脆弱的，易碎的'},
-      {w:'fraud', zh:'n. 欺诈，骗子'},
-      {w:'friction', zh:'n. 摩擦，摩擦力'},
-      {w:'fugitive', zh:'n. 逃亡者 adj. 逃亡的'},
-      {w:'gauge', zh:'n. 标准，计量器 v. 测量'},
-      {w:'glide', zh:'v. 滑行，滑动'},
-      {w:'gorgeous', zh:'adj. 华丽的，极好的'},
-      {w:'grief', zh:'n. 悲痛，悲伤'},
-      {w:'grim', zh:'adj. 严峻的，冷酷的'},
-      {w:'gross', zh:'adj. 总的，严重的'},
-      {w:'hamper', zh:'v. 阻碍，妨碍'},
-      {w:'haughty', zh:'adj. 傲慢的，轻蔑的'},
-      {w:'hierarchy', zh:'n. 等级制度，层级'},
-      {w:'hinder', zh:'v. 阻碍，妨碍'},
-      {w:'hostage', zh:'n. 人质，抵押品'},
-      {w:'humiliate', zh:'v. 羞辱，使丢脸'},
-      {w:'hypocrisy', zh:'n. 虚伪，伪善'},
-      {w:'idle', zh:'adj. 空闲的，懒散的'},
-      {w:'illuminate', zh:'v. 照亮，阐明'},
-      {w:'immerse', zh:'v. 沉浸，浸入'},
-      {w:'immunity', zh:'n. 免疫力，豁免'},
-      {w:'impair', zh:'v. 损害，削弱'},
-      {w:'impartial', zh:'adj. 公正的，不偏袒的'},
-      {w:'impede', zh:'v. 阻碍，妨碍'},
-      {w:'imperative', zh:'adj. 必要的，命令的'},
-      {w:'implicit', zh:'adj. 含蓄的，暗示的'},
-      {w:'impulse', zh:'n. 冲动，推动力'},
-      {w:'incentive', zh:'n. 激励，动机'},
-      {w:'incidence', zh:'n. 发生率，影响范围'},
-      {w:'incline', zh:'v. 倾向，倾斜'},
-      {w:'incorporate', zh:'v. 合并，包含'},
-      {w:'indignant', zh:'adj. 愤怒的，义愤的'},
-      {w:'induce', zh:'v. 诱导，引起'},
-      {w:'indulge', zh:'v. 放纵，沉溺'},
-      {w:'inflict', zh:'v. 使遭受，施加'},
-      {w:'ingenious', zh:'adj. 巧妙的，独创的'},
-      {w:'inherent', zh:'adj. 固有的，内在的'},
-      {w:'inhibit', zh:'v. 抑制，阻止'},
-      {w:'initiate', zh:'v. 开始，发起'},
-      {w:'inject', zh:'v. 注射，注入'},
-      {w:'innate', zh:'adj. 天生的，固有的'},
-      {w:'innumerable', zh:'adj. 无数的，数不清的'},
-      {w:'insight', zh:'n. 洞察力，见解'},
-      {w:'integrate', zh:'v. 整合，融合'},
-      {w:'integrity', zh:'n. 诚信，完整'},
-      {w:'intercept', zh:'v. 拦截，截取'},
-      {w:'intervene', zh:'v. 干预，介入'},
-      {w:'intricate', zh:'adj. 复杂的，错综的'},
-      {w:'intrigue', zh:'v. 引起兴趣 n. 阴谋'},
-      {w:'intrinsic', zh:'adj. 固有的，内在的'},
-      {w:'invalid', zh:'adj. 无效的 n. 病人'},
-      {w:'invaluable', zh:'adj. 无价的，宝贵的'},
-      {w:'invert', zh:'v. 倒置，反转'},
-      {w:'irrigate', zh:'v. 灌溉，冲洗'},
-      {w:'jeopardize', zh:'v. 危及，损害'},
-      {w:'justification', zh:'n. 正当理由，辩护'},
-      {w:'kidnap', zh:'v. 绑架，诱拐'},
-      {w:'lament', zh:'v. 哀悼，悲叹'},
-      {w:'latent', zh:'adj. 潜在的，潜伏的'},
-      {w:'legacy', zh:'n. 遗产，遗留'},
-      {w:'legitimate', zh:'adj. 合法的，正当的'},
-      {w:'liability', zh:'n. 责任，负债'},
-      {w:'linger', zh:'v. 逗留，徘徊'},
-      {w:'magnify', zh:'v. 放大，夸大'},
-      {w:'manifest', zh:'v. 表明 adj. 明显的'},
-      {w:'manipulate', zh:'v. 操纵，操作'},
-      {w:'marginal', zh:'adj. 边缘的，微小的'},
-      {w:'mediate', zh:'v. 调解，斡旋'},
-      {w:'meditate', zh:'v. 冥想，沉思'},
-      {w:'merge', zh:'v. 合并，融合'},
-      {w:'metropolitan', zh:'adj. 大都市的'},
-      {w:'migrate', zh:'v. 迁移，移居'},
-      {w:'mingle', zh:'v. 混合，交往'},
-      {w:'mock', zh:'v. 嘲笑，模仿'},
-      {w:'momentum', zh:'n. 动力，动量'},
-      {w:'monotonous', zh:'adj. 单调的，乏味的'},
-      {w:'morale', zh:'n. 士气，斗志'},
-      {w:'mutter', zh:'v. 咕哝，嘀咕'},
-      {w:'naive', zh:'adj. 天真的，幼稚的'},
-      {w:'narrative', zh:'n. 叙述 adj. 叙事的'},
-      {w:'negligible', zh:'adj. 微不足道的'},
-      {w:'nominate', zh:'v. 提名，任命'},
-      {w:'notorious', zh:'adj. 臭名昭著的'},
-      {w:'nourish', zh:'v. 滋养，抚养'},
-      {w:'novice', zh:'n. 新手，初学者'},
-      {w:'nuisance', zh:'n. 讨厌的人或事'},
-      {w:'obedient', zh:'adj. 服从的，顺从的'},
-      {w:'obscure', zh:'adj. 模糊的 v. 使模糊'},
-      {w:'obsess', zh:'v. 使着迷，困扰'},
-      {w:'obsolete', zh:'adj. 过时的，废弃的'},
-      {w:'obstacle', zh:'n. 障碍，阻碍'},
-      {w:'offset', zh:'v. 抵消，弥补'},
-      {w:'oppress', zh:'v. 压迫，压抑'},
-      {w:'outbreak', zh:'n. 爆发，暴发'},
-      {w:'outrage', zh:'n. 愤怒，暴行'},
-      {w:'overlap', zh:'v. 重叠，部分相同'},
-      {w:'overwhelm', zh:'v. 压倒，淹没'},
-      {w:'paradox', zh:'n. 悖论，反论'},
-      {w:'paramount', zh:'adj. 最重要的，至高无上的'},
-      {w:'patent', zh:'n. 专利 adj. 明显的'},
-      {w:'pathetic', zh:'adj. 可怜的，可悲的'},
-      {w:'patrol', zh:'n./v. 巡逻，巡查'},
-      {w:'pave', zh:'v. 铺路，铺砌'},
-      {w:'peculiar', zh:'adj. 奇特的，特有的'},
-      {w:'penetrate', zh:'v. 穿透，渗透'},
-      {w:'perish', zh:'v. 死亡，毁灭'},
-      {w:'perpetual', zh:'adj. 永久的，不断的'},
-      {w:'persevere', zh:'v. 坚持，不屈不挠'},
-      {w:'pertinent', zh:'adj. 相关的，切题的'},
-      {w:'pessimistic', zh:'adj. 悲观的，厌世的'},
-      {w:'pioneer', zh:'n. 先驱，开拓者'},
-      {w:'plausible', zh:'adj. 似乎合理的'},
-      {w:'plead', zh:'v. 恳求，辩护'},
-      {w:'pledge', zh:'n./v. 保证，誓言'},
-      {w:'plunge', zh:'v. 跳入，暴跌'},
-      {w:'precede', zh:'v. 在……之前，先于'},
-      {w:'precedent', zh:'n. 先例，前例'},
-      {w:'preclude', zh:'v. 排除，阻止'},
-      {w:'predominant', zh:'adj. 主要的，占优势的'},
-      {w:'preliminary', zh:'adj. 初步的，预备的'},
-      {w:'premise', zh:'n. 前提，房屋'},
-      {w:'prescribe', zh:'v. 规定，开处方'},
-      {w:'preside', zh:'v. 主持，主管'},
-      {w:'prestige', zh:'n. 声望，威信'},
-      {w:'presume', zh:'v. 假定，推测'},
-      {w:'prevail', zh:'v. 盛行，获胜'},
-      {w:'prevalent', zh:'adj. 普遍的，流行的'},
-      {w:'proficient', zh:'adj. 熟练的，精通的'},
-      {w:'profound', zh:'adj. 深刻的，渊博的'},
-      {w:'prolong', zh:'v. 延长，拖延'},
-      {w:'prominent', zh:'adj. 杰出的，显著的'},
-      {w:'prone', zh:'adj. 倾向于，易于'},
-      {w:'propaganda', zh:'n. 宣传，宣传运动'},
-      {w:'propel', zh:'v. 推进，驱使'},
-      {w:'provoke', zh:'v. 激怒，引起'},
-      {w:'prudent', zh:'adj. 谨慎的，精明的'},
-      {w:'quota', zh:'n. 配额，定额'},
-      {w:'radical', zh:'adj. 根本的，激进的'},
-      {w:'ratify', zh:'v. 批准，认可'},
-      {w:'rebel', zh:'n. 反叛者 v. 反叛'},
-      {w:'recede', zh:'v. 后退，减弱'},
-      {w:'reconcile', zh:'v. 使和解，调和'},
-      {w:'redundant', zh:'adj. 多余的，累赘的'},
-      {w:'refute', zh:'v. 驳斥，反驳'},
-      {w:'reign', zh:'n./v. 统治，主宰'},
-      {w:'reinforce', zh:'v. 加强，增援'},
-      {w:'relentless', zh:'adj. 无情的，不间断的'},
-      {w:'relinquish', zh:'v. 放弃，让出'},
-      {w:'relish', zh:'v. 享受，喜爱'},
-      {w:'reluctant', zh:'adj. 不情愿的，勉强的'},
-      {w:'render', zh:'v. 使成为，提供'},
-      {w:'renounce', zh:'v. 放弃，断绝关系'},
-      {w:'reproach', zh:'v./n. 责备，指责'},
-      {w:'reside', zh:'v. 居住，存在于'},
-      {w:'resonance', zh:'n. 共鸣，共振'},
-      {w:'restrain', zh:'v. 抑制，约束'},
-      {w:'resume', zh:'v. 恢复，继续'},
-      {w:'retrieve', zh:'v. 取回，检索'},
-      {w:'revenue', zh:'n. 收入，税收'},
-      {w:'revive', zh:'v. 复活，复兴'},
-      {w:'rigid', zh:'adj. 严格的，僵硬的'},
-      {w:'rigorous', zh:'adj. 严格的，严谨的'},
-      {w:'riot', zh:'n. 暴乱，骚乱'},
-      {w:'rip', zh:'v. 撕裂，扯破'},
-      {w:'rival', zh:'n. 对手 v. 竞争'},
-      {w:'robust', zh:'adj. 强健的，稳健的'},
-      {w:'rotate', zh:'v. 旋转，轮换'},
-      {w:'ruthless', zh:'adj. 无情的，残忍的'},
-      {w:'sacred', zh:'adj. 神圣的，宗教的'},
-      {w:'sanction', zh:'n. 制裁，批准'},
-      {w:'savage', zh:'adj. 野蛮的，凶猛的'},
-      {w:'scan', zh:'v. 扫描，浏览'},
-      {w:'scatter', zh:'v. 分散，散开'},
-      {w:'scorn', zh:'n./v. 轻蔑，鄙视'},
-      {w:'scrutiny', zh:'n. 详细审查，仔细观察'},
-      {w:'segregate', zh:'v. 隔离，分开'},
-      {w:'sensation', zh:'n. 感觉，轰动'},
-      {w:'sentiment', zh:'n. 情感，观点'},
-      {w:'serene', zh:'adj. 宁静的，安详的'},
-      {w:'shrewd', zh:'adj. 精明的，敏锐的'},
-      {w:'simulate', zh:'v. 模拟，假装'},
-      {w:'simultaneous', zh:'adj. 同时的，同步的'},
-      {w:'skeptic', zh:'n. 怀疑者，怀疑论者'},
-      {w:'slogan', zh:'n. 标语，口号'},
-      {w:'sober', zh:'adj. 清醒的，冷静的'},
-      {w:'solidarity', zh:'n. 团结，一致'},
-      {w:'solitary', zh:'adj. 孤独的，单独的'},
-      {w:'sophisticated', zh:'adj. 复杂的，精致的，老练的'},
-      {w:'sovereign', zh:'n. 君主 adj. 主权的'},
-      {w:'spacious', zh:'adj. 宽敞的，广阔的'},
-      {w:'spectacle', zh:'n. 景象，壮观'},
-      {w:'spectrum', zh:'n. 光谱，范围'},
-      {w:'speculate', zh:'v. 推测，投机'},
-      {w:'sphere', zh:'n. 球体，领域'},
-      {w:'spontaneous', zh:'adj. 自发的，自然的'},
-      {w:'spouse', zh:'n. 配偶，伴侣'},
-      {w:'stabilize', zh:'v. 稳定，使稳固'},
-      {w:'stagnant', zh:'adj. 停滞的，不流动的'},
-      {w:'startle', zh:'v. 使惊吓，使吃惊'},
-      {w:'static', zh:'adj. 静态的，静止的'},
-      {w:'stereotype', zh:'n. 刻板印象，陈规'},
-      {w:'stern', zh:'adj. 严厉的，坚定的'},
-      {w:'stimulate', zh:'v. 刺激，激励'},
-      {w:'stipulate', zh:'v. 规定，约定'},
-      {w:'strive', zh:'v. 努力，奋斗'},
-      {w:'subordinate', zh:'adj. 从属的 n. 下属'},
-      {w:'subscribe', zh:'v. 订阅，同意'},
-      {w:'subsidy', zh:'n. 补贴，津贴'},
-      {w:'substantial', zh:'adj. 大量的，实质的'},
-      {w:'subtract', zh:'v. 减去，扣除'},
-      {w:'succession', zh:'n. 连续，继承'},
-      {w:'suffice', zh:'v. 足够，满足'},
-      {w:'summit', zh:'n. 顶点，峰会'},
-      {w:'superficial', zh:'adj. 表面的，肤浅的'},
-      {w:'supervise', zh:'v. 监督，管理'},
-      {w:'suppress', zh:'v. 镇压，抑制'},
-      {w:'surge', zh:'n./v. 激增，涌动'},
-      {w:'surpass', zh:'v. 超越，胜过'},
-      {w:'surveillance', zh:'n. 监视，监督'},
-      {w:'susceptible', zh:'adj. 易受影响的'},
-      {w:'suspend', zh:'v. 暂停，悬挂'},
-      {w:'suspicious', zh:'adj. 可疑的，多疑的'},
-      {w:'tackle', zh:'v. 处理，对付'},
-      {w:'tangible', zh:'adj. 有形的，可触摸的'},
-      {w:'tedious', zh:'adj. 冗长的，乏味的'},
-      {w:'temper', zh:'n. 脾气，心情'},
-      {w:'tempt', zh:'v. 诱惑，引诱'},
-      {w:'tenant', zh:'n. 房客，租户'},
-      {w:'terminate', zh:'v. 终止，结束'},
-      {w:'testify', zh:'v. 作证，证明'},
-      {w:'thereby', zh:'adv. 从而，因此'},
-      {w:'thrive', zh:'v. 繁荣，兴旺'},
-      {w:'tickle', zh:'v. 使发痒，逗乐'},
-      {w:'toss', zh:'v. 投掷，摇摆'},
-      {w:'trait', zh:'n. 特征，特点'},
-      {w:'tranquil', zh:'adj. 宁静的，平静的'},
-      {w:'transcend', zh:'v. 超越，胜过'},
-      {w:'transient', zh:'adj. 短暂的，临时的'},
-      {w:'transit', zh:'n. 运输，过境'},
-      {w:'tribute', zh:'n. 致敬，贡品'},
-      {w:'trivial', zh:'adj. 琐碎的，不重要的'},
-      {w:'tropical', zh:'adj. 热带的'},
-      {w:'tuck', zh:'v. 塞进，卷起'},
-      {w:'tumble', zh:'v. 跌倒，翻滚'},
-      {w:'turbulent', zh:'adj. 动荡的，混乱的'},
-      {w:'twilight', zh:'n. 黄昏，暮色'},
-      {w:'ultimate', zh:'adj. 最终的，根本的'},
-      {w:'unanimous', zh:'adj. 一致同意的'},
-      {w:'underestimate', zh:'v. 低估，看轻'},
-      {w:'undermine', zh:'v. 削弱，破坏'},
-      {w:'unify', zh:'v. 统一，联合'},
-      {w:'upheaval', zh:'n. 剧变，动乱'},
-      {w:'uphold', zh:'v. 支持，维护'},
-      {w:'utilize', zh:'v. 利用，使用'},
-      {w:'utter', zh:'v. 说出 adj. 完全的'},
-      {w:'vacant', zh:'adj. 空的，空闲的'},
-      {w:'vain', zh:'adj. 徒劳的，自负的'},
-      {w:'validate', zh:'v. 验证，证实'},
-      {w:'vegetation', zh:'n. 植被，植物'},
-      {w:'vehement', zh:'adj. 激烈的，热烈的'},
-      {w:'velocity', zh:'n. 速度，速率'},
-      {w:'venerable', zh:'adj. 可敬的，庄严的'},
-      {w:'ventilate', zh:'v. 通风，使空气流通'},
-      {w:'verdict', zh:'n. 裁决，判断'},
-      {w:'verge', zh:'n. 边缘 v. 接近'},
-      {w:'versatile', zh:'adj. 多才多艺的，通用的'},
-      {w:'veto', zh:'n./v. 否决，否决权'},
-      {w:'vibrate', zh:'v. 振动，摇摆'},
-      {w:'vicious', zh:'adj. 恶毒的，凶猛的'},
-      {w:'vigorous', zh:'adj. 精力充沛的，有力的'},
-      {w:'violate', zh:'v. 违反，侵犯'},
-      {w:'virtual', zh:'adj. 虚拟的，实际上的'},
-      {w:'vocal', zh:'adj. 声音的，直言的'},
-      {w:'vow', zh:'n./v. 誓言，发誓'},
-      {w:'vulgar', zh:'adj. 粗俗的，庸俗的'},
-      {w:'vulnerable', zh:'adj. 脆弱的，易受攻击的'},
-      {w:'warrant', zh:'n. 授权令 v. 保证'},
-      {w:'weary', zh:'adj. 疲倦的，厌烦的'},
-      {w:'withdraw', zh:'v. 撤回，退出'},
-      {w:'wither', zh:'v. 枯萎，凋谢'},
-      {w:'withhold', zh:'v. 抑制，隐瞒'},
-      {w:'withstand', zh:'v. 抵挡，承受'},
-      {w:'yell', zh:'v. 大叫，喊叫'},
-      {w:'zeal', zh:'n. 热情，热忱'},
-    ]
-  },
-  gao3500: {
-    name: '高中 3500',
-    desc: '高中英语核心词汇',
-    words: [
-      {w:'abandon', zh:'v. 放弃，抛弃'},
-      {w:'ability', zh:'n. 能力，才能'},
-      {w:'absence', zh:'n. 缺席，缺乏'},
-      {w:'absorb', zh:'v. 吸收，吸引'},
-      {w:'abstract', zh:'adj. 抽象的 n. 摘要'},
-      {w:'academic', zh:'adj. 学术的 n. 学者'},
-      {w:'accept', zh:'v. 接受，同意'},
-      {w:'access', zh:'n. 通道，访问 v. 访问'},
-      {w:'accident', zh:'n. 事故，意外'},
-      {w:'accompany', zh:'v. 陪伴，伴随'},
-      {w:'accomplish', zh:'v. 完成，实现'},
-      {w:'account', zh:'n. 账户，描述 v. 解释'},
-      {w:'accurate', zh:'adj. 准确的，精确的'},
-      {w:'accuse', zh:'v. 指责，控告'},
-      {w:'achieve', zh:'v. 达到，实现'},
-      {w:'acknowledge', zh:'v. 承认，感谢'},
-      {w:'acquire', zh:'v. 获得，学到'},
-      {w:'adapt', zh:'v. 适应，改编'},
-      {w:'addition', zh:'n. 增加，加法'},
-      {w:'adequate', zh:'adj. 足够的，适当的'},
-      {w:'adjust', zh:'v. 调整，适应'},
-      {w:'admire', zh:'v. 钦佩，欣赏'},
-      {w:'admit', zh:'v. 承认，准许进入'},
-      {w:'adopt', zh:'v. 采用，收养'},
-      {w:'advance', zh:'v./n. 前进，进步'},
-      {w:'advantage', zh:'n. 优势，好处'},
-      {w:'adventure', zh:'n. 冒险，奇遇'},
-      {w:'advertise', zh:'v. 做广告，宣传'},
-      {w:'advise', zh:'v. 建议，劝告'},
-      {w:'affect', zh:'v. 影响，感动'},
-      {w:'afford', zh:'v. 负担得起，提供'},
-      {w:'agenda', zh:'n. 议程，日程'},
-      {w:'aggressive', zh:'adj. 好斗的，有进取心的'},
-      {w:'agriculture', zh:'n. 农业，农学'},
-      {w:'aim', zh:'n. 目标 v. 瞄准'},
-      {w:'alarm', zh:'n. 警报 v. 使惊恐'},
-      {w:'alter', zh:'v. 改变，修改'},
-      {w:'alternative', zh:'n. 替代品 adj. 可选的'},
-      {w:'amaze', zh:'v. 使惊讶，使惊奇'},
-      {w:'ambition', zh:'n. 雄心，野心'},
-      {w:'amount', zh:'n. 数量 v. 合计'},
-      {w:'analysis', zh:'n. 分析，分析报告'},
-      {w:'ancient', zh:'adj. 古代的，古老的'},
-      {w:'announce', zh:'v. 宣布，通告'},
-      {w:'annual', zh:'adj. 每年的 n. 年刊'},
-      {w:'anxious', zh:'adj. 焦虑的，渴望的'},
-      {w:'apologize', zh:'v. 道歉，认错'},
-      {w:'apparent', zh:'adj. 明显的，表面的'},
-      {w:'appeal', zh:'v./n. 呼吁，吸引力'},
-      {w:'appear', zh:'v. 出现，似乎'},
-      {w:'appetite', zh:'n. 食欲，欲望'},
-      {w:'applaud', zh:'v. 鼓掌，称赞'},
-      {w:'apply', zh:'v. 申请，应用'},
-      {w:'appoint', zh:'v. 任命，约定'},
-      {w:'appreciate', zh:'v. 欣赏，感激'},
-      {w:'approach', zh:'v. 接近 n. 方法'},
-      {w:'appropriate', zh:'adj. 适当的，恰当的'},
-      {w:'approve', zh:'v. 赞成，批准'},
-      {w:'architecture', zh:'n. 建筑学，架构'},
-      {w:'argue', zh:'v. 争论，辩论'},
-      {w:'arrange', zh:'v. 安排，整理'},
-      {w:'arrest', zh:'v./n. 逮捕，拘留'},
-      {w:'artificial', zh:'adj. 人造的，虚伪的'},
-      {w:'ashamed', zh:'adj. 惭愧的，羞耻的'},
-      {w:'aspect', zh:'n. 方面，外观'},
-      {w:'assess', zh:'v. 评估，评定'},
-      {w:'assist', zh:'v. 帮助，协助'},
-      {w:'associate', zh:'v. 联系 n. 同事'},
-      {w:'assume', zh:'v. 假定，承担'},
-      {w:'astonish', zh:'v. 使惊讶，使吃惊'},
-      {w:'athlete', zh:'n. 运动员，体育家'},
-      {w:'atmosphere', zh:'n. 大气，气氛'},
-      {w:'attach', zh:'v. 附上，系上'},
-      {w:'attempt', zh:'v./n. 尝试，企图'},
-      {w:'attend', zh:'v. 参加，照顾'},
-      {w:'attitude', zh:'n. 态度，看法'},
-      {w:'attract', zh:'v. 吸引，引起'},
-      {w:'audience', zh:'n. 观众，听众'},
-      {w:'authority', zh:'n. 权威，当局'},
-      {w:'available', zh:'adj. 可用的，可获得的'},
-      {w:'avoid', zh:'v. 避免，回避'},
-      {w:'awake', zh:'adj. 醒着的 v. 唤醒'},
-      {w:'aware', zh:'adj. 意识到的，知道的'},
-      {w:'awkward', zh:'adj. 尴尬的，笨拙的'},
-      {w:'balance', zh:'n./v. 平衡，余额'},
-      {w:'ban', zh:'v. 禁止 n. 禁令'},
-      {w:'bargain', zh:'n. 便宜货 v. 讨价还价'},
-      {w:'barrier', zh:'n. 障碍，屏障'},
-      {w:'basis', zh:'n. 基础，根据'},
-      {w:'behave', zh:'v. 表现，举止'},
-      {w:'belief', zh:'n. 信念，相信'},
-      {w:'benefit', zh:'n. 利益 v. 有益于'},
-      {w:'betray', zh:'v. 背叛，泄露'},
-      {w:'beyond', zh:'prep. 超过，在……之外'},
-      {w:'bless', zh:'v. 祝福，保佑'},
-      {w:'boost', zh:'v. 促进，提高'},
-      {w:'bother', zh:'v. 打扰，麻烦'},
-      {w:'brief', zh:'adj. 简短的 n. 摘要'},
-      {w:'brilliant', zh:'adj. 杰出的，明亮的'},
-      {w:'broad', zh:'adj. 宽阔的，广泛的'},
-      {w:'budget', zh:'n. 预算 v. 编制预算'},
-      {w:'burden', zh:'n. 负担，重负'},
-      {w:'calculate', zh:'v. 计算，估计'},
-      {w:'campaign', zh:'n. 运动，战役'},
-      {w:'cancel', zh:'v. 取消，撤销'},
-      {w:'candidate', zh:'n. 候选人，申请人'},
-      {w:'capable', zh:'adj. 有能力的，能干的'},
-      {w:'capacity', zh:'n. 容量，能力'},
-      {w:'career', zh:'n. 职业，生涯'},
-      {w:'casual', zh:'adj. 随便的，休闲的'},
-      {w:'category', zh:'n. 类别，种类'},
-      {w:'cease', zh:'v. 停止，终止'},
-      {w:'celebrate', zh:'v. 庆祝，赞美'},
-      {w:'challenge', zh:'n./v. 挑战'},
-      {w:'characteristic', zh:'n. 特征 adj. 典型的'},
-      {w:'charge', zh:'v. 收费，指控 n. 费用'},
-      {w:'cheerful', zh:'adj. 快乐的，愉快的'},
-      {w:'circumstance', zh:'n. 情况，环境'},
-      {w:'citizen', zh:'n. 公民，市民'},
-      {w:'civilization', zh:'n. 文明，文化'},
-      {w:'claim', zh:'v. 声称，要求 n. 主张'},
-      {w:'clarify', zh:'v. 澄清，阐明'},
-      {w:'classify', zh:'v. 分类，归类'},
-      {w:'climate', zh:'n. 气候，气氛'},
-      {w:'collapse', zh:'v./n. 崩溃，倒塌'},
-      {w:'colleague', zh:'n. 同事，同僚'},
-      {w:'combine', zh:'v. 结合，联合'},
-      {w:'comment', zh:'n./v. 评论，意见'},
-      {w:'commit', zh:'v. 犯（罪），承诺'},
-      {w:'communicate', zh:'v. 交流，沟通'},
-      {w:'community', zh:'n. 社区，团体'},
-      {w:'compare', zh:'v. 比较，对照'},
-      {w:'compete', zh:'v. 竞争，比赛'},
-      {w:'complain', zh:'v. 抱怨，投诉'},
-      {w:'complex', zh:'adj. 复杂的 n. 综合体'},
-      {w:'component', zh:'n. 组成部分，部件'},
-      {w:'compose', zh:'v. 组成，创作'},
-      {w:'comprehensive', zh:'adj. 综合的，全面的'},
-      {w:'compromise', zh:'n./v. 妥协，折中'},
-      {w:'concentrate', zh:'v. 集中，专心'},
-      {w:'concept', zh:'n. 概念，观念'},
-      {w:'concern', zh:'v./n. 关心，担忧'},
-      {w:'conclude', zh:'v. 得出结论，结束'},
-      {w:'condition', zh:'n. 条件，状况'},
-      {w:'conduct', zh:'v. 进行，指挥 n. 行为'},
-      {w:'conference', zh:'n. 会议，研讨会'},
-      {w:'confident', zh:'adj. 自信的，确信的'},
-      {w:'confirm', zh:'v. 确认，证实'},
-      {w:'conflict', zh:'n./v. 冲突，矛盾'},
-      {w:'confuse', zh:'v. 使困惑，混淆'},
-      {w:'congratulate', zh:'v. 祝贺，恭喜'},
-      {w:'connect', zh:'v. 连接，联系'},
-      {w:'conscious', zh:'adj. 有意识的，自觉的'},
-      {w:'consequence', zh:'n. 结果，后果'},
-      {w:'conservation', zh:'n. 保护，保存'},
-      {w:'considerable', zh:'adj. 相当大的，可观的'},
-      {w:'consist', zh:'v. 由……组成，一致'},
-      {w:'constant', zh:'adj. 不断的，恒定的'},
-      {w:'construct', zh:'v. 建造，构造'},
-      {w:'consult', zh:'v. 咨询，商议'},
-      {w:'consume', zh:'v. 消耗，消费'},
-      {w:'contain', zh:'v. 包含，容纳'},
-      {w:'contemporary', zh:'adj. 当代的 n. 同代人'},
-      {w:'content', zh:'n. 内容 adj. 满足的'},
-      {w:'context', zh:'n. 上下文，背景'},
-      {w:'continue', zh:'v. 继续，持续'},
-      {w:'contract', zh:'n. 合同 v. 收缩'},
-      {w:'contrary', zh:'adj. 相反的 n. 相反'},
-      {w:'contrast', zh:'n./v. 对比，对照'},
-      {w:'contribute', zh:'v. 贡献，捐赠'},
-      {w:'convenient', zh:'adj. 方便的，便利的'},
-      {w:'convince', zh:'v. 使确信，说服'},
-      {w:'cooperate', zh:'v. 合作，协作'},
-      {w:'correspond', zh:'v. 符合，相当于，通信'},
-      {w:'courage', zh:'n. 勇气，胆量'},
-      {w:'create', zh:'v. 创造，创作'},
-      {w:'credit', zh:'n. 信用，学分，赞扬'},
-      {w:'crisis', zh:'n. 危机，紧要关头'},
-      {w:'critical', zh:'adj. 批评的，关键的'},
-      {w:'crucial', zh:'adj. 至关重要的'},
-      {w:'cultural', zh:'adj. 文化的，人文的'},
-      {w:'cure', zh:'v./n. 治愈，治疗'},
-      {w:'curious', zh:'adj. 好奇的，奇怪的'},
-      {w:'current', zh:'adj. 当前的 n. 水流，电流'},
-      {w:'custom', zh:'n. 习俗，习惯'},
-      {w:'damage', zh:'n./v. 损害，损坏'},
-      {w:'deadline', zh:'n. 最后期限，截止日期'},
-      {w:'debate', zh:'n./v. 辩论，争论'},
-      {w:'decade', zh:'n. 十年'},
-      {w:'decline', zh:'v./n. 下降，衰退，拒绝'},
-      {w:'decorate', zh:'v. 装饰，布置'},
-      {w:'dedicate', zh:'v. 献身，致力于'},
-      {w:'defeat', zh:'v./n. 击败，失败'},
-      {w:'defend', zh:'v. 保卫，辩护'},
-      {w:'define', zh:'v. 定义，界定'},
-      {w:'delay', zh:'v./n. 延迟，耽误'},
-      {w:'deliver', zh:'v. 递送，发表'},
-      {w:'demand', zh:'n./v. 要求，需求'},
-      {w:'demonstrate', zh:'v. 证明，演示'},
-      {w:'deny', zh:'v. 否认，拒绝'},
-      {w:'depend', zh:'v. 依赖，取决于'},
-      {w:'describe', zh:'v. 描述，形容'},
-      {w:'deserve', zh:'v. 值得，应得'},
-      {w:'desire', zh:'n./v. 渴望，欲望'},
-      {w:'desperate', zh:'adj. 绝望的，拼命的'},
-      {w:'despite', zh:'prep. 尽管，不顾'},
-      {w:'destroy', zh:'v. 破坏，毁灭'},
-      {w:'detail', zh:'n. 细节，详情'},
-      {w:'detect', zh:'v. 察觉，侦查'},
-      {w:'determine', zh:'v. 决定，确定'},
-      {w:'develop', zh:'v. 发展，开发'},
-      {w:'device', zh:'n. 装置，设备'},
-      {w:'devote', zh:'v. 献身，致力于'},
-      {w:'differ', zh:'v. 不同，相异'},
-      {w:'digital', zh:'adj. 数字的，数码的'},
-      {w:'diligent', zh:'adj. 勤奋的，用功的'},
-      {w:'direct', zh:'adj. 直接的 v. 指挥'},
-      {w:'disappear', zh:'v. 消失，不见'},
-      {w:'disaster', zh:'n. 灾难，灾害'},
-      {w:'discount', zh:'n. 折扣 v. 打折'},
-      {w:'discourage', zh:'v. 使泄气，阻碍'},
-      {w:'discover', zh:'v. 发现，发觉'},
-      {w:'discuss', zh:'v. 讨论，商议'},
-      {w:'display', zh:'v./n. 展示，显示'},
-      {w:'distance', zh:'n. 距离，远方'},
-      {w:'distinguish', zh:'v. 区分，辨别'},
-      {w:'distribute', zh:'v. 分配，分发'},
-      {w:'disturb', zh:'v. 打扰，扰乱'},
-      {w:'diverse', zh:'adj. 多样的，不同的'},
-      {w:'divide', zh:'v. 分开，划分'},
-      {w:'domestic', zh:'adj. 国内的，家庭的'},
-      {w:'dominate', zh:'v. 支配，占优势'},
-      {w:'donate', zh:'v. 捐赠，捐献'},
-      {w:'doubt', zh:'n./v. 怀疑，疑惑'},
-      {w:'duty', zh:'n. 责任，义务，税'},
-      {w:'eager', zh:'adj. 渴望的，热切的'},
-      {w:'earn', zh:'v. 赚得，获得'},
-      {w:'economy', zh:'n. 经济，节约'},
-      {w:'educate', zh:'v. 教育，培养'},
-      {w:'effect', zh:'n. 影响，效果'},
-      {w:'efficient', zh:'adj. 高效的，能干的'},
-      {w:'effort', zh:'n. 努力，尝试'},
-      {w:'elect', zh:'v. 选举，推选'},
-      {w:'element', zh:'n. 元素，成分'},
-      {w:'eliminate', zh:'v. 消除，淘汰'},
-      {w:'emerge', zh:'v. 出现，浮现'},
-      {w:'emotion', zh:'n. 情感，情绪'},
-      {w:'emphasize', zh:'v. 强调，着重'},
-      {w:'employ', zh:'v. 雇用，使用'},
-      {w:'enable', zh:'v. 使能够，使成为可能'},
-      {w:'encounter', zh:'v./n. 遭遇，相遇'},
-      {w:'encourage', zh:'v. 鼓励，促进'},
-      {w:'endure', zh:'v. 忍耐，持续'},
-      {w:'energy', zh:'n. 能量，精力'},
-      {w:'engage', zh:'v. 从事，参与，订婚'},
-      {w:'enhance', zh:'v. 提高，增强'},
-      {w:'enormous', zh:'adj. 巨大的，庞大的'},
-      {w:'ensure', zh:'v. 确保，保证'},
-      {w:'entertain', zh:'v. 娱乐，招待'},
-      {w:'enthusiasm', zh:'n. 热情，热心'},
-      {w:'entire', zh:'adj. 全部的，整个的'},
-      {w:'environment', zh:'n. 环境，周围状况'},
-      {w:'equal', zh:'adj. 相等的 v. 等于'},
-      {w:'equip', zh:'v. 装备，配备'},
-      {w:'error', zh:'n. 错误，差错'},
-      {w:'escape', zh:'v./n. 逃跑，逃脱'},
-      {w:'essential', zh:'adj. 必要的，本质的'},
-      {w:'establish', zh:'v. 建立，确立'},
-      {w:'estimate', zh:'v./n. 估计，评估'},
-      {w:'evaluate', zh:'v. 评价，评估'},
-      {w:'eventually', zh:'adv. 最终，终于'},
-      {w:'evidence', zh:'n. 证据，证明'},
-      {w:'evolve', zh:'v. 进化，发展'},
-      {w:'exact', zh:'adj. 精确的，准确的'},
-      {w:'exaggerate', zh:'v. 夸大，夸张'},
-      {w:'examine', zh:'v. 检查，审查'},
-      {w:'exceed', zh:'v. 超过，超越'},
-      {w:'excellent', zh:'adj. 优秀的，杰出的'},
-      {w:'exchange', zh:'v./n. 交换，交流'},
-      {w:'exclude', zh:'v. 排除，不包括'},
-      {w:'exhibit', zh:'v. 展出，显示 n. 展览'},
-      {w:'exist', zh:'v. 存在，生存'},
-      {w:'expand', zh:'v. 扩展，膨胀'},
-      {w:'expect', zh:'v. 期待，预料'},
-      {w:'expense', zh:'n. 花费，费用'},
-      {w:'experience', zh:'n. 经验 v. 经历'},
-      {w:'experiment', zh:'n./v. 实验，试验'},
-      {w:'explain', zh:'v. 解释，说明'},
-      {w:'explore', zh:'v. 探索，勘探'},
-      {w:'export', zh:'v./n. 出口，输出'},
-      {w:'expose', zh:'v. 暴露，揭露'},
-      {w:'express', zh:'v. 表达 adj. 快速的'},
-      {w:'extend', zh:'v. 延伸，扩展'},
-      {w:'external', zh:'adj. 外部的，外面的'},
-      {w:'extreme', zh:'adj. 极端的 n. 极端'},
-      {w:'fade', zh:'v. 褪色，衰退'},
-      {w:'failure', zh:'n. 失败，故障'},
-      {w:'familiar', zh:'adj. 熟悉的，常见的'},
-      {w:'fascinate', zh:'v. 迷住，使着迷'},
-      {w:'fashion', zh:'n. 时尚，方式'},
-      {w:'fatal', zh:'adj. 致命的，重大的'},
-      {w:'favor', zh:'n. 恩惠，赞成 v. 支持'},
-      {w:'feature', zh:'n. 特征，特色 v. 以……为特色'},
-      {w:'feedback', zh:'n. 反馈，反应'},
-      {w:'figure', zh:'n. 数字，人物 v. 认为'},
-      {w:'finance', zh:'n. 财政，金融 v. 资助'},
-      {w:'flexible', zh:'adj. 灵活的，柔韧的'},
-      {w:'fluent', zh:'adj. 流利的，流畅的'},
-      {w:'focus', zh:'v./n. 集中，焦点'},
-      {w:'forbid', zh:'v. 禁止，不许'},
-      {w:'forecast', zh:'n./v. 预报，预测'},
-      {w:'formal', zh:'adj. 正式的，正规的'},
-      {w:'former', zh:'adj. 以前的 n. 前者'},
-      {w:'fortune', zh:'n. 运气，财富'},
-      {w:'foundation', zh:'n. 基础，基金会'},
-      {w:'frequent', zh:'adj. 频繁的，经常的'},
-      {w:'frighten', zh:'v. 使惊吓，使害怕'},
-      {w:'frustrate', zh:'v. 使沮丧，挫败'},
-      {w:'function', zh:'n. 功能 v. 运作'},
-      {w:'fundamental', zh:'adj. 基本的，根本的'},
-      {w:'furthermore', zh:'adv. 此外，而且'},
-      {w:'gather', zh:'v. 聚集，收集'},
-      {w:'generate', zh:'v. 产生，生成'},
-      {w:'generous', zh:'adj. 慷慨的，大方的'},
-      {w:'genuine', zh:'adj. 真正的，真诚的'},
-      {w:'gesture', zh:'n. 手势，姿态'},
-      {w:'glance', zh:'v./n. 一瞥，扫视'},
-      {w:'govern', zh:'v. 统治，管理'},
-      {w:'gradual', zh:'adj. 逐渐的，渐进的'},
-      {w:'graduate', zh:'v. 毕业 n. 毕业生'},
-      {w:'grasp', zh:'v. 抓住，理解 n. 掌握'},
-      {w:'grateful', zh:'adj. 感激的，感谢的'},
-      {w:'guarantee', zh:'v./n. 保证，担保'},
-      {w:'guilty', zh:'adj. 内疚的，有罪的'},
-      {w:'habit', zh:'n. 习惯，习性'},
-      {w:'handle', zh:'v. 处理，操作 n. 把手'},
-      {w:'harmony', zh:'n. 和谐，融洽'},
-      {w:'harvest', zh:'n./v. 收获，收割'},
-      {w:'hesitate', zh:'v. 犹豫，踌躇'},
-      {w:'honest', zh:'adj. 诚实的，正直的'},
-      {w:'horizon', zh:'n. 地平线，眼界'},
-      {w:'horrible', zh:'adj. 可怕的，糟糕的'},
-      {w:'hostile', zh:'adj. 敌对的，敌意的'},
-      {w:'humble', zh:'adj. 谦逊的，卑微的'},
-      {w:'humor', zh:'n. 幽默，诙谐'},
-      {w:'identify', zh:'v. 识别，认出'},
-      {w:'ignore', zh:'v. 忽视，不理'},
-      {w:'illustrate', zh:'v. 说明，举例'},
-      {w:'imagine', zh:'v. 想象，设想'},
-      {w:'imitate', zh:'v. 模仿，仿效'},
-      {w:'immediate', zh:'adj. 立即的，直接的'},
-      {w:'impact', zh:'n./v. 影响，冲击'},
-      {w:'imply', zh:'v. 暗示，意味着'},
-      {w:'import', zh:'v./n. 进口，输入'},
-      {w:'impress', zh:'v. 使印象深刻'},
-      {w:'improve', zh:'v. 改进，提高'},
-      {w:'include', zh:'v. 包括，包含'},
-      {w:'income', zh:'n. 收入，所得'},
-      {w:'increase', zh:'v./n. 增加，增长'},
-      {w:'indeed', zh:'adv. 的确，确实'},
-      {w:'indicate', zh:'v. 表明，指示'},
-      {w:'individual', zh:'adj. 个别的 n. 个人'},
-      {w:'industry', zh:'n. 工业，行业'},
-      {w:'influence', zh:'n./v. 影响，感化'},
-      {w:'inform', zh:'v. 通知，告知'},
-      {w:'initial', zh:'adj. 最初的 n. 首字母'},
-      {w:'injure', zh:'v. 伤害，损害'},
-      {w:'innocent', zh:'adj. 无辜的，天真的'},
-      {w:'inquire', zh:'v. 询问，打听'},
-      {w:'insist', zh:'v. 坚持，坚决要求'},
-      {w:'inspect', zh:'v. 检查，视察'},
-      {w:'inspire', zh:'v. 激励，启发'},
-      {w:'install', zh:'v. 安装，任命'},
-      {w:'instance', zh:'n. 例子，实例'},
-      {w:'instant', zh:'adj. 立即的 n. 瞬间'},
-      {w:'instruct', zh:'v. 指导，命令'},
-      {w:'insurance', zh:'n. 保险，保险费'},
-      {w:'intend', zh:'v. 打算，意图'},
-      {w:'intense', zh:'adj. 强烈的，紧张的'},
-      {w:'interpret', zh:'v. 解释，口译'},
-      {w:'interrupt', zh:'v. 中断，打断'},
-      {w:'introduce', zh:'v. 介绍，引进'},
-      {w:'invent', zh:'v. 发明，创造'},
-      {w:'invest', zh:'v. 投资，投入'},
-      {w:'investigate', zh:'v. 调查，研究'},
-      {w:'involve', zh:'v. 涉及，包含'},
-      {w:'isolate', zh:'v. 隔离，孤立'},
-      {w:'issue', zh:'n. 问题，期号 v. 发布'},
-      {w:'journey', zh:'n. 旅行，旅程'},
-      {w:'judge', zh:'v. 判断，评判 n. 法官'},
-      {w:'justice', zh:'n. 正义，公平'},
-      {w:'justify', zh:'v. 证明……正当'},
-      {w:'knowledge', zh:'n. 知识，学问'},
-      {w:'labor', zh:'n. 劳动，劳工'},
-      {w:'launch', zh:'v. 发射，发起 n. 发布'},
-      {w:'leadership', zh:'n. 领导，领导力'},
-      {w:'legal', zh:'adj. 合法的，法律的'},
-      {w:'leisure', zh:'n. 闲暇，休闲'},
-      {w:'limit', zh:'n. 限制 v. 限制'},
-      {w:'literature', zh:'n. 文学，文献'},
-      {w:'locate', zh:'v. 位于，定位'},
-      {w:'logic', zh:'n. 逻辑，推理'},
-      {w:'loyal', zh:'adj. 忠诚的，忠实的'},
-      {w:'luxury', zh:'n. 奢侈，奢侈品'},
-      {w:'maintain', zh:'v. 维持，维修，主张'},
-      {w:'majority', zh:'n. 大多数，多数'},
-      {w:'manage', zh:'v. 管理，设法做到'},
-      {w:'material', zh:'n. 材料 adj. 物质的'},
-      {w:'mature', zh:'adj. 成熟的 v. 成熟'},
-      {w:'means', zh:'n. 方法，手段'},
-      {w:'measure', zh:'v. 测量 n. 措施'},
-      {w:'mental', zh:'adj. 精神的，智力的'},
-      {w:'mention', zh:'v./n. 提及，说起'},
-      {w:'merely', zh:'adv. 仅仅，只不过'},
-      {w:'method', zh:'n. 方法，办法'},
-      {w:'minority', zh:'n. 少数，少数民族'},
-      {w:'mission', zh:'n. 任务，使命'},
-      {w:'modify', zh:'v. 修改，调整'},
-      {w:'monitor', zh:'v. 监控 n. 监视器'},
-      {w:'motivate', zh:'v. 激发，激励'},
-      {w:'mutual', zh:'adj. 相互的，共同的'},
-      {w:'negative', zh:'adj. 消极的，否定的'},
-      {w:'neglect', zh:'v./n. 忽视，疏忽'},
-      {w:'negotiate', zh:'v. 谈判，协商'},
-      {w:'nevertheless', zh:'adv. 然而，不过'},
-      {w:'normal', zh:'adj. 正常的，标准的'},
-      {w:'notice', zh:'v. 注意到 n. 通知'},
-      {w:'obey', zh:'v. 服从，遵守'},
-      {w:'object', zh:'n. 物体，目标 v. 反对'},
-      {w:'observe', zh:'v. 观察，遵守'},
-      {w:'obtain', zh:'v. 获得，得到'},
-      {w:'obvious', zh:'adj. 明显的，显然的'},
-      {w:'occasion', zh:'n. 场合，时机'},
-      {w:'occupy', zh:'v. 占据，占用'},
-      {w:'occur', zh:'v. 发生，出现'},
-      {w:'offend', zh:'v. 冒犯，得罪'},
-      {w:'operate', zh:'v. 操作，做手术'},
-      {w:'opinion', zh:'n. 意见，看法'},
-      {w:'opportunity', zh:'n. 机会，时机'},
-      {w:'oppose', zh:'v. 反对，抵制'},
-      {w:'optimistic', zh:'adj. 乐观的'},
-      {w:'organize', zh:'v. 组织，安排'},
-      {w:'origin', zh:'n. 起源，出身'},
-      {w:'overcome', zh:'v. 克服，战胜'},
-      {w:'participate', zh:'v. 参与，参加'},
-      {w:'particular', zh:'adj. 特别的，特定的'},
-      {w:'passion', zh:'n. 激情，热情'},
-      {w:'patient', zh:'adj. 耐心的 n. 病人'},
-      {w:'perform', zh:'v. 表演，执行'},
-      {w:'permanent', zh:'adj. 永久的，长期的'},
-      {w:'permit', zh:'v. 允许 n. 许可证'},
-      {w:'persist', zh:'v. 坚持，持续'},
-      {w:'perspective', zh:'n. 视角，观点'},
-      {w:'persuade', zh:'v. 说服，劝说'},
-      {w:'phenomenon', zh:'n. 现象'},
-      {w:'policy', zh:'n. 政策，方针'},
-      {w:'potential', zh:'adj. 潜在的 n. 潜力'},
-      {w:'practical', zh:'adj. 实际的，实用的'},
-      {w:'precise', zh:'adj. 精确的，准确的'},
-      {w:'predict', zh:'v. 预测，预言'},
-      {w:'prefer', zh:'v. 更喜欢，宁愿'},
-      {w:'prepare', zh:'v. 准备，预备'},
-      {w:'preserve', zh:'v. 保存，保护'},
-      {w:'prevent', zh:'v. 阻止，预防'},
-      {w:'previous', zh:'adj. 以前的，先前的'},
-      {w:'principle', zh:'n. 原则，原理'},
-      {w:'priority', zh:'n. 优先，优先权'},
-      {w:'process', zh:'n. 过程 v. 处理'},
-      {w:'produce', zh:'v. 生产，产生'},
-      {w:'profession', zh:'n. 职业，专业'},
-      {w:'profit', zh:'n. 利润 v. 获益'},
-      {w:'progress', zh:'n./v. 进步，进展'},
-      {w:'promote', zh:'v. 促进，提升'},
-      {w:'propose', zh:'v. 提议，求婚'},
-      {w:'protect', zh:'v. 保护，防护'},
-      {w:'prove', zh:'v. 证明，证实'},
-      {w:'provide', zh:'v. 提供，供给'},
-      {w:'publish', zh:'v. 出版，发表'},
-      {w:'purchase', zh:'v./n. 购买'},
-      {w:'pursue', zh:'v. 追求，从事'},
-      {w:'qualify', zh:'v. 使合格，限定'},
-      {w:'quantity', zh:'n. 数量，量'},
-      {w:'quote', zh:'v. 引用，引述'},
-      {w:'random', zh:'adj. 随机的，任意的'},
-      {w:'range', zh:'n. 范围 v. 变化'},
-      {w:'reaction', zh:'n. 反应，反作用'},
-      {w:'realize', zh:'v. 意识到，实现'},
-      {w:'reasonable', zh:'adj. 合理的，有道理的'},
-      {w:'recall', zh:'v. 回忆，召回'},
-      {w:'receive', zh:'v. 收到，接待'},
-      {w:'recognize', zh:'v. 认出，承认'},
-      {w:'recommend', zh:'v. 推荐，建议'},
-      {w:'recover', zh:'v. 恢复，康复'},
-      {w:'reduce', zh:'v. 减少，降低'},
-      {w:'refer', zh:'v. 提到，参考'},
-      {w:'reflect', zh:'v. 反映，反射，思考'},
-      {w:'reform', zh:'n./v. 改革，改造'},
-      {w:'refuse', zh:'v. 拒绝，不肯'},
-      {w:'regard', zh:'v. 认为，看待 n. 尊重'},
-      {w:'region', zh:'n. 地区，区域'},
-      {w:'register', zh:'v. 注册，登记'},
-      {w:'regret', zh:'v./n. 后悔，遗憾'},
-      {w:'regular', zh:'adj. 定期的，规律的'},
-      {w:'reject', zh:'v. 拒绝，抵制'},
-      {w:'relate', zh:'v. 关联，叙述'},
-      {w:'release', zh:'v./n. 释放，发布'},
-      {w:'relevant', zh:'adj. 相关的，切题的'},
-      {w:'reliable', zh:'adj. 可靠的，可信赖的'},
-      {w:'relieve', zh:'v. 减轻，缓解'},
-      {w:'remain', zh:'v. 保持，剩下'},
-      {w:'remark', zh:'n./v. 评论，谈论'},
-      {w:'remind', zh:'v. 提醒，使想起'},
-      {w:'remove', zh:'v. 移除，去掉'},
-      {w:'repair', zh:'v./n. 修理，修复'},
-      {w:'replace', zh:'v. 替换，取代'},
-      {w:'represent', zh:'v. 代表，表现'},
-      {w:'reputation', zh:'n. 名声，声誉'},
-      {w:'request', zh:'n./v. 请求，要求'},
-      {w:'require', zh:'v. 需要，要求'},
-      {w:'rescue', zh:'v./n. 营救，救援'},
-      {w:'research', zh:'n./v. 研究，调查'},
-      {w:'resemble', zh:'v. 像，类似于'},
-      {w:'reserve', zh:'v. 预订，保留 n. 储备'},
-      {w:'resist', zh:'v. 抵抗，抗拒'},
-      {w:'resolve', zh:'v. 解决，决心'},
-      {w:'resource', zh:'n. 资源，财力'},
-      {w:'respect', zh:'n./v. 尊敬，尊重'},
-      {w:'respond', zh:'v. 回应，响应'},
-      {w:'responsible', zh:'adj. 负责的，可靠的'},
-      {w:'restore', zh:'v. 恢复，修复'},
-      {w:'restrict', zh:'v. 限制，约束'},
-      {w:'result', zh:'n. 结果 v. 导致'},
-      {w:'retire', zh:'v. 退休，退役'},
-      {w:'reveal', zh:'v. 揭示，透露'},
-      {w:'review', zh:'n./v. 回顾，复习，评论'},
-      {w:'revise', zh:'v. 修改，复习'},
-      {w:'reward', zh:'n./v. 奖励，报酬'},
-      {w:'routine', zh:'n. 常规 adj. 例行的'},
-      {w:'satisfy', zh:'v. 满足，使满意'},
-      {w:'scarce', zh:'adj. 稀少的，不足的'},
-      {w:'schedule', zh:'n. 时间表 v. 安排'},
-      {w:'scheme', zh:'n. 计划，阴谋'},
-      {w:'scope', zh:'n. 范围，余地'},
-      {w:'secure', zh:'adj. 安全的 v. 获得'},
-      {w:'seek', zh:'v. 寻找，追求'},
-      {w:'seize', zh:'v. 抓住，夺取'},
-      {w:'select', zh:'v. 选择，挑选'},
-      {w:'sensitive', zh:'adj. 敏感的，灵敏的'},
-      {w:'separate', zh:'v. 分开 adj. 分开的'},
-      {w:'sequence', zh:'n. 顺序，序列'},
-      {w:'serious', zh:'adj. 严肃的，严重的'},
-      {w:'settle', zh:'v. 解决，安顿'},
-      {w:'severe', zh:'adj. 严重的，严厉的'},
-      {w:'shelter', zh:'n. 庇护所 v. 庇护'},
-      {w:'shift', zh:'v./n. 转移，改变'},
-      {w:'significant', zh:'adj. 重要的，显著的'},
-      {w:'similar', zh:'adj. 相似的，类似的'},
-      {w:'simplify', zh:'v. 简化，使简单'},
-      {w:'situation', zh:'n. 情况，处境'},
-      {w:'solve', zh:'v. 解决，解答'},
-      {w:'source', zh:'n. 来源，源头'},
-      {w:'specific', zh:'adj. 具体的，明确的'},
-      {w:'spread', zh:'v. 传播，展开'},
-      {w:'stable', zh:'adj. 稳定的 n. 马厩'},
-      {w:'standard', zh:'n. 标准 adj. 标准的'},
-      {w:'statistics', zh:'n. 统计，统计学'},
-      {w:'status', zh:'n. 地位，状态'},
-      {w:'strategy', zh:'n. 策略，战略'},
-      {w:'strengthen', zh:'v. 加强，巩固'},
-      {w:'stress', zh:'n. 压力 v. 强调'},
-      {w:'strict', zh:'adj. 严格的，严厉的'},
-      {w:'structure', zh:'n. 结构，构造'},
-      {w:'struggle', zh:'v./n. 挣扎，斗争'},
-      {w:'submit', zh:'v. 提交，服从'},
-      {w:'substitute', zh:'n. 替代品 v. 代替'},
-      {w:'succeed', zh:'v. 成功，继承'},
-      {w:'sufficient', zh:'adj. 足够的，充分的'},
-      {w:'suggest', zh:'v. 建议，暗示'},
-      {w:'suitable', zh:'adj. 合适的，适宜的'},
-      {w:'supply', zh:'v./n. 供应，供给'},
-      {w:'support', zh:'v./n. 支持，支撑'},
-      {w:'suppose', zh:'v. 假设，认为'},
-      {w:'survive', zh:'v. 幸存，生存'},
-      {w:'suspect', zh:'v. 怀疑 n. 嫌疑人'},
-      {w:'sustain', zh:'v. 维持，支撑'},
-      {w:'switch', zh:'v. 转换 n. 开关'},
-      {w:'symbol', zh:'n. 象征，符号'},
-      {w:'sympathy', zh:'n. 同情，同感'},
-      {w:'technique', zh:'n. 技术，技巧'},
-      {w:'temporary', zh:'adj. 暂时的，临时的'},
-      {w:'tend', zh:'v. 倾向于，照料'},
-      {w:'tense', zh:'adj. 紧张的 n. 时态'},
-      {w:'theory', zh:'n. 理论，学说'},
-      {w:'threaten', zh:'v. 威胁，恐吓'},
-      {w:'tolerate', zh:'v. 容忍，忍受'},
-      {w:'tradition', zh:'n. 传统，惯例'},
-      {w:'transfer', zh:'v. 转移，调动'},
-      {w:'transform', zh:'v. 改变，转化'},
-      {w:'translate', zh:'v. 翻译，转化'},
-      {w:'transport', zh:'v. 运输 n. 交通'},
-      {w:'treat', zh:'v. 对待，治疗'},
-      {w:'tremble', zh:'v. 颤抖，哆嗦'},
-      {w:'trend', zh:'n. 趋势，倾向'},
-      {w:'trial', zh:'n. 试验，审判'},
-      {w:'trust', zh:'v./n. 信任，委托'},
-      {w:'typical', zh:'adj. 典型的，有代表性的'},
-      {w:'unique', zh:'adj. 独特的，唯一的'},
-      {w:'urge', zh:'v. 催促，力劝 n. 冲动'},
-      {w:'valid', zh:'adj. 有效的，合理的'},
-      {w:'value', zh:'n. 价值 v. 重视'},
-      {w:'vanish', zh:'v. 消失，不见'},
-      {w:'variety', zh:'n. 多样性，种类'},
-      {w:'various', zh:'adj. 各种各样的'},
-      {w:'vary', zh:'v. 变化，不同'},
-      {w:'vast', zh:'adj. 巨大的，广阔的'},
-      {w:'vehicle', zh:'n. 车辆，工具'},
-      {w:'venture', zh:'n. 冒险 v. 冒险'},
-      {w:'verify', zh:'v. 核实，证明'},
-      {w:'version', zh:'n. 版本，说法'},
-      {w:'victim', zh:'n. 受害者，牺牲品'},
-      {w:'violate', zh:'v. 违反，侵犯'},
-      {w:'virtue', zh:'n. 美德，优点'},
-      {w:'visible', zh:'adj. 可见的，明显的'},
-      {w:'vital', zh:'adj. 至关重要的，有活力的'},
-      {w:'volume', zh:'n. 体积，音量，卷'},
-      {w:'voluntary', zh:'adj. 自愿的，志愿的'},
-      {w:'wander', zh:'v. 漫游，徘徊'},
-      {w:'warn', zh:'v. 警告，告诫'},
-      {w:'weaken', zh:'v. 削弱，变弱'},
-      {w:'wealth', zh:'n. 财富，丰富'},
-      {w:'witness', zh:'n. 目击者 v. 目击'},
-      {w:'worship', zh:'v./n. 崇拜，敬仰'},
-      {w:'yield', zh:'v. 产生，屈服 n. 产量'},
-    ]
-  }
-};
-
 /* ============ 全局 ============ */
 const GlobalState = {
-  version: 19,
+  version: 18,
   mainColor: '#ff8fab', bgColor: '#ffe0e8',
   background: null, userImage: null, userShow: false, userX: 0.5, userY: 0.88,
   userBubblePos: 'center',
@@ -2190,13 +482,8 @@ function newCharacterData(id){
     lastSelfDiaryDate: null,
     lastFestivalDate: null,
     lastBackgroundNotifAt: 0,
-    // 背单词
-    wordBook: 'cet4',           // 当前词库
-    wordToday: 0,               // 今日已背
-    wordTodayCorrect: 0,        // 今日答对
-    wordTodayDate: null,        // 记录日期
-    wordCurrent: null,          // 当前题目
-    wordAnswered: false,        // 是否已作答
+    money: { budget: 3000, logs: [] },
+    wordBook: { currentBook: null, learnedCount: 0 },
   };
 }
 let Current = null;
@@ -2619,17 +906,11 @@ function computeTrack(){
 }
 function updateTrackBar(){
   if(!Current) return;
-  // 自动检查角色是否该回来了
-  if(Current.isAway && Current.awayUntil && Date.now() >= Current.awayUntil){
-    Current.isAway = false;
-    Current.awayUntil = null;
-    saveGameDebounced();
-  }
   const t=computeTrack();
   const el=document.getElementById('trackNow');
   if(el){
     if(Current.isAway && Current.awayUntil){
-      const mins = Math.max(0, Math.ceil((Current.awayUntil - Date.now())/60000));
+      const mins = Math.max(1, Math.round((Current.awayUntil - Date.now())/60000));
       el.textContent = `📍 他出门了 · 大概 ${mins} 分钟后回来`;
     } else {
       el.textContent=`📍 在${t.place} · ${t.action}`;
@@ -2716,6 +997,8 @@ function buildSystemPrompt(userInput){
   if(!Current) return '';
   const c=Current;
   const love = c.relationValue || 0;
+  const now = new Date();
+  const nowStr = now.toLocaleString('zh-CN', { hour12: false });
   const parts=[
     '========== 你的人设（最高优先级）==========',
     `你的名字：「${c.name}」`,
@@ -2740,10 +1023,15 @@ function buildSystemPrompt(userInput){
     '1. 不许反复问同一件事。2. 不许一句话反复说。3. 每轮回复先在心里过一遍：这句话我是不是刚说过？',
     '',
     '========== 默认风格 ==========',
-    `- 默认回复 1~3 句。`,
+    `- 你必须只回复 1 句话，绝对不能超过 2 句话。这是硬性规定。`,
     `- 默认语气：${love>=75?'温柔亲昵':love>=50?'亲近关心':love>=25?'轻松开玩笑':'平淡有点距离'}。`,
     `- 默认不用颜文字，偶尔可以。默认用口语。`,
     c.language ? `- 必须用${c.language}回复。不管你之前用什么语言，从这一句开始全部用${c.language}。` : '',
+    '',
+    '========== 当前时间与真实感 ==========',
+    `【当前时间】${nowStr}`,
+    `【时间规则】你是有真实时间概念的。不能出现“洗澡洗了 12 个小时”、“睡觉睡了 20 个小时”这种违背常识的情况。`,
+    `【话题结束规则】如果你上一次回复说“我去洗澡/睡觉/吃饭/出门”，而当前时间已经距离那件事超过了 2 小时，你必须默认那件事已经结束，开启新话题，不要再提洗澡/睡觉了。`,
     '',
     '========== 你现在的情况 ==========',
     `关系：${getRelationName(c.relationType)}（好感 ${Math.round(c.relationValue)}/100）`,
@@ -3481,7 +1769,7 @@ function tryWork(){
     if(!Current) return;
     Current.isAway=false; Current.awayUntil=null;
     updateTrackBar();
-    const earn = Math.floor((10 + Math.random()*21) * (0.7 + Current.stats.mood/200));
+    const earn = Math.floor((50 + Math.random()*101) * (0.7 + Current.stats.mood/200));
     Current.coin += earn;
     const gotGift = Math.random() < 0.5;
     if(gotGift){
@@ -3814,191 +2102,6 @@ function openGift(){
     }).join('')}
   `;
   openModal();
-}
-
-/* ============ 背单词 ============ */
-function openWordBookPicker(){
-  if(!Current) return;
-  const modal=document.getElementById('modalContent');
-  const books = [
-    {key:'cet4', ico:'📗', name:'四级 CET-4', desc:'约 4500 词'},
-    {key:'cet6', ico:'📘', name:'六级 CET-6', desc:'进阶词汇'},
-    {key:'gao3500', ico:'📙', name:'高中 3500', desc:'高中核心'},
-  ];
-  modal.innerHTML=`
-    <h2>背单词 <span class="close" onclick="closeModal()">×</span></h2>
-    <p style="font-size:12px;color:var(--text-soft);margin-bottom:8px;">选一个词库开始吧。</p>
-    <div class="word-book-grid">
-      ${books.map(b=>`
-        <div class="word-book-cell ${Current.wordBook===b.key?'active':''}" onclick="startWordBook('${b.key}')">
-          <div class="wb-ico">${b.ico}</div>
-          <div class="wb-name">${b.name}</div>
-          <div class="wb-desc">${b.desc}</div>
-        </div>
-      `).join('')}
-    </div>
-    <p style="font-size:12px;color:var(--text-soft);margin-top:14px;text-align:center;">
-      今日已背 <b>${Current.wordToday||0}</b> 个 · 答对 <b>${Current.wordTodayCorrect||0}</b> 个
-    </p>
-  `;
-  openModal();
-}
-function startWordBook(key){
-  if(!Current) return;
-  if(!WORD_BOOKS[key]){
-    say('词库不存在','tip');
-    return;
-  }
-  Current.wordBook = key;
-  const today = todayStr();
-  if(Current.wordTodayDate !== today){
-    Current.wordTodayDate = today;
-    Current.wordToday = 0;
-    Current.wordTodayCorrect = 0;
-  }
-  saveGame();
-  openWordQuiz();
-}
-function pickRandomWord(){
-  if(!Current) return null;
-  const book = WORD_BOOKS[Current.wordBook];
-  if(!book || !book.words || !book.words.length) return null;
-  const w = book.words[Math.floor(Math.random()*book.words.length)];
-  // 避免连续重复
-  if(Current.wordCurrent && Current.wordCurrent.w === w.w && book.words.length > 1){
-    return book.words[Math.floor(Math.random()*book.words.length)];
-  }
-  return w;
-}
-function openWordQuiz(){
-  if(!Current) return;
-  const today = todayStr();
-  if(Current.wordTodayDate !== today){
-    Current.wordTodayDate = today;
-    Current.wordToday = 0;
-    Current.wordTodayCorrect = 0;
-    saveGame();
-  }
-  if(!Current.wordCurrent || Current.wordAnswered){
-    Current.wordCurrent = pickRandomWord();
-    Current.wordAnswered = false;
-  }
-  const w = Current.wordCurrent;
-  if(!w){
-    say('词库为空','tip');
-    return;
-  }
-  const modal=document.getElementById('modalContent');
-  const book = WORD_BOOKS[Current.wordBook];
-  modal.innerHTML=`
-    <h2>📚 ${book.name} <span class="close" onclick="closeModal()">×</span></h2>
-    <div class="word-stat">
-      <span>今日已背 <b>${Current.wordToday||0}</b></span>
-      <span>答对 <b>${Current.wordTodayCorrect||0}</b></span>
-      <span>当前词库 <b>${book.name}</b></span>
-    </div>
-    <div class="word-card">
-      <div class="word-en">${w.w}</div>
-    </div>
-    <div class="field"><label>这个词的中文意思是？</label>
-      <input id="wordAnswerInput" placeholder="输入中文意思…" autocomplete="off">
-    </div>
-    <button class="btn" onclick="submitWordAnswer()">提交</button>
-    <div id="wordResult"></div>
-    <button class="btn ghost" onclick="openWordBookPicker()">换词库</button>
-  `;
-  openModal();
-  setTimeout(()=>{
-    const inp = document.getElementById('wordAnswerInput');
-    if(inp){
-      inp.focus();
-      inp.addEventListener('keydown', e=>{
-        if(e.key === 'Enter') submitWordAnswer();
-      });
-    }
-  }, 200);
-}
-async function submitWordAnswer(){
-  if(!Current || !Current.wordCurrent) return;
-  if(Current.wordAnswered) return;
-  const inp = document.getElementById('wordAnswerInput');
-  if(!inp) return;
-  const ans = inp.value.trim();
-  if(!ans){ say('请输入答案','tip'); return; }
-  Current.wordAnswered = true;
-  const w = Current.wordCurrent;
-  const box = document.getElementById('wordResult');
-  // 简单判断：答对的判断交给 AI（因为中文意思有很多种表达）
-  if(box){
-    box.innerHTML = '<div style="text-align:center;color:var(--text-soft);font-size:13px;">他正在判断…</div>';
-  }
-  try {
-    const sys = `你是一个英语单词助手。用户背的单词是「${w.w}」，正确意思是「${w.zh}」。用户填写的意思是「${ans}」。请判断用户答得对不对，如果基本意思对了就算对，只要意思接近就算对。只回复"对"或"不对"，不要别的文字。`;
-    const reply = await callAI([
-      {role:'system', content: sys},
-      {role:'user', content: '判断'},
-    ], {maxTokens: 10, temperature: 0.1});
-    const isCorrect = reply && reply.includes('对') && !reply.includes('不对');
-    Current.wordToday = (Current.wordToday||0) + 1;
-    if(isCorrect){
-      Current.wordTodayCorrect = (Current.wordTodayCorrect||0) + 1;
-      addRelationValue(0.5);
-    }
-    saveGame();
-    if(box){
-      box.innerHTML = isCorrect
-        ? `<div class="word-result-ok">✅ 答对啦！<br>「${w.w}」的意思是：<b>${w.zh}</b></div>`
-        : `<div class="word-result-fail">❌ 再想想~<br>「${w.w}」的意思是：<b>${w.zh}</b></div>`;
-    }
-    // 角色反应
-    await wordCharReply(isCorrect, w);
-  } catch(e) {
-    // AI 判断失败，退化成字符串匹配
-    const isCorrect = w.zh.includes(ans) || ans.includes(w.zh.replace(/[a-z]+\.\s*/g,'').split(/[，,；;]/)[0]);
-    Current.wordToday = (Current.wordToday||0) + 1;
-    if(isCorrect){
-      Current.wordTodayCorrect = (Current.wordTodayCorrect||0) + 1;
-      addRelationValue(0.5);
-    }
-    saveGame();
-    if(box){
-      box.innerHTML = isCorrect
-        ? `<div class="word-result-ok">✅ 答对啦！<br>「${w.w}」的意思是：<b>${w.zh}</b></div>`
-        : `<div class="word-result-fail">❌ 再想想~<br>「${w.w}」的意思是：<b>${w.zh}</b></div>`;
-    }
-    await wordCharReply(isCorrect, w);
-  }
-}
-async function wordCharReply(isCorrect, w){
-  if(!API.ready || !Current) return;
-  const scene = isCorrect
-    ? `对方刚刚答对了英语单词「${w.w}」，意思是「${w.zh}」。请以你的身份，夸一夸对方，1~2句。`
-    : `对方刚刚背英语单词「${w.w}」答错了，正确意思是「${w.zh}」。请以你的身份，安慰或者鼓励一下对方，1~2句。`;
-  try {
-    const sys = buildSystemPrompt('') + '\n\n【场景】' + scene + '\n【要求】直接以你的身份说 1~2 句话。不要复述【场景】，不要提到"设定""规则""单词"这些词，不要用括号写动作。';
-    const reply = await callAI([
-      {role:'system',content:sys},
-      ...Current.chatLog.slice(-8).map(m=>({role:m.role,content:m.text})),
-      {role:'user',content:'【系统触发】'},
-    ]);
-    if(reply){
-      let{clean,emo,label}=parseEmotion(reply);
-      const bg=parseBgColor(clean); clean=bg.clean;
-      const km=parseKaomoji(clean); clean=km.clean;
-      if(bg.color)applyBgColor(bg.color);
-      say(clean,'them',{kaomoji:km.kaomoji});
-      applyEmotion(emo,label);
-      Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
-      saveGameDebounced();
-    }
-  } catch(e){}
-}
-function nextWord(){
-  if(!Current) return;
-  Current.wordCurrent = pickRandomWord();
-  Current.wordAnswered = false;
-  saveGame();
-  openWordQuiz();
 }
 
 /* ============ 聊天 ============ */
@@ -4484,6 +2587,182 @@ function openLog(){
   openModal();
 }
 
+/* ============ 学习 / 背单词 / 阅读 ============ */
+function openStudyMenu(){
+  const modal=document.getElementById('modalContent');
+  modal.innerHTML=`
+    <h2>学习 <span class="close" onclick="closeModal()">×</span></h2>
+    <div class="game-item" onclick="closeModal();openTimer()"><div><div class="g-name">⏱️ 番茄钟</div><div class="g-desc">专注一段时间，让角色陪你学习</div></div><div class="g-arrow">›</div></div>
+    <div class="game-item" onclick="closeModal();openWordBook()"><div><div class="g-name">📖 背单词</div><div class="g-desc">选课本，学单词，答对就换下一个</div></div><div class="g-arrow">›</div></div>
+    <div class="game-item" onclick="closeModal();openEnglishReading()"><div><div class="g-name">📄 英语阅读</div><div class="g-desc">读一段短文，也算作专注时间</div></div><div class="g-arrow">›</div></div>
+    <div class="game-item" onclick="closeModal();openSubjectPractice()"><div><div class="g-name">✏️ 其他学科</div><div class="g-desc">数学、历史等练习</div></div><div class="g-arrow">›</div></div>
+  `;
+  openModal();
+}
+function openWordBook(){
+  if(!Current) return;
+  const modal=document.getElementById('modalContent');
+  modal.innerHTML=`
+    <h2>背单词 <span class="close" onclick="closeModal()">×</span></h2>
+    <div class="field"><label>选择课本</label>
+      <select id="wordBookSelect">
+        <option value="CET4">四级核心词汇</option>
+        <option value="CET6">六级核心词汇</option>
+        <option value="IELTS">雅思核心词汇</option>
+        <option value="Daily">日常口语词汇</option>
+      </select>
+    </div>
+    <button class="btn" onclick="startWordGame()">开始学习</button>
+  `;
+  openModal();
+}
+let wordGameState = { book:null, currentWord:null, count:0, correctCount:0, isReviewing:false };
+async function startWordGame() {
+  if(!API.ready) { needApiTip(); return; }
+  wordGameState.book = document.getElementById('wordBookSelect').value;
+  wordGameState.count = 0;
+  wordGameState.correctCount = 0;
+  await nextWord();
+}
+async function nextWord() {
+  const modal = document.getElementById('modalContent');
+  modal.innerHTML = `
+    <h2>背单词 <span class="close" onclick="closeModal()">×</span></h2>
+    <div class="game-panel">
+      <div class="g-status">正在生成单词…</div>
+      <div class="g-content" id="wordPrompt"></div>
+      <div class="g-input-row"><input id="wordInput" placeholder="输入中文意思…"><button onclick="checkWordAnswer()">提交</button></div>
+      <div class="g-log" id="wordLog">已背 ${wordGameState.count} 个</div>
+    </div>
+  `;
+  try {
+    const reply = await callAI([
+      {role:'system', content:'你是英语单词老师。只输出 JSON，不要别的文字。'},
+      {role:'user', content:`请从「${wordGameState.book}」词库中随机选一个英语单词，给出它的中文释义。输出 JSON：{"en":"单词","zh":"中文意思"}。不要重复出题。`}
+    ], {maxTokens:100, temperature:0.9});
+    let wordData = {en: 'apple', zh: '苹果'};
+    try { wordData = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); } catch(e){}
+    wordGameState.currentWord = wordData;
+    document.getElementById('wordPrompt').innerHTML = `<b style="font-size:20px;">${wordData.en}</b><br><span style="color:var(--text-soft);font-size:12px;">请输入中文意思</span>`;
+    document.getElementById('wordInput').focus();
+  } catch(e) {
+    document.getElementById('wordPrompt').textContent = '生成失败：' + e.message;
+  }
+}
+async function checkWordAnswer() {
+  const input = document.getElementById('wordInput');
+  const userAnswer = input.value.trim();
+  if (!userAnswer || !wordGameState.currentWord) return;
+  const correct = wordGameState.currentWord.zh;
+  if (userAnswer === correct || correct.includes(userAnswer) || userAnswer.includes(correct)) {
+    wordGameState.correctCount++;
+    wordGameState.count++;
+    document.getElementById('wordLog').textContent = `✅ 答对了！已背 ${wordGameState.count} 个`;
+    input.value = '';
+    if (wordGameState.count % 10 === 0) {
+      say('（他看你背完了 10 个单词，凑过来说：）', 'action');
+      const sys = buildSystemPrompt('') + `\n【场景】对方已经连续背完了 10 个单词，并全部答对。请以你的身份，夸奖他一句，1 句话。`;
+      callAI([{role:'system', content: sys}]).then(reply => {
+        if (reply) {
+          let {clean} = parseEmotion(reply);
+          say(clean, 'them');
+        }
+      });
+    }
+    setTimeout(() => nextWord(), 500);
+  } else {
+    document.getElementById('wordLog').textContent = `❌ 答错了，正确答案是：${correct}。再试一次。`;
+    input.value = '';
+  }
+}
+function openEnglishReading() {
+  const modal = document.getElementById('modalContent');
+  modal.innerHTML = `
+    <h2>英语阅读 <span class="close" onclick="closeModal()">×</span></h2>
+    <div class="game-panel">
+      <div class="g-status">正在生成文章…</div>
+      <div class="g-content" id="readingText"></div>
+      <div class="g-input-row"><button onclick="finishReading()">阅读完成</button><button onclick="closeModal()">退出</button></div>
+    </div>
+  `;
+  openModal();
+  callAI([
+    {role:'system', content:'你是英语阅读老师。请输出一篇 100 字左右的英语短文，主题日常，难度中等。只输出英文正文。'},
+    {role:'user', content:'请生成一篇英语阅读文章。'}
+  ], {maxTokens:300, temperature:0.8}).then(reply => {
+    document.getElementById('readingText').textContent = reply || '生成失败。';
+  });
+}
+function finishReading() {
+  closeModal();
+  if (Current) {
+    Current.pomoHistory.push({ date: todayStr(), min: 15, time: Date.now() });
+    saveGame();
+    say('（你读完了这篇文章，他朝你笑了笑。）', 'action');
+    addRelationValue(3);
+    if (API.ready) {
+      const sys = buildSystemPrompt('') + '\n【场景】对方刚读完一篇英语文章。请以你的身份夸奖一句。';
+      callAI([{role:'system', content: sys}]).then(reply => {
+        if (reply) say(parseEmotion(reply).clean, 'them');
+      });
+    }
+  }
+}
+function openSubjectPractice() {
+  const modal = document.getElementById('modalContent');
+  modal.innerHTML = `
+    <h2>其他学科 <span class="close" onclick="closeModal()">×</span></h2>
+    <div class="field"><label>选择科目</label>
+      <select id="subjectSelect">
+        <option value="数学">数学</option>
+        <option value="历史">历史</option>
+        <option value="地理">地理</option>
+        <option value="物理">物理</option>
+      </select>
+    </div>
+    <button class="btn" onclick="startSubjectPractice()">开始练习</button>
+  `;
+  openModal();
+}
+async function startSubjectPractice() {
+  if(!API.ready) { needApiTip(); return; }
+  const subject = document.getElementById('subjectSelect').value;
+  const modal = document.getElementById('modalContent');
+  modal.innerHTML = `
+    <h2>${subject}练习 <span class="close" onclick="closeModal()">×</span></h2>
+    <div class="game-panel">
+      <div class="g-status">正在生成题目…</div>
+      <div class="g-content" id="subjectPrompt"></div>
+      <div class="g-input-row"><input id="subjectInput" placeholder="输入答案…"><button onclick="checkSubjectAnswer()">提交</button></div>
+    </div>
+  `;
+  try {
+    const reply = await callAI([
+      {role:'system', content:'你是学科老师。请出一道单选题，只输出 JSON：{"q":"题目","a":"答案"}。'},
+      {role:'user', content:`请出一道${subject}的基础单选题。`}
+    ], {maxTokens:200, temperature:0.9});
+    let data = {q:'1+1=?', a:'2'};
+    try { data = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); } catch(e){}
+    Current.subjectAnswer = data.a;
+    document.getElementById('subjectPrompt').textContent = data.q;
+    document.getElementById('subjectInput').focus();
+  } catch(e) {
+    document.getElementById('subjectPrompt').textContent = '生成失败：' + e.message;
+  }
+}
+function checkSubjectAnswer() {
+  const input = document.getElementById('subjectInput');
+  const ans = input.value.trim();
+  if (!ans || !Current.subjectAnswer) return;
+  if (ans === Current.subjectAnswer || Current.subjectAnswer.includes(ans)) {
+    say('答对了！', 'tip');
+    addRelationValue(1);
+    closeModal();
+  } else {
+    say('再想想？', 'tip');
+  }
+}
+
 /* ============ 小游戏 ============ */
 function openGameMenu(){
   const modal=document.getElementById('modalContent');
@@ -4493,6 +2772,7 @@ function openGameMenu(){
     <div class="game-item" onclick="startGame('bomb')"><div><div class="g-name">💣 数字炸弹</div><div class="g-desc">1-100 里有个雷，轮流猜</div></div><div class="g-arrow">›</div></div>
     <div class="game-item" onclick="startGame('twenty')"><div><div class="g-name">❓ 20 问</div><div class="g-desc">他想了样东西，你问 20 个问题猜</div></div><div class="g-arrow">›</div></div>
     <div class="game-item" onclick="startGame('story')"><div><div class="g-name">📖 接龙编故事</div><div class="g-desc">你一句他一句，一起编故事</div></div><div class="g-arrow">›</div></div>
+    <div class="game-item" onclick="startRPS()"><div><div class="g-name">✊ 石头剪刀布</div><div class="g-desc">赢了让 AI 真心话大冒险</div></div><div class="g-arrow">›</div></div>
   `;
   openModal();
 }
@@ -4714,688 +2994,122 @@ function closeGame(){
   closeModal();
 }
 
-/* ============ 角色切换 ============ */
-function openCharSwitch(){
-  const modal=document.getElementById('modalContent');
-  modal.innerHTML=`
-    <h2>切换角色 <span class="close" onclick="closeModal()">×</span></h2>
-    ${GlobalState.characters.map(c=>{
-      const isActive = c.id === GlobalState.currentCharId;
-      const img = (c.outfits&&c.outfits[c.currentOutfitIndex]) ? c.outfits[c.currentOutfitIndex].img : c.image;
-      return `<div class="char-list-item ${isActive?'active':''}" onclick="switchCharacter('${c.id}')">
-        ${img ? `<img src="${img}">` : `<div class="avatar-placeholder">🧑</div>`}
-        <div class="info"><div class="n">${c.name}${isActive?' （当前）':''}</div><div class="d">${getRelationName(c.relationType)} · 好感 ${Math.round(c.relationValue)}</div></div>
-        ${GlobalState.characters.length>1 ? `<button class="del-btn" onclick="event.stopPropagation();deleteCharacter('${c.id}')">删除</button>` : ''}
-      </div>`;
-    }).join('')}
-    <button class="btn" onclick="createCharacter()">+ 新建角色</button>
-  `;
-  openModal();
-}
-function switchCharacter(id){
-  if(id === GlobalState.currentCharId) { closeModal(); return; }
-  saveGame();
-  GlobalState.currentCharId = id;
-  Current = GlobalState.characters.find(c=>c.id===id);
-  if(!Current){ Current = newCharacterData(id); GlobalState.characters.push(Current); }
-  const box=document.getElementById('bubbles'); if(box) box.innerHTML='';
-  pickRandomOutfit();
-  renderCharacter(); renderPet(); updateStats(); updateRelationUI(); updateTrackBar();
-  saveGame(); closeModal();
-  say(`已切换到「${Current.name}」。`,'tip');
-}
-function createCharacter(){
-  const id = 'c_' + Date.now();
-  const c = newCharacterData(id); c.name = '新角色';
-  GlobalState.characters.push(c); saveGame();
-  switchCharacter(id);
-}
-function deleteCharacter(id){
-  if(GlobalState.characters.length <= 1){ say('至少要保留一个角色。','tip'); return; }
-  if(!confirm('确定要删除这个角色吗？')) return;
-  GlobalState.characters = GlobalState.characters.filter(c=>c.id!==id);
-  if(GlobalState.currentCharId === id){
-    GlobalState.currentCharId = GlobalState.characters[0].id;
-    Current = GlobalState.characters[0];
-  }
-  saveGame();
-  const box=document.getElementById('bubbles'); if(box) box.innerHTML='';
-  renderCharacter(); renderPet(); updateStats(); updateRelationUI(); updateTrackBar();
-  openCharSwitch();
-}
-
-/* ============ 设置 ============ */
-function openSettings(){
-  if(!Current) return;
-  if(!settingsDraft) initSettingsDraft();
-  isSettingsOpen = true;
-  const d = settingsDraft;
-  const modal=document.getElementById('modalContent');
-  const isKnown = KNOWN_MODELS.some(m=>m.id === d.apiModel);
-  const bubblePos = d.userBubblePos || 'center';
-  modal.innerHTML=`
-    <h2>设置 <span class="close" onclick="closeSettings()">×</span></h2>
-    <div class="field"><label>上传他的图片</label>
-      <input type="file" id="setUpload" accept="image/*" onchange="handleCharUpload(event)">
-      ${d.image?'<button class="btn ghost" onclick="removeCharImage()">删除角色图</button>':''}
-    </div>
-    <div class="field"><label>上传背景图</label>
-      <input type="file" id="setBg" accept="image/*" onchange="handleBgUpload(event)">
-      ${d.background_img?'<button class="btn ghost" onclick="removeBgImage()">删除背景图</button>':''}
-    </div>
-    <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
-    <div class="field"><label>他叫什么</label><input id="setName" value="${d.name}" oninput="settingsDraft.name=this.value"></div>
-    <div class="field"><label>他叫你什么</label><input id="setCall" value="${d.callYou}" oninput="settingsDraft.callYou=this.value"></div>
-    <div class="field"><label>角色 / 身份</label><input id="setRole" value="${d.role||''}" oninput="settingsDraft.role=this.value"></div>
-    <div class="field"><label>性格（人设最高优先级）</label><textarea id="setPersonality" oninput="settingsDraft.personality=this.value">${d.personality||''}</textarea></div>
-    <div class="field"><label>背景故事</label><textarea id="setBackground" oninput="settingsDraft.background=this.value">${d.background||''}</textarea></div>
-    <div class="field"><label>世界观</label><textarea id="setWorldview" oninput="settingsDraft.worldview=this.value">${d.worldview||''}</textarea></div>
-    <div class="field"><label>说话风格</label><input id="setStyle" value="${d.style||''}" oninput="settingsDraft.style=this.value"></div>
-    <div class="field"><label>生日（角色生日）</label><input id="setBirthday" type="date" value="${d.birthday||''}" oninput="settingsDraft.birthday=this.value"></div>
-    <div class="field"><label>语言</label>
-      <select id="setLanguage" onchange="settingsDraft.language=this.value">
-        ${['中文','English','日本語','한국어'].map(l=>`<option value="${l}" ${d.language===l?'selected':''}>${l}</option>`).join('')}
-      </select>
-    </div>
-    <div class="field"><label>开场白</label><input id="setIntro" value="${d.intro||''}" oninput="settingsDraft.intro=this.value"></div>
-    <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
-    <div class="field"><label>关系</label>
-      <select id="setRelation" onchange="settingsDraft.relationType=this.value">
-        ${REL_TYPES.map(rt=>`<option value="${rt.key}" ${d.relationType===rt.key?'selected':''}>${rt.name}</option>`).join('')}
-      </select>
-    </div>
-    <div class="field"><label>好感度</label><input type="number" id="setRelationValue" min="0" max="100" value="${Math.round(d.relationValue)}" oninput="settingsDraft.relationValue=parseInt(this.value)||0"></div>
-    <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
-    <div class="field"><label>你说的气泡显示位置</label>
-      <div class="pos-palette">
-        <div class="pos-swatch ${bubblePos==='left'?'active':''}" onclick="setBubblePos('left')">左</div>
-        <div class="pos-swatch ${bubblePos==='center'?'active':''}" onclick="setBubblePos('center')">中</div>
-        <div class="pos-swatch ${bubblePos==='right'?'active':''}" onclick="setBubblePos('right')">右</div>
-        <div class="pos-swatch ${bubblePos==='random'?'active':''}" onclick="setBubblePos('random')">随机</div>
-      </div>
-    </div>
-    <div class="field"><label>天气城市</label>
-      <input id="setWeatherCity" value="${d.weatherManualCity||''}" oninput="settingsDraft.weatherManualCity=this.value">
-      <button class="btn ghost" onclick="collectSettingsDraft();updateWeatherReal(true).then(()=>openSettings())">🔄 刷新天气</button>
-    </div>
-    <button class="btn ghost" onclick="collectSettingsDraft();openLorebook()">📖 世界书（${(d.lorebook||[]).length}）</button>
-    <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
-    <div class="field"><label>表情图</label>
-      <div>${(d.images||[]).map((im,i)=>`<div class="face-item"><img src="${im.img}"><input value="${im.label||''}" placeholder="备注" onchange="settingsDraft.images[${i}].label=this.value.trim()"><button onclick="collectSettingsDraft();removeFace(${i})">删除</button></div>`).join('')}</div>
-      <input type="file" id="faceUpload" accept="image/*" multiple onchange="handleFaceUpload(event)">
-    </div>
-    <div class="field"><label>服装</label>
-      <div>${(d.outfits||[]).map((o,i)=>`<div class="face-item"><img src="${o.img}"><input value="${o.label||''}" placeholder="备注" onchange="settingsDraft.outfits[${i}].label=this.value.trim()">${d.currentOutfitIndex === i ? '<span class="tag-preview">当前</span>' : ''}<button onclick="collectSettingsDraft();removeOutfit(${i})">删除</button></div>`).join('')}</div>
-      <input type="file" id="outfitUpload" accept="image/*" multiple onchange="handleOutfitUpload(event)">
-    </div>
-    <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
-    <div class="field"><label>我的形象</label>
-      <input type="file" id="userUpload" accept="image/*" onchange="handleUserUpload(event)">
-      <label style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-        <input type="checkbox" id="userShowChk" ${d.userShow?'checked':''} onchange="settingsDraft.userShow=this.checked">
-        <span>在舞台上显示我的形象</span>
-      </label>
-      ${d.userImage?'<button class="btn ghost" onclick="collectSettingsDraft();removeUserImage()">删除我的形象</button>':''}
-    </div>
-    <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
-    <div class="field"><label>API 地址</label><input id="setApiUrl" value="${d.apiUrl}" oninput="settingsDraft.apiUrl=this.value"></div>
-    <div class="field"><label>API Key</label><input id="setApiKey" value="${d.apiKey}" oninput="settingsDraft.apiKey=this.value"></div>
-    <div class="field"><label>模型</label>
-      <select id="setApiModelSelect" onchange="onModelChange()">
-        ${KNOWN_MODELS.map(m=>`<option value="${m.id}" ${d.apiModel===m.id?'selected':''}>${m.label}</option>`).join('')}
-        <option value="__custom__" ${!isKnown?'selected':''}>自定义</option>
-      </select>
-      <input id="setApiModelCustom" value="${d.apiModel}" placeholder="手填模型名" style="margin-top:6px;${isKnown?'display:none':''}" oninput="settingsDraft.apiModel=this.value">
-    </div>
-    <div class="field">
-      <label style="display:flex;align-items:center;gap:8px;">
-        <input type="checkbox" id="useFallbackChk" ${d.useFallback?'checked':''} onchange="settingsDraft.useFallback=this.checked">
-        <span>主模型失败时，自动试备用模型</span>
-      </label>
-      <label style="margin-top:6px;">备用模型（逗号分隔）</label>
-      <input id="setFallback" value="${(d.fallbackModels||[]).join(',')}" oninput="settingsDraft.fallbackModels=this.value.split(',').map(s=>s.trim()).filter(Boolean)">
-    </div>
-    <button class="btn ghost" onclick="collectSettingsDraft();testConnection()">🔌 测试连接</button>
-    <div id="testBox"></div>
-    <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
-    <div class="field"><label>主题色</label>
-      <div class="main-palette">${MAIN_PALETTE.map(cl=>`<div class="main-swatch ${d.mainColor===cl?'active':''}" style="background:${cl}" onclick="pickMainColor('${cl}')"></div>`).join('')}</div>
-      <input type="color" value="${d.mainColor||'#ff8fab'}" onchange="pickMainColor(this.value)" style="width:100%;height:48px;cursor:pointer;border-radius:12px;">
-    </div>
-    <div class="field"><label>背景色</label>
-      <div class="bg-palette">${['#ffe0e8','#fff5cc','#d8ecff','#d8f0dc','#e8d8ff','#f0e0d0','#ffd8d8','#d8f0f0','#ffd8f0','#d8ffe0','#f0e8d8','#d8d8ff'].map(cl=>`<div class="bg-swatch ${d.bgColor===cl?'active':''}" style="background:${cl}" onclick="setBgColor('${cl}')"></div>`).join('')}</div>
-      <input type="color" value="${d.bgColor||'#ffe0e8'}" onchange="setBgColor(this.value)" style="width:100%;height:48px;cursor:pointer;border-radius:12px;">
-    </div>
-    <button class="btn" onclick="saveSettings()">保存设置</button>
-    <button class="btn ghost" onclick="collectSettingsDraft();openPetSetup()">宠物</button>
-    <button class="btn ghost" onclick="collectSettingsDraft();openNotice()">📢 查看公告</button>
-    <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
-    <button class="btn ghost" onclick="exportSave()">📤 导出存档</button>
-    <input type="file" id="importFile" style="display:none" onchange="importSave(event)">
-    <button class="btn ghost" onclick="document.getElementById('importFile').click()">📥 导入存档</button>
-    <button class="btn ghost" onclick="resetAll()">重新开始（清空存档）</button>
-  `;
-  openModal();
-}
-function setBubblePos(pos){
-  collectSettingsDraft();
-  settingsDraft.userBubblePos = pos;
-  GlobalState.userBubblePos = pos;
-  openSettings();
-}
-function onModelChange(){
-  collectSettingsDraft();
-  const sel=document.getElementById('setApiModelSelect');
-  const input=document.getElementById('setApiModelCustom');
-  if(!sel||!input)return;
-  if(sel.value==='__custom__'){ input.style.display='block'; settingsDraft.apiModel = input.value.trim() || ''; }
-  else{ input.style.display='none'; input.value=sel.value; settingsDraft.apiModel = sel.value; }
-}
-function removeCharImage(){ collectSettingsDraft(); if(settingsDraft)settingsDraft.image=null; if(Current)Current.image=null; renderCharacter(); openSettings(); }
-function removeBgImage(){ collectSettingsDraft(); if(settingsDraft)settingsDraft.background_img=null; GlobalState.background=null; renderBackground(); openSettings(); }
-function removeUserImage(){ collectSettingsDraft(); if(settingsDraft){settingsDraft.userImage=null;settingsDraft.userShow=false;} GlobalState.userImage=null;GlobalState.userShow=false; renderUser(); openSettings(); }
-function removeFace(i){ collectSettingsDraft(); if(settingsDraft)settingsDraft.images.splice(i,1); if(Current)Current.images.splice(i,1); openSettings(); }
-function pickMainColor(hex){ collectSettingsDraft(); if(settingsDraft)settingsDraft.mainColor=hex; applyMainColor(hex); openSettings(); }
-function setBgColor(hex){ collectSettingsDraft(); if(settingsDraft)settingsDraft.bgColor=hex; applyBgColor(hex); openSettings(); }
-function saveSettings(){
-  if(!settingsDraft) return;
-  collectSettingsDraft();
-  const d = settingsDraft;
-  Current.name = d.name || '他'; Current.callYou = d.callYou || '你';
-  Current.role=d.role; Current.personality=d.personality; Current.background=d.background;
-  Current.worldview=d.worldview; Current.style=d.style; Current.language=d.language;
-  Current.intro=d.intro; Current.relationType=d.relationType;
-  Current.birthday = d.birthday || '';
-  Current.relationValue=Math.max(0,Math.min(100,parseInt(d.relationValue)||0));
-  Current.image = d.image; Current.images = d.images; Current.outfits = d.outfits;
-  Current.currentOutfitIndex = d.currentOutfitIndex;
-  Current.pet = d.pet; Current.lorebook = d.lorebook;
-  Current.pomoGoalMin = d.pomoGoalMin || 120;
-  GlobalState.background = d.background_img;
-  GlobalState.userImage = d.userImage; GlobalState.userShow = d.userShow;
-  GlobalState.userBubblePos = d.userBubblePos || 'center';
-  GlobalState.mainColor = d.mainColor; GlobalState.bgColor = d.bgColor;
-  const newCity = (d.weatherManualCity || '').trim();
-  if(newCity !== GlobalState.weatherManualCity){
-    GlobalState.weatherManualCity = newCity;
-    GlobalState.weatherLat = null; GlobalState.weatherLon = null; GlobalState.weatherUpdatedAt = 0;
-    updateWeatherReal(true);
-  }
-  API.baseUrl = d.apiUrl; API.key = d.apiKey; API.model = d.apiModel;
-  GlobalState.useFallback = d.useFallback; GlobalState.fallbackModels = d.fallbackModels;
-  saveAPIConfig();
-  saveGame();
-  applyMainColor(GlobalState.mainColor);
-  settingsDraft = null; isSettingsOpen = false; closeModal();
-  updateStats(); updateRelationUI();
-  renderBackground(); renderCharacter(); renderUser(); renderPet();
-  if(API.ready) say('设置已保存。','them'); else say('已保存。别忘了填 API 哦。','tip');
-}
-function closeSettings(){
-  collectSettingsDraft();
-  isSettingsOpen = false; settingsDraft = null; closeModal();
-  loadGame().then(()=>{
-    Current = GlobalState.characters.find(c=>c.id===GlobalState.currentCharId) || GlobalState.characters[0];
-    applyMainColor(GlobalState.mainColor);
-    renderBackground(); renderCharacter(); renderUser(); renderPet();
-    updateStats(); updateRelationUI();
-  });
-}
-function resetAll(){
-  if(!confirm('确定要清空存档、重新开始吗？'))return;
-  localStorage.removeItem('dream_save'); localStorage.removeItem('dream_api');
-  localStorage.removeItem('dream_notice_seen');
-  try{ indexedDB.deleteDatabase(DB_NAME); }catch(e){}
-  location.reload();
-}
-
-/* ============ 世界书 / 宠物设置 ============ */
-function openLorebook(){
-  if(!Current) return;
-  const modal=document.getElementById('modalContent');
-  const lb = (settingsDraft ? settingsDraft.lorebook : (Current.lorebook || []));
-  modal.innerHTML=`
-    <h2>世界书 <span class="close" onclick="collectSettingsDraft();openSettings()">×</span></h2>
-    <div>
-      ${lb.length===0?'<p style="color:var(--text-soft);font-size:13px;">还没有条目。</p>':
-        lb.map((e,i)=>`<div class="lore-item"><input placeholder="关键词" value="${e.key||''}" onchange="settingsDraft.lorebook[${i}].key=this.value"><input placeholder="内容" value="${e.text||''}" onchange="settingsDraft.lorebook[${i}].text=this.value"><div class="actions"><button class="del" onclick="deleteLore(${i})">删除</button></div></div>`).join('')}
-    </div>
-    <button class="btn ghost" onclick="addLore()">+ 添加条目</button>
-    <button class="btn" onclick="collectSettingsDraft();openSettings()">保存并返回</button>
-  `;
-  openModal();
-}
-function addLore(){ if(!settingsDraft) initSettingsDraft(); settingsDraft.lorebook.push({key:'',text:''}); openLorebook(); }
-function deleteLore(i){ if(!settingsDraft)return; settingsDraft.lorebook.splice(i,1); openLorebook(); }
-function openPetSetup(){
-  if(!Current) return;
-  if(!settingsDraft) initSettingsDraft();
-  const modal=document.getElementById('modalContent');
-  const p = settingsDraft.pet;
-  modal.innerHTML=`
-    <h2>宠物 <span class="close" onclick="collectSettingsDraft();openSettings()">×</span></h2>
-    ${p.has?`
-      <p style="font-size:13px;color:var(--text-soft);margin-bottom:12px;">当前宠物：${p.name}（${p.type}）</p>
-      <div class="field"><label>宠物名字</label><input id="petNameInput" value="${p.name||'小家伙'}" placeholder="给它取个名字"></div>
-      <div class="field"><label>上传宠物图片</label><input type="file" id="petUpload" accept="image/*" onchange="handlePetUpload(event)">${p.image?'<button class="btn ghost" onclick="collectSettingsDraft();removePetImage()">删除宠物图</button>':''}</div>
-      <button class="btn" onclick="collectSettingsDraft();settingsDraft.pet.name=(document.getElementById('petNameInput').value.trim()||'小家伙');if(Current)Current.pet.name=settingsDraft.pet.name;saveGame();openSettings();">保存名字</button>
-      <button class="btn ghost" onclick="collectSettingsDraft();removePet()">送走宠物</button>
-    `:`
-      <div class="field"><label>种类</label><select id="petType"><option value="cat">猫</option><option value="dog">狗</option><option value="rabbit">兔</option><option value="bird">鸟</option></select></div>
-      <div class="field"><label>名字</label><input id="petName" value="小家伙"></div>
-      <button class="btn" onclick="createPet()">领养</button>
-    `}
-  `;
-  openModal();
-}
-function createPet(){
-  if(!settingsDraft) initSettingsDraft();
-  const type=document.getElementById('petType').value;
-  const name=document.getElementById('petName').value.trim()||'小家伙';
-  settingsDraft.pet = { has:true, type, name, image:null, x:0.78, y:0.82, food:80, clean:80, mood:80, lastTick:Date.now(), flip:false, nextWalkAt:0 };
-  if(Current) Current.pet = deepCloneSafe(settingsDraft.pet);
-  renderPet(); openSettings();
-}
-function removePet(){
-  if(!settingsDraft) return;
-  settingsDraft.pet = { has:false, type:'cat', name:'小家伙', image:null, x:0.78, y:0.82, food:80, clean:80, mood:80, lastTick:Date.now(), flip:false, nextWalkAt:0 };
-  if(Current) Current.pet = deepCloneSafe(settingsDraft.pet);
-  renderPet(); openSettings();
-}
-function removePetImage(){
-  if(!settingsDraft) return;
-  settingsDraft.pet.image = null;
-  if(Current) Current.pet.image = null;
-  renderPet(); openSettings();
-}
-
-/* ============ 公告 ============ */
-function noticeHash(text){ let h = 0; for(let i=0;i<text.length;i++){ h = ((h<<5)-h+text.charCodeAt(i))|0; } return 'h'+h; }
-function isNoticeSeen(){
-  try{ const saved = JSON.parse(localStorage.getItem('dream_notice_seen')||'null'); if(!saved) return false; return saved.hash === noticeHash(NOTICE_TEXT); }catch(e){ return false; }
-}
-function markNoticeSeen(){
-  try{ localStorage.setItem('dream_notice_seen', JSON.stringify({ hash: noticeHash(NOTICE_TEXT), seenAt: Date.now() })); }catch(e){}
-}
-function openNotice(){
-  const modal=document.getElementById('modalContent');
-  let html = NOTICE_TEXT.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/(1473727478@qq\.com)/g, '<span class="notice-email">$1</span>');
-  modal.innerHTML=`<h2>📢 公告 <span class="close" onclick="closeNotice()">×</span></h2><div class="notice-body">${html}</div><button class="btn" onclick="closeNotice()">知道了</button>`;
-  openModal();
-}
-function closeNotice(){ markNoticeSeen(); closeModal(); }
-
-/* ============ 弹层 / 工具栏 ============ */
-function openModal(){ document.getElementById('modalMask').classList.add('show'); }
-function closeModal(){ document.getElementById('modalMask').classList.remove('show'); }
-document.getElementById('modalMask').addEventListener('click',e=>{
-  if(e.target.id==='modalMask'){ if(isSettingsOpen) closeSettings(); else closeModal(); }
-});
-function bindToolbar(){
-  document.querySelectorAll('.tool').forEach(t=>{
-    t.onclick=()=>{
-      const p=t.dataset.panel;
-      if(p==='gift')openGift();
-      else if(p==='touch')openTouch();
-      else if(p==='outfit')openOutfitPicker();
-      else if(p==='word')openWordBookPicker();
-      else if(p==='game')openGameMenu();
-      else if(p==='shop')openShop();
-      else if(p==='settings')openSettings();
-      else if(p==='diary')openDiary();
-      else if(p==='timer')openTimer();
-      else if(p==='sleep')openSleep();
-      else if(p==='period')openPeriod();
-      else if(p==='anniv')openAnniv();
-      else if(p==='log')openLog();
-    };
-  });
-}
-
-/* ============ 输入 ============ */
-function bindChat(){
-  const input=document.getElementById('chatInput');
-  const btn=document.getElementById('sendBtn');
-  const send=()=>{
-    const t=input.value.trim(); if(!t)return;
-    if(!API.ready){ needApiTip(); return; }
-    input.value=''; chat(t);
-  };
-  btn.onclick=send;
-  input.addEventListener('keydown',e=>{ if(e.key==='Enter')send(); });
-}
-const QUICK_TOPICS=['今天过得怎么样？','我有点累','想你了','在做什么？','陪我聊聊天','今天发生了一件小事'];
-function renderQuick(){
-  document.getElementById('quick').innerHTML=QUICK_TOPICS.map(t=>`<button onclick="quickSend('${t}')">${t}</button>`).join('');
-}
-function quickSend(t){
-  if(!API.ready){ needApiTip(); return; }
-  document.getElementById('chatInput').value=t;
-  chat(t); document.getElementById('chatInput').value='';
-}
-
-/* ============ 存档 ============ */
-function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
-function buildSaveObject(){
-  return {
-    version: GlobalState.version,
-    mainColor: GlobalState.mainColor, bgColor: GlobalState.bgColor,
-    background: GlobalState.background, userImage: GlobalState.userImage,
-    userShow: GlobalState.userShow, userX: GlobalState.userX, userY: GlobalState.userY,
-    userBubblePos: GlobalState.userBubblePos,
-    weather: GlobalState.weather, weatherDate: GlobalState.weatherDate,
-    weatherCity: GlobalState.weatherCity, weatherLat: GlobalState.weatherLat, weatherLon: GlobalState.weatherLon,
-    weatherManualCity: GlobalState.weatherManualCity, weatherUpdatedAt: GlobalState.weatherUpdatedAt,
-    currentCharId: GlobalState.currentCharId, characters: deepClone(GlobalState.characters),
-    lastTick: lastTick,
-  };
-}
-function applySaveObject(d){
-  if(!d)return;
-  GlobalState.version = d.version || 19;
-  GlobalState.mainColor = d.mainColor || '#ff8fab';
-  GlobalState.bgColor = d.bgColor || '#ffe0e8';
-  GlobalState.background = d.background || null;
-  GlobalState.userImage = d.userImage || null;
-  GlobalState.userShow = !!d.userShow;
-  GlobalState.userX = typeof d.userX === 'number' ? d.userX : 0.5;
-  GlobalState.userY = typeof d.userY === 'number' ? d.userY : 0.88;
-  GlobalState.userBubblePos = d.userBubblePos || 'center';
-  GlobalState.weather = d.weather || '晴';
-  GlobalState.weatherDate = d.weatherDate || null;
-  GlobalState.weatherCity = d.weatherCity || '';
-  GlobalState.weatherLat = (typeof d.weatherLat === 'number') ? d.weatherLat : null;
-  GlobalState.weatherLon = (typeof d.weatherLon === 'number') ? d.weatherLon : null;
-  GlobalState.weatherManualCity = d.weatherManualCity || '';
-  GlobalState.weatherUpdatedAt = d.weatherUpdatedAt || 0;
-  GlobalState.characters = Array.isArray(d.characters) ? d.characters : [];
-  GlobalState.currentCharId = d.currentCharId || null;
-  if(d.lastTick) lastTick = d.lastTick;
-  GlobalState.characters = GlobalState.characters.map(raw=>{
-    const c = newCharacterData(raw.id || ('c_'+Math.random().toString(36).slice(2,8)));
-    for(const k in raw){ if(k in c) c[k] = raw[k]; }
-    if(!c.pet || typeof c.pet !== 'object') c.pet = { has:false, type:'cat', name:'小家伙', image:null, x:0.78, y:0.82, food:80, clean:80, mood:80, lastTick:Date.now(), flip:false, nextWalkAt:0 };
-    if(typeof c.pet.food !== 'number') c.pet.food = 80;
-    if(typeof c.pet.clean !== 'number') c.pet.clean = 80;
-    if(typeof c.pet.mood !== 'number') c.pet.mood = 80;
-    if(!c.pet.lastTick) c.pet.lastTick = Date.now();
-    if(typeof c.pet.flip !== 'boolean') c.pet.flip = false;
-    if(!c.pet.nextWalkAt) c.pet.nextWalkAt = 0;
-    if(!c.stats || typeof c.stats !== 'object') c.stats = { mood:80, food:80, energy:80 };
-    if(typeof c.stats.energy !== 'number') c.stats.energy = 80;
-    ['images','outfits','lorebook','track','anniversaries','customShopItems','recentTopics','pomoHistory','recentGames'].forEach(k=>{ if(!Array.isArray(c[k])) c[k] = []; });
-    if(!c.inventory || typeof c.inventory !== 'object') c.inventory = {};
-    if(!c.diary || typeof c.diary !== 'object') c.diary = { yours:[], his:[] };
-    if(!c.period || typeof c.period !== 'object') c.period = { lastStart:null, cycle:28, duration:5, manualOn:false };
-    if(!c.chatLog || !Array.isArray(c.chatLog)) c.chatLog = [];
-    if(typeof c.pomoGoalMin !== 'number') c.pomoGoalMin = 120;
-    if(typeof c.lastPomoNudge !== 'number') c.lastPomoNudge = 0;
-    if(typeof c.birthday !== 'string') c.birthday = '';
-    if(!c.lastSelfDiaryDate) c.lastSelfDiaryDate = null;
-    if(!c.lastFestivalDate) c.lastFestivalDate = null;
-    if(typeof c.lastBackgroundNotifAt !== 'number') c.lastBackgroundNotifAt = 0;
-    if(typeof c.wordBook !== 'string') c.wordBook = 'cet4';
-    if(typeof c.wordToday !== 'number') c.wordToday = 0;
-    if(typeof c.wordTodayCorrect !== 'number') c.wordTodayCorrect = 0;
-    if(!c.wordTodayDate) c.wordTodayDate = null;
-    if(!c.wordCurrent || typeof c.wordCurrent !== 'object') c.wordCurrent = null;
-    if(typeof c.wordAnswered !== 'boolean') c.wordAnswered = false;
-    return c;
-  });
-  if(!GlobalState.characters.length){
-    const c = newCharacterData('c_default');
-    GlobalState.characters = [c]; GlobalState.currentCharId = c.id;
-  }
-  if(!GlobalState.currentCharId || !GlobalState.characters.find(c=>c.id===GlobalState.currentCharId)){
-    GlobalState.currentCharId = GlobalState.characters[0].id;
-  }
-}
-function saveGame(){
-  try{
-    const data = buildSaveObject();
-    const str = JSON.stringify(data);
-    try{ localStorage.setItem('dream_save_bak', localStorage.getItem('dream_save')||''); localStorage.setItem('dream_save', str); }catch(e){}
-    idbSet('dream_save', data).catch(()=>{});
-  }catch(e){ console.warn('存档失败', e); }
-}
-let saveTimer = null;
-function saveGameDebounced(){
-  if(saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(()=>{ saveGame(); }, 1200);
-}
-async function loadGame(){
-  try{
-    let d = null;
-    try{ d = await idbGet('dream_save'); }catch(e){}
-    if(!d){ const raw = localStorage.getItem('dream_save') || localStorage.getItem('dream_save_bak'); if(raw) d = JSON.parse(raw); }
-    if(!d) return false;
-    applySaveObject(d);
-    return true;
-  }catch(e){ console.warn('读档失败', e); return false; }
-}
-
-/* ============ 导出 / 导入 ============ */
-function exportSave(){
-  const payload = {
-    app: 'yunqi', version: GlobalState.version,
-    exportedAt: new Date().toISOString(),
-    api: {baseUrl:API.baseUrl, key:API.key, model:API.model, fallbackModels:GlobalState.fallbackModels, useFallback:GlobalState.useFallback},
-    global: {
-      mainColor: GlobalState.mainColor, bgColor: GlobalState.bgColor,
-      background: GlobalState.background, userImage: GlobalState.userImage,
-      userShow: GlobalState.userShow, userX: GlobalState.userX, userY: GlobalState.userY,
-      userBubblePos: GlobalState.userBubblePos,
-      weather: GlobalState.weather, weatherManualCity: GlobalState.weatherManualCity,
-      currentCharId: GlobalState.currentCharId, characters: GlobalState.characters,
-      lastTick: lastTick,
-    }
-  };
-  const str = JSON.stringify(payload, null, 2);
-  const filename = `yunqi_save_${todayStr()}.json`;
-  window.__lastExportFilename = filename;
-  window.__lastExportContent = str;
+/* ============ 真心话大冒险 / 猜拳 ============ */
+function startRPS() {
   const modal = document.getElementById('modalContent');
-  const preview = str.length > 8000 ? str.slice(0, 8000) + '\n...(太长已截断，完整内容已保存，请用「复制」按钮)' : str;
-  modal.innerHTML=`
-    <h2>导出存档 <span class="close" onclick="closeSettings()">×</span></h2>
-    <p style="font-size:12px;color:var(--text-soft);margin-bottom:10px;">
-      点下面「下载 json 文件」，会保存到手机的「文档」文件夹。<br>
-      如果没反应，用「复制」按钮。
+  modal.innerHTML = `
+    <h2>✊ 石头剪刀布 <span class="close" onclick="closeModal()">×</span></h2>
+    <div class="game-panel" style="text-align:center;">
+      <p style="margin-bottom:20px;">出拳吧！赢了可以让他真心话大冒险，输了你要接受惩罚哦。</p>
+      <div style="display:flex; justify-content:space-around; margin-bottom:20px;">
+        <button class="btn" style="width:30%; font-size:30px; padding:20px;" onclick="playRPS('石头')">✊</button>
+        <button class="btn" style="width:30%; font-size:30px; padding:20px;" onclick="playRPS('剪刀')">✌️</button>
+        <button class="btn" style="width:30%; font-size:30px; padding:20px;" onclick="playRPS('布')">✋</button>
+      </div>
+      <div id="rpsResult" style="font-size:16px; font-weight:bold; margin-bottom:20px; min-height:40px;"></div>
+      <button class="btn ghost" onclick="closeModal()">退出</button>
+    </div>
+  `;
+  openModal();
+}
+function playRPS(userChoice) {
+  const choices = ['石头', '剪刀', '布'];
+  const aiChoice = choices[Math.floor(Math.random() * 3)];
+  let result = '';
+  if (userChoice === aiChoice) result = '平局';
+  else if (
+    (userChoice === '石头' && aiChoice === '剪刀') ||
+    (userChoice === '剪刀' && aiChoice === '布') ||
+    (userChoice === '布' && aiChoice === '石头')
+  ) result = '你赢了';
+  else result = '你输了';
+  const resEl = document.getElementById('rpsResult');
+  resEl.innerHTML = `你出了 <b>${userChoice}</b>，他出了 <b>${aiChoice}</b>。<br>🎉 <b>${result}</b>！`;
+  if (result === '你赢了') {
+    setTimeout(() => openTruthOrDare('ai'), 1000);
+  } else if (result === '你输了') {
+    setTimeout(() => openTruthOrDare('user'), 1000);
+  } else {
+    setTimeout(() => { resEl.innerHTML += '<br>再来一局！'; }, 1000);
+  }
+}
+function openTruthOrDare(target) {
+  const modal = document.getElementById('modalContent');
+  modal.innerHTML = `
+    <h2>${target === 'ai' ? '你赢了！指定他' : '他赢了！指定你'} <span class="close" onclick="closeModal()">×</span></h2>
+    <p style="font-size:14px; text-align:center; margin-bottom:20px;">
+      ${target === 'ai' ? '他必须完成你指定的任务' : '你必须完成他指定的任务'}
     </p>
-    <button class="btn" onclick="downloadSaveFile()">📥 下载 .json 文件</button>
-    <button class="btn ghost" onclick="copyExportToClipboard()" style="margin-top:8px;">📋 复制全部内容到剪贴板</button>
-    <div style="margin-top:12px;font-size:12px;color:var(--text-soft);">预览（前 8000 字）：</div>
-    <textarea readonly id="exportPreview" style="min-height:160px;font-size:11px;margin-top:6px;font-family:monospace;" onclick="this.select()">${preview.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</textarea>
-    <p style="font-size:11px;color:var(--text-soft);margin-top:6px;text-align:center;">长按文本框可全选</p>
-    <button class="btn ghost" onclick="closeSettings()">返回设置</button>
+    <button class="btn" onclick="doTruthOrDare('truth', '${target}')">💬 真心话</button>
+    <button class="btn ghost" onclick="doTruthOrDare('dare', '${target}')">🎯 大冒险</button>
   `;
   openModal();
 }
-async function downloadSaveFile(){
-  const str = window.__lastExportContent || '';
-  const filename = window.__lastExportFilename || `yunqi_save_${todayStr()}.json`;
-  if(!str){ alert('没有内容可下载'); return; }
-  const res = await saveFileToLocal(filename, str);
-  if(res){
-    alert('已保存到手机的「文档」文件夹，文件名：' + filename);
-    return;
+async function doTruthOrDare(type, target) {
+  closeModal();
+  if (!API.ready) return;
+  const sysPrompt = target === 'ai'
+    ? `【场景】你们在玩真心话大冒险，你输了，对方要求你进行【${type === 'truth' ? '真心话' : '大冒险'}】。请以你的身份，完成这个任务，1~2 句话。`
+    : `【场景】你们在玩真心话大冒险，你赢了，对方要求你进行【${type === 'truth' ? '真心话' : '大冒险'}】。请你以裁判的身份，给对方出一道${type === 'truth' ? '真心话问题' : '大冒险任务'}，1 句话。`;
+  const reply = await callAI([
+    {role:'system', content: buildSystemPrompt('') + '\n\n' + sysPrompt},
+    {role:'user', content:'【系统触发】'}
+  ]);
+  if (reply) {
+    let {clean, emo, label} = parseEmotion(reply);
+    say(clean, 'them');
   }
-  try{
-    const blob = new Blob([str], {type:'application/json'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(()=>URL.revokeObjectURL(url), 3000);
-    alert('已触发下载，请到手机「下载」文件夹查看。如果没看到，用「复制」按钮。');
-  }catch(e){ alert('下载失败：' + e.message + '，请用「复制」按钮。'); }
-}
-function copyExportToClipboard(){
-  const str = window.__lastExportContent || '';
-  if(!str){ alert('没有内容可复制'); return; }
-  try{
-    if(navigator.clipboard && navigator.clipboard.writeText){
-      navigator.clipboard.writeText(str).then(()=>{
-        alert('已复制到剪贴板，可以粘贴到备忘录或微信里保存。');
-      }).catch(()=>{ fallbackCopy(str); });
-    } else {
-      fallbackCopy(str);
-    }
-  }catch(e){ fallbackCopy(str); }
-}
-function fallbackCopy(str){
-  const ta = document.createElement('textarea');
-  ta.value = str;
-  ta.style.position = 'fixed';
-  ta.style.left = '-9999px';
-  document.body.appendChild(ta);
-  ta.select();
-  try{
-    const ok = document.execCommand('copy');
-    alert(ok ? '已复制到剪贴板。' : '复制失败，请长按上方文本框全选复制。');
-  }catch(e){ alert('复制失败，请长按上方文本框全选复制。'); }
-  document.body.removeChild(ta);
-}
-function importSave(e){
-  const file = e.target.files[0]; if(!file)return;
-  const reader = new FileReader();
-  reader.onload = async ev => {
-    try {
-      const data = JSON.parse(ev.target.result);
-      if(!data.global && !data.save) throw new Error('文件格式不正确');
-      if(!confirm('导入会覆盖当前存档，确定吗？')) return;
-      if(data.api){
-        API.baseUrl = data.api.baseUrl || ''; API.key = data.api.key || ''; API.model = data.api.model || '';
-        if(data.api.fallbackModels) GlobalState.fallbackModels = data.api.fallbackModels;
-        if(typeof data.api.useFallback==='boolean') GlobalState.useFallback = data.api.useFallback;
-        saveAPIConfig();
-      }
-      if(data.global){
-        GlobalState.mainColor = data.global.mainColor || '#ff8fab';
-        GlobalState.bgColor = data.global.bgColor || '#ffe0e8';
-        GlobalState.background = data.global.background || null;
-        GlobalState.userImage = data.global.userImage || null;
-        GlobalState.userShow = !!data.global.userShow;
-        GlobalState.userX = typeof data.global.userX === 'number' ? data.global.userX : 0.5;
-        GlobalState.userY = typeof data.global.userY === 'number' ? data.global.userY : 0.88;
-        GlobalState.userBubblePos = data.global.userBubblePos || 'center';
-        GlobalState.weather = data.global.weather || '晴';
-        GlobalState.weatherManualCity = data.global.weatherManualCity || '';
-        GlobalState.currentCharId = data.global.currentCharId || null;
-        GlobalState.characters = Array.isArray(data.global.characters) ? data.global.characters : [];
-      } else if(data.save){
-        const oldChar = data.save;
-        const c = newCharacterData(oldChar.id || ('c_'+Date.now()));
-        for(const k in oldChar){ if(k in c) c[k] = oldChar[k]; }
-        GlobalState.characters = [c]; GlobalState.currentCharId = c.id;
-      }
-      if(data.global && data.global.lastTick) lastTick = data.global.lastTick;
-      applySaveObject(buildSaveObject());
-      applyMainColor(GlobalState.mainColor);
-      saveGame();
-      try{ await idbSet('dream_save', buildSaveObject()); }catch(e){}
-      alert('导入成功，即将刷新页面。');
-      location.reload();
-    } catch(err) { alert('导入失败：' + err.message); }
-  };
-  reader.readAsText(file);
 }
 
-/* ============ 初始化 ============ */
-setInterval(saveGame, 30000);
-window.addEventListener('beforeunload', ()=>{ try{ saveGame(); }catch(e){} });
-window.addEventListener('resize',()=>{ positionCharacter(); positionUser(); positionPet(); repositionAllBubblesDebounced(); });
-function firstTimeSetup(){
-  const modal=document.getElementById('modalContent');
-  modal.innerHTML=`
-    <h2>欢迎来到云栖阁 <span class="close" onclick="closeModal()">×</span></h2>
-    <p style="font-size:13px;color:var(--text-soft);margin-bottom:16px;">先上传他的图片，再填一下 API 吧。</p>
-    <button class="btn" onclick="closeModal();openSettings()">开始设置</button>
-    <button class="btn ghost" onclick="closeModal()">先随便看看</button>
+/* ============ 记账模式 ============ */
+function openMoney() {
+  if(!Current) return;
+  const m = Current.money || { budget: 3000, logs: [] };
+  const totalSpent = m.logs.reduce((a,b) => a + (b.amount||0), 0);
+  const percent = Math.min(100, Math.round((totalSpent / m.budget) * 100)) || 0;
+  const modal = document.getElementById('modalContent');
+  modal.innerHTML = `
+    <h2>记账 <span class="close" onclick="closeModal()">×</span></h2>
+    <div class="field" style="background:var(--card); border-radius:12px; padding:12px; margin-bottom:12px;">
+      <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+        <span>本月额度：🪙 ${m.budget}</span>
+        <span>已花费：🪙 ${totalSpent}</span>
+      </div>
+      <div class="bar" style="height:8px; background:var(--accent); border-radius:4px; overflow:hidden;">
+        <i style="display:block; height:100%; width:${percent}%; background:${percent > 80 ? '#e08a8a' : 'var(--main)'}; border-radius:4px; transition:width .3s;"></i>
+      </div>
+      <div style="font-size:11px; color:var(--text-soft); margin-top:4px; text-align:right;">剩余：🪙 ${m.budget - totalSpent}（${percent}%）</div>
+    </div>
+    <div class="field"><label>设置本月额度</label><input type="number" id="moneyBudget" value="${m.budget}" min="0"></div>
+    <div class="field"><label>记一笔账</label>
+      <input id="moneyAmount" type="number" placeholder="金额" style="margin-bottom:6px;">
+      <input id="moneyDesc" placeholder="买了什么？" style="margin-bottom:6px;">
+      <button class="btn" onclick="addMoneyLog()">记录</button>
+    </div>
+    <hr style="margin:16px 0; border:none; border-top:1px solid #00000011;">
+    <label style="display:block; font-size:13px; color:var(--text-soft); margin-bottom:8px;">最近记录</label>
+    ${m.logs.slice(-10).reverse().map(l => `<div class="log-item"><div class="who">${l.date}</div><div class="txt">${l.desc} - 🪙 ${l.amount}</div></div>`).join('') || '<p style="color:var(--text-soft); font-size:13px;">暂无记录。</p>'}
   `;
   openModal();
 }
-async function boot(){
-  loadAPIConfig();
-  const hasSave = await loadGame();
-
-  // 补漏：如果上次离开时 App 被杀了，导致 isAway 没重置，这里检查一次
-  if(Current && Current.isAway && Current.awayUntil && Date.now() >= Current.awayUntil){
-    Current.isAway = false;
-    Current.awayUntil = null;
+function addMoneyLog() {
+  if(!Current) return;
+  const amount = parseFloat(document.getElementById('moneyAmount').value);
+  const desc = document.getElementById('moneyDesc').value.trim();
+  if (!amount || amount <= 0 || !desc) { say('请填写有效的金额和描述', 'tip'); return; }
+  if (!Current.money) Current.money = { budget: 3000, logs: [] };
+  Current.money.logs.push({ date: todayStr(), amount, desc });
+  const totalSpent = Current.money.logs.reduce((a,b) => a + (b.amount||0), 0);
+  if (totalSpent / Current.money.budget > 0.8) {
+    const sys = buildSystemPrompt('') + `\n【场景】对方这个月已经花了 ${totalSpent} 金币，预算只有 ${Current.money.budget}。请以你的身份，提醒他注意节制，1 句话。`;
+    callAI([{role:'system', content: sys}]).then(reply => {
+      if (reply) say(parseEmotion(reply).clean, 'them');
+    });
   }
-
-  if(!GlobalState.characters || !GlobalState.characters.length){
-    const c = newCharacterData('c_default');
-    GlobalState.characters = [c]; GlobalState.currentCharId = c.id;
-  }
-  if(!GlobalState.currentCharId || !GlobalState.characters.find(c=>c.id===GlobalState.currentCharId)){
-    GlobalState.currentCharId = GlobalState.characters[0].id;
-  }
-  Current = GlobalState.characters.find(c=>c.id===GlobalState.currentCharId);
-
-  // 再检查一次（Current 赋值后）
-  if(Current && Current.isAway && Current.awayUntil && Date.now() >= Current.awayUntil){
-    Current.isAway = false;
-    Current.awayUntil = null;
-  }
-
-  applyMainColor(GlobalState.mainColor || '#ff8fab');
-  pickRandomOutfit();
-  if(Current && Current.pet && Current.pet.has && !Current.pet.nextWalkAt){
-    scheduleNextPetWalk();
-  }
-  setTimeout(()=>{ requestNotifPermission(); }, 2000);
-  saveGame();
-  renderBackground(); renderCharacter(); renderUser(); renderPet();
-  renderWeather(); updateStats(); updateRelationUI(); renderQuick();
-  bindChat(); bindToolbar(); bindStage();
-  startIdleWalk(); startTrackLoop(); checkSleepState();
-  setTimeout(()=>{ positionCharacter(); positionUser(); positionPet(); repositionAllBubbles(); },100);
-  updateWeatherReal(true);
-  setInterval(()=>{ updateWeatherReal(true); checkMeal(); checkSleepState(); updateTrackBar(); }, 3600000);
-  // 从 60000 改成 10000（10 秒检查一次，角色出门回来更及时）
-  setInterval(()=>{ checkMeal(); checkSleepState(); updateTrackBar(); }, 10000);
-  if(!isNoticeSeen()) setTimeout(()=>{ openNotice(); }, 500);
-  setTimeout(()=>{ nudgeStudy(); }, 3000);
-  setTimeout(()=>{ checkFestival(); }, 4000);
-  setTimeout(()=>{ checkSelfDiary(); }, 6000);
-  if(!hasSave){
-    setTimeout(()=>{ if(API.ready)proactiveTalk('greet').catch(()=>{}); else say('先去设置里填 API 和上传图片吧。','tip'); },1200);
-    setTimeout(firstTimeSetup,2500);
-  }else{
-    setTimeout(()=>{ if(Current.sick)say(`${Current.name}还病着，需要照顾。`,'them'); else timeGreeting(); },1000);
-  }
+  saveGame(); openMoney();
 }
 
-document.addEventListener('visibilitychange', ()=>{
-  if(document.hidden){
-    GlobalState.lastBackgroundAt = Date.now();
-    setTimeout(()=>{ tryBackgroundAINotification(); }, 3000);
-  }else{
-    if(GlobalState.lastBackgroundAt && Date.now() - GlobalState.lastBackgroundAt > 60*1000){
-      updateTrackBar();
-      updateStats();
-    }
-  }
-});
-window.addEventListener('blur', ()=>{
-  GlobalState.lastBackgroundAt = Date.now();
-  setTimeout(()=>{ tryBackgroundAINotification(); }, 3000);
-});
-
-function startIdleWalk(){
-  setInterval(()=>{
-    const wrap=document.getElementById('charWrap');
-    if(!wrap||!Current)return;
-    if(wrap.classList.contains('dragging'))return;
-    if(!Current.image && !getCurrentOutfitImg())return;
-    if(Current.isAway || Current.focusMode)return;
-    if(Math.random()>0.5)return;
-    walkTo(0.2+Math.random()*0.6);
-  },12000);
-}
-boot();
+/* ============ 设置 / 其他辅助功能（接下半部分） ============ */
 </script>
 </body>
 </html>
