@@ -484,6 +484,7 @@ function newCharacterData(id){
     lastBackgroundNotifAt: 0,
     money: { budget: 3000, logs: [] },
     wordBook: { currentBook: null, learnedCount: 0 },
+    subjectAnswer: null,
   };
 }
 let Current = null;
@@ -512,6 +513,7 @@ function initSettingsDraft(){
     apiUrl:API.baseUrl||'', apiKey:API.key||'', apiModel:API.model||'',
     useFallback:!!GlobalState.useFallback, fallbackModels:(GlobalState.fallbackModels||[]).slice(),
     pomoGoalMin: (typeof c.pomoGoalMin === 'number') ? c.pomoGoalMin : 120,
+    moneyBudget: (c.money && typeof c.money.budget === 'number') ? c.money.budget : 3000,
   };
 }
 function collectSettingsDraft(){
@@ -539,6 +541,7 @@ function collectSettingsDraft(){
   if(g('userShowChk')) settingsDraft.userShow = g('userShowChk').checked;
   if(g('petNameInput')) settingsDraft.pet.name = g('petNameInput').value.trim() || '小家伙';
   if(g('pomoGoalInput')) settingsDraft.pomoGoalMin = Math.max(0, parseInt(g('pomoGoalInput').value)||0);
+  if(g('setMoneyBudget')) settingsDraft.moneyBudget = Math.max(0, parseInt(g('setMoneyBudget').value)||0);
 }
 
 /* ============ 图片压缩 ============ */
@@ -3109,7 +3112,642 @@ function addMoneyLog() {
   saveGame(); openMoney();
 }
 
-/* ============ 设置 / 其他辅助功能（接下半部分） ============ */
+/* ============ 设置 / 其他辅助功能 ============ */
+function openSettings(){
+  if(!Current) return;
+  if(!settingsDraft) initSettingsDraft();
+  isSettingsOpen = true;
+  const d = settingsDraft;
+  const modal=document.getElementById('modalContent');
+  const isKnown = KNOWN_MODELS.some(m=>m.id === d.apiModel);
+  const bubblePos = d.userBubblePos || 'center';
+  modal.innerHTML=`
+    <h2>设置 <span class="close" onclick="closeSettings()">×</span></h2>
+    <div class="field"><label>上传他的图片</label>
+      <input type="file" id="setUpload" accept="image/*" onchange="handleCharUpload(event)">
+      ${d.image?'<button class="btn ghost" onclick="removeCharImage()">删除角色图</button>':''}
+    </div>
+    <div class="field"><label>上传背景图</label>
+      <input type="file" id="setBg" accept="image/*" onchange="handleBgUpload(event)">
+      ${d.background_img?'<button class="btn ghost" onclick="removeBgImage()">删除背景图</button>':''}
+    </div>
+    <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
+    <div class="field"><label>他叫什么</label><input id="setName" value="${d.name}" oninput="settingsDraft.name=this.value"></div>
+    <div class="field"><label>他叫你什么</label><input id="setCall" value="${d.callYou}" oninput="settingsDraft.callYou=this.value"></div>
+    <div class="field"><label>角色 / 身份</label><input id="setRole" value="${d.role||''}" oninput="settingsDraft.role=this.value"></div>
+    <div class="field"><label>性格（人设最高优先级）</label><textarea id="setPersonality" oninput="settingsDraft.personality=this.value">${d.personality||''}</textarea></div>
+    <div class="field"><label>背景故事</label><textarea id="setBackground" oninput="settingsDraft.background=this.value">${d.background||''}</textarea></div>
+    <div class="field"><label>世界观</label><textarea id="setWorldview" oninput="settingsDraft.worldview=this.value">${d.worldview||''}</textarea></div>
+    <div class="field"><label>说话风格</label><input id="setStyle" value="${d.style||''}" oninput="settingsDraft.style=this.value"></div>
+    <div class="field"><label>生日（角色生日）</label><input id="setBirthday" type="date" value="${d.birthday||''}" oninput="settingsDraft.birthday=this.value"></div>
+    <div class="field"><label>语言</label>
+      <select id="setLanguage" onchange="settingsDraft.language=this.value">
+        ${['中文','English','日本語','한국어'].map(l=>`<option value="${l}" ${d.language===l?'selected':''}>${l}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field"><label>开场白</label><input id="setIntro" value="${d.intro||''}" oninput="settingsDraft.intro=this.value"></div>
+    <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
+    <div class="field"><label>关系</label>
+      <select id="setRelation" onchange="settingsDraft.relationType=this.value">
+        ${REL_TYPES.map(rt=>`<option value="${rt.key}" ${d.relationType===rt.key?'selected':''}>${rt.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field"><label>好感度</label><input type="number" id="setRelationValue" min="0" max="100" value="${Math.round(d.relationValue)}" oninput="settingsDraft.relationValue=parseInt(this.value)||0"></div>
+    <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
+    <div class="field"><label>你说的气泡显示位置</label>
+      <div class="pos-palette">
+        <div class="pos-swatch ${bubblePos==='left'?'active':''}" onclick="setBubblePos('left')">左</div>
+        <div class="pos-swatch ${bubblePos==='center'?'active':''}" onclick="setBubblePos('center')">中</div>
+        <div class="pos-swatch ${bubblePos==='right'?'active':''}" onclick="setBubblePos('right')">右</div>
+        <div class="pos-swatch ${bubblePos==='random'?'active':''}" onclick="setBubblePos('random')">随机</div>
+      </div>
+    </div>
+    <div class="field"><label>天气城市</label>
+      <input id="setWeatherCity" value="${d.weatherManualCity||''}" oninput="settingsDraft.weatherManualCity=this.value">
+      <button class="btn ghost" onclick="collectSettingsDraft();updateWeatherReal(true).then(()=>openSettings())">🔄 刷新天气</button>
+    </div>
+    <button class="btn ghost" onclick="collectSettingsDraft();openLorebook()">📖 世界书（${(d.lorebook||[]).length}）</button>
+    <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
+    <div class="field"><label>表情图</label>
+      <div>${(d.images||[]).map((im,i)=>`<div class="face-item"><img src="${im.img}"><input value="${im.label||''}" placeholder="备注" onchange="settingsDraft.images[${i}].label=this.value.trim()"><button onclick="collectSettingsDraft();removeFace(${i})">删除</button></div>`).join('')}</div>
+      <input type="file" id="faceUpload" accept="image/*" multiple onchange="handleFaceUpload(event)">
+    </div>
+    <div class="field"><label>服装</label>
+      <div>${(d.outfits||[]).map((o,i)=>`<div class="face-item"><img src="${o.img}"><input value="${o.label||''}" placeholder="备注" onchange="settingsDraft.outfits[${i}].label=this.value.trim()">${d.currentOutfitIndex === i ? '<span class="tag-preview">当前</span>' : ''}<button onclick="collectSettingsDraft();removeOutfit(${i})">删除</button></div>`).join('')}</div>
+      <input type="file" id="outfitUpload" accept="image/*" multiple onchange="handleOutfitUpload(event)">
+    </div>
+    <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
+    <div class="field"><label>我的形象</label>
+      <input type="file" id="userUpload" accept="image/*" onchange="handleUserUpload(event)">
+      <label style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+        <input type="checkbox" id="userShowChk" ${d.userShow?'checked':''} onchange="settingsDraft.userShow=this.checked">
+        <span>在舞台上显示我的形象</span>
+      </label>
+      ${d.userImage?'<button class="btn ghost" onclick="collectSettingsDraft();removeUserImage()">删除我的形象</button>':''}
+    </div>
+    <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
+    <div class="field"><label>API 地址</label><input id="setApiUrl" value="${d.apiUrl}" oninput="settingsDraft.apiUrl=this.value"></div>
+    <div class="field"><label>API Key</label><input id="setApiKey" value="${d.apiKey}" oninput="settingsDraft.apiKey=this.value"></div>
+    <div class="field"><label>模型</label>
+      <select id="setApiModelSelect" onchange="onModelChange()">
+        ${KNOWN_MODELS.map(m=>`<option value="${m.id}" ${d.apiModel===m.id?'selected':''}>${m.label}</option>`).join('')}
+        <option value="__custom__" ${!isKnown?'selected':''}>自定义</option>
+      </select>
+      <input id="setApiModelCustom" value="${d.apiModel}" placeholder="手填模型名" style="margin-top:6px;${isKnown?'display:none':''}" oninput="settingsDraft.apiModel=this.value">
+    </div>
+    <div class="field">
+      <label style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="useFallbackChk" ${d.useFallback?'checked':''} onchange="settingsDraft.useFallback=this.checked">
+        <span>主模型失败时，自动试备用模型</span>
+      </label>
+      <label style="margin-top:6px;">备用模型（逗号分隔）</label>
+      <input id="setFallback" value="${(d.fallbackModels||[]).join(',')}" oninput="settingsDraft.fallbackModels=this.value.split(',').map(s=>s.trim()).filter(Boolean)">
+    </div>
+    <button class="btn ghost" onclick="collectSettingsDraft();testConnection()">🔌 测试连接</button>
+    <div id="testBox"></div>
+    <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
+    <div class="field"><label>主题色</label>
+      <div class="main-palette">${MAIN_PALETTE.map(cl=>`<div class="main-swatch ${d.mainColor===cl?'active':''}" style="background:${cl}" onclick="pickMainColor('${cl}')"></div>`).join('')}</div>
+      <input type="color" value="${d.mainColor||'#ff8fab'}" onchange="pickMainColor(this.value)" style="width:100%;height:48px;cursor:pointer;border-radius:12px;">
+    </div>
+    <div class="field"><label>背景色</label>
+      <div class="bg-palette">${['#ffe0e8','#fff5cc','#d8ecff','#d8f0dc','#e8d8ff','#f0e0d0','#ffd8d8','#d8f0f0','#ffd8f0','#d8ffe0','#f0e8d8','#d8d8ff'].map(cl=>`<div class="bg-swatch ${d.bgColor===cl?'active':''}" style="background:${cl}" onclick="setBgColor('${cl}')"></div>`).join('')}</div>
+      <input type="color" value="${d.bgColor||'#ffe0e8'}" onchange="setBgColor(this.value)" style="width:100%;height:48px;cursor:pointer;border-radius:12px;">
+    </div>
+    <button class="btn" onclick="saveSettings()">保存设置</button>
+    <button class="btn ghost" onclick="collectSettingsDraft();openPetSetup()">宠物</button>
+    <button class="btn ghost" onclick="collectSettingsDraft();openNotice()">📢 查看公告</button>
+    <hr style="margin:16px 0;border:none;border-top:1px solid #00000011;">
+    <button class="btn ghost" onclick="exportSave()">📤 导出存档</button>
+    <input type="file" id="importFile" style="display:none" onchange="importSave(event)">
+    <button class="btn ghost" onclick="document.getElementById('importFile').click()">📥 导入存档</button>
+    <button class="btn ghost" onclick="resetAll()">重新开始（清空存档）</button>
+  `;
+  openModal();
+}
+function setBubblePos(pos){
+  collectSettingsDraft();
+  settingsDraft.userBubblePos = pos;
+  GlobalState.userBubblePos = pos;
+  openSettings();
+}
+function onModelChange(){
+  collectSettingsDraft();
+  const sel=document.getElementById('setApiModelSelect');
+  const input=document.getElementById('setApiModelCustom');
+  if(!sel||!input)return;
+  if(sel.value==='__custom__'){ input.style.display='block'; settingsDraft.apiModel = input.value.trim() || ''; }
+  else{ input.style.display='none'; input.value=sel.value; settingsDraft.apiModel = sel.value; }
+}
+function removeCharImage(){ collectSettingsDraft(); if(settingsDraft)settingsDraft.image=null; if(Current)Current.image=null; renderCharacter(); openSettings(); }
+function removeBgImage(){ collectSettingsDraft(); if(settingsDraft)settingsDraft.background_img=null; GlobalState.background=null; renderBackground(); openSettings(); }
+function removeUserImage(){ collectSettingsDraft(); if(settingsDraft){settingsDraft.userImage=null;settingsDraft.userShow=false;} GlobalState.userImage=null;GlobalState.userShow=false; renderUser(); openSettings(); }
+function removeFace(i){ collectSettingsDraft(); if(settingsDraft)settingsDraft.images.splice(i,1); if(Current)Current.images.splice(i,1); openSettings(); }
+function pickMainColor(hex){ collectSettingsDraft(); if(settingsDraft)settingsDraft.mainColor=hex; applyMainColor(hex); openSettings(); }
+function setBgColor(hex){ collectSettingsDraft(); if(settingsDraft)settingsDraft.bgColor=hex; applyBgColor(hex); openSettings(); }
+function saveSettings(){
+  if(!settingsDraft) return;
+  collectSettingsDraft();
+  const d = settingsDraft;
+  Current.name = d.name || '他'; Current.callYou = d.callYou || '你';
+  Current.role=d.role; Current.personality=d.personality; Current.background=d.background;
+  Current.worldview=d.worldview; Current.style=d.style; Current.language=d.language;
+  Current.intro=d.intro; Current.relationType=d.relationType;
+  Current.birthday = d.birthday || '';
+  Current.relationValue=Math.max(0,Math.min(100,parseInt(d.relationValue)||0));
+  Current.image = d.image; Current.images = d.images; Current.outfits = d.outfits;
+  Current.currentOutfitIndex = d.currentOutfitIndex;
+  Current.pet = d.pet; Current.lorebook = d.lorebook;
+  Current.pomoGoalMin = d.pomoGoalMin || 120;
+  Current.money.budget = d.moneyBudget || 3000;
+  GlobalState.background = d.background_img;
+  GlobalState.userImage = d.userImage; GlobalState.userShow = d.userShow;
+  GlobalState.userBubblePos = d.userBubblePos || 'center';
+  GlobalState.mainColor = d.mainColor; GlobalState.bgColor = d.bgColor;
+  const newCity = (d.weatherManualCity || '').trim();
+  if(newCity !== GlobalState.weatherManualCity){
+    GlobalState.weatherManualCity = newCity;
+    GlobalState.weatherLat = null; GlobalState.weatherLon = null; GlobalState.weatherUpdatedAt = 0;
+    updateWeatherReal(true);
+  }
+  API.baseUrl = d.apiUrl; API.key = d.apiKey; API.model = d.apiModel;
+  GlobalState.useFallback = d.useFallback; GlobalState.fallbackModels = d.fallbackModels;
+  saveAPIConfig();
+  saveGame();
+  applyMainColor(GlobalState.mainColor);
+  settingsDraft = null; isSettingsOpen = false; closeModal();
+  updateStats(); updateRelationUI();
+  renderBackground(); renderCharacter(); renderUser(); renderPet();
+  if(API.ready) say('设置已保存。','them'); else say('已保存。别忘了填 API 哦。','tip');
+}
+function closeSettings(){
+  collectSettingsDraft();
+  isSettingsOpen = false; settingsDraft = null; closeModal();
+  loadGame().then(()=>{
+    Current = GlobalState.characters.find(c=>c.id===GlobalState.currentCharId) || GlobalState.characters[0];
+    applyMainColor(GlobalState.mainColor);
+    renderBackground(); renderCharacter(); renderUser(); renderPet();
+    updateStats(); updateRelationUI();
+  });
+}
+function resetAll(){
+  if(!confirm('确定要清空存档、重新开始吗？'))return;
+  localStorage.removeItem('dream_save'); localStorage.removeItem('dream_api');
+  localStorage.removeItem('dream_notice_seen');
+  try{ indexedDB.deleteDatabase(DB_NAME); }catch(e){}
+  location.reload();
+}
+
+/* ============ 世界书 / 宠物设置 ============ */
+function openLorebook(){
+  if(!Current) return;
+  const modal=document.getElementById('modalContent');
+  const lb = (settingsDraft ? settingsDraft.lorebook : (Current.lorebook || []));
+  modal.innerHTML=`
+    <h2>世界书 <span class="close" onclick="collectSettingsDraft();openSettings()">×</span></h2>
+    <div>
+      ${lb.length===0?'<p style="color:var(--text-soft);font-size:13px;">还没有条目。</p>':
+        lb.map((e,i)=>`<div class="lore-item"><input placeholder="关键词" value="${e.key||''}" onchange="settingsDraft.lorebook[${i}].key=this.value"><input placeholder="内容" value="${e.text||''}" onchange="settingsDraft.lorebook[${i}].text=this.value"><div class="actions"><button class="del" onclick="deleteLore(${i})">删除</button></div></div>`).join('')}
+    </div>
+    <button class="btn ghost" onclick="addLore()">+ 添加条目</button>
+    <button class="btn" onclick="collectSettingsDraft();openSettings()">保存并返回</button>
+  `;
+  openModal();
+}
+function addLore(){ if(!settingsDraft) initSettingsDraft(); settingsDraft.lorebook.push({key:'',text:''}); openLorebook(); }
+function deleteLore(i){ if(!settingsDraft)return; settingsDraft.lorebook.splice(i,1); openLorebook(); }
+function openPetSetup(){
+  if(!Current) return;
+  if(!settingsDraft) initSettingsDraft();
+  const modal=document.getElementById('modalContent');
+  const p = settingsDraft.pet;
+  modal.innerHTML=`
+    <h2>宠物 <span class="close" onclick="collectSettingsDraft();openSettings()">×</span></h2>
+    ${p.has?`
+      <p style="font-size:13px;color:var(--text-soft);margin-bottom:12px;">当前宠物：${p.name}（${p.type}）</p>
+      <div class="field"><label>宠物名字</label><input id="petNameInput" value="${p.name||'小家伙'}" placeholder="给它取个名字"></div>
+      <div class="field"><label>上传宠物图片</label><input type="file" id="petUpload" accept="image/*" onchange="handlePetUpload(event)">${p.image?'<button class="btn ghost" onclick="collectSettingsDraft();removePetImage()">删除宠物图</button>':''}</div>
+      <button class="btn" onclick="collectSettingsDraft();settingsDraft.pet.name=(document.getElementById('petNameInput').value.trim()||'小家伙');if(Current)Current.pet.name=settingsDraft.pet.name;saveGame();openSettings();">保存名字</button>
+      <button class="btn ghost" onclick="collectSettingsDraft();removePet()">送走宠物</button>
+    `:`
+      <div class="field"><label>种类</label><select id="petType"><option value="cat">猫</option><option value="dog">狗</option><option value="rabbit">兔</option><option value="bird">鸟</option></select></div>
+      <div class="field"><label>名字</label><input id="petName" value="小家伙"></div>
+      <button class="btn" onclick="createPet()">领养</button>
+    `}
+  `;
+  openModal();
+}
+function createPet(){
+  if(!settingsDraft) initSettingsDraft();
+  const type=document.getElementById('petType').value;
+  const name=document.getElementById('petName').value.trim()||'小家伙';
+  settingsDraft.pet = { has:true, type, name, image:null, x:0.78, y:0.82, food:80, clean:80, mood:80, lastTick:Date.now(), flip:false, nextWalkAt:0 };
+  if(Current) Current.pet = deepCloneSafe(settingsDraft.pet);
+  renderPet(); openSettings();
+}
+function removePet(){
+  if(!settingsDraft) return;
+  settingsDraft.pet = { has:false, type:'cat', name:'小家伙', image:null, x:0.78, y:0.82, food:80, clean:80, mood:80, lastTick:Date.now(), flip:false, nextWalkAt:0 };
+  if(Current) Current.pet = deepCloneSafe(settingsDraft.pet);
+  renderPet(); openSettings();
+}
+function removePetImage(){
+  if(!settingsDraft) return;
+  settingsDraft.pet.image = null;
+  if(Current) Current.pet.image = null;
+  renderPet(); openSettings();
+}
+
+/* ============ 公告 ============ */
+function noticeHash(text){ let h = 0; for(let i=0;i<text.length;i++){ h = ((h<<5)-h+text.charCodeAt(i))|0; } return 'h'+h; }
+function isNoticeSeen(){
+  try{ const saved = JSON.parse(localStorage.getItem('dream_notice_seen')||'null'); if(!saved) return false; return saved.hash === noticeHash(NOTICE_TEXT); }catch(e){ return false; }
+}
+function markNoticeSeen(){
+  try{ localStorage.setItem('dream_notice_seen', JSON.stringify({ hash: noticeHash(NOTICE_TEXT), seenAt: Date.now() })); }catch(e){}
+}
+function openNotice(){
+  const modal=document.getElementById('modalContent');
+  let html = NOTICE_TEXT.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/(1473727478@qq\.com)/g, '<span class="notice-email">$1</span>');
+  modal.innerHTML=`<h2>📢 公告 <span class="close" onclick="closeNotice()">×</span></h2><div class="notice-body">${html}</div><button class="btn" onclick="closeNotice()">知道了</button>`;
+  openModal();
+}
+function closeNotice(){ markNoticeSeen(); closeModal(); }
+
+/* ============ 弹层 / 工具栏 ============ */
+function openModal(){ document.getElementById('modalMask').classList.add('show'); }
+function closeModal(){ document.getElementById('modalMask').classList.remove('show'); }
+document.getElementById('modalMask').addEventListener('click',e=>{
+  if(e.target.id==='modalMask'){ if(isSettingsOpen) closeSettings(); else closeModal(); }
+});
+function bindToolbar(){
+  document.querySelectorAll('.tool').forEach(t=>{
+    t.onclick=()=>{
+      const p=t.dataset.panel;
+      if(p==='gift')openGift();
+      else if(p==='touch')openTouch();
+      else if(p==='outfit')openOutfitPicker();
+      else if(p==='study')openStudyMenu();
+      else if(p==='game')openGameMenu();
+      else if(p==='shop')openShop();
+      else if(p==='money')openMoney();
+      else if(p==='diary')openDiary();
+      else if(p==='sleep')openSleep();
+      else if(p==='period')openPeriod();
+      else if(p==='anniv')openAnniv();
+      else if(p==='log')openLog();
+      else if(p==='settings')openSettings();
+    };
+  });
+}
+
+/* ============ 输入 ============ */
+function bindChat(){
+  const input=document.getElementById('chatInput');
+  const btn=document.getElementById('sendBtn');
+  const send=()=>{
+    const t=input.value.trim(); if(!t)return;
+    if(!API.ready){ needApiTip(); return; }
+    input.value=''; chat(t);
+  };
+  btn.onclick=send;
+  input.addEventListener('keydown',e=>{ if(e.key==='Enter')send(); });
+  document.getElementById('newTopicBtn').onclick = () => {
+    if (!API.ready) { needApiTip(); return; }
+    if (!Current) return;
+    const sys = buildSystemPrompt('') + '\n\n【场景】请主动开启一个全新的、有意思的话题，不要再提之前聊过的内容了。1~2 句话即可。\n【要求】直接以你的身份说 1~2 句话。不要复述【场景】，不要提到"设定""规则"，不要用括号写动作。';
+    callAI([
+      {role:'system',content: sys},
+      ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
+      {role:'user',content:'【系统触发】'},
+    ]).then(reply => {
+      if (reply) {
+        let {clean, emo, label} = parseEmotion(reply);
+        const bg = parseBgColor(clean); clean = bg.clean;
+        const km = parseKaomoji(clean); clean = km.clean;
+        if (bg.color) applyBgColor(bg.color);
+        say(clean, 'them', {kaomoji: km.kaomoji});
+        applyEmotion(emo, label);
+        Current.chatLog.push({role:'assistant', text:clean, time:Date.now()});
+        saveGameDebounced();
+      }
+    });
+  };
+}
+const QUICK_TOPICS=['今天过得怎么样？','我有点累','想你了','在做什么？','陪我聊聊天','今天发生了一件小事'];
+function renderQuick(){
+  document.getElementById('quick').innerHTML=QUICK_TOPICS.map(t=>`<button onclick="quickSend('${t}')">${t}</button>`).join('');
+}
+function quickSend(t){
+  if(!API.ready){ needApiTip(); return; }
+  document.getElementById('chatInput').value=t;
+  chat(t); document.getElementById('chatInput').value='';
+}
+
+/* ============ 存档 ============ */
+function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
+function buildSaveObject(){
+  return {
+    version: GlobalState.version,
+    mainColor: GlobalState.mainColor, bgColor: GlobalState.bgColor,
+    background: GlobalState.background, userImage: GlobalState.userImage,
+    userShow: GlobalState.userShow, userX: GlobalState.userX, userY: GlobalState.userY,
+    userBubblePos: GlobalState.userBubblePos,
+    weather: GlobalState.weather, weatherDate: GlobalState.weatherDate,
+    weatherCity: GlobalState.weatherCity, weatherLat: GlobalState.weatherLat, weatherLon: GlobalState.weatherLon,
+    weatherManualCity: GlobalState.weatherManualCity, weatherUpdatedAt: GlobalState.weatherUpdatedAt,
+    currentCharId: GlobalState.currentCharId, characters: deepClone(GlobalState.characters),
+    lastTick: lastTick,
+  };
+}
+function applySaveObject(d){
+  if(!d)return;
+  GlobalState.version = d.version || 18;
+  GlobalState.mainColor = d.mainColor || '#ff8fab';
+  GlobalState.bgColor = d.bgColor || '#ffe0e8';
+  GlobalState.background = d.background || null;
+  GlobalState.userImage = d.userImage || null;
+  GlobalState.userShow = !!d.userShow;
+  GlobalState.userX = typeof d.userX === 'number' ? d.userX : 0.5;
+  GlobalState.userY = typeof d.userY === 'number' ? d.userY : 0.88;
+  GlobalState.userBubblePos = d.userBubblePos || 'center';
+  GlobalState.weather = d.weather || '晴';
+  GlobalState.weatherDate = d.weatherDate || null;
+  GlobalState.weatherCity = d.weatherCity || '';
+  GlobalState.weatherLat = (typeof d.weatherLat === 'number') ? d.weatherLat : null;
+  GlobalState.weatherLon = (typeof d.weatherLon === 'number') ? d.weatherLon : null;
+  GlobalState.weatherManualCity = d.weatherManualCity || '';
+  GlobalState.weatherUpdatedAt = d.weatherUpdatedAt || 0;
+  GlobalState.characters = Array.isArray(d.characters) ? d.characters : [];
+  GlobalState.currentCharId = d.currentCharId || null;
+  if(d.lastTick) lastTick = d.lastTick;
+  GlobalState.characters = GlobalState.characters.map(raw=>{
+    const c = newCharacterData(raw.id || ('c_'+Math.random().toString(36).slice(2,8)));
+    for(const k in raw){ if(k in c) c[k] = raw[k]; }
+    if(!c.pet || typeof c.pet !== 'object') c.pet = { has:false, type:'cat', name:'小家伙', image:null, x:0.78, y:0.82, food:80, clean:80, mood:80, lastTick:Date.now(), flip:false, nextWalkAt:0 };
+    if(typeof c.pet.food !== 'number') c.pet.food = 80;
+    if(typeof c.pet.clean !== 'number') c.pet.clean = 80;
+    if(typeof c.pet.mood !== 'number') c.pet.mood = 80;
+    if(!c.pet.lastTick) c.pet.lastTick = Date.now();
+    if(typeof c.pet.flip !== 'boolean') c.pet.flip = false;
+    if(!c.pet.nextWalkAt) c.pet.nextWalkAt = 0;
+    if(!c.stats || typeof c.stats !== 'object') c.stats = { mood:80, food:80, energy:80 };
+    if(typeof c.stats.energy !== 'number') c.stats.energy = 80;
+    ['images','outfits','lorebook','track','anniversaries','customShopItems','recentTopics','pomoHistory','recentGames'].forEach(k=>{ if(!Array.isArray(c[k])) c[k] = []; });
+    if(!c.inventory || typeof c.inventory !== 'object') c.inventory = {};
+    if(!c.diary || typeof c.diary !== 'object') c.diary = { yours:[], his:[] };
+    if(!c.period || typeof c.period !== 'object') c.period = { lastStart:null, cycle:28, duration:5, manualOn:false };
+    if(!c.chatLog || !Array.isArray(c.chatLog)) c.chatLog = [];
+    if(typeof c.pomoGoalMin !== 'number') c.pomoGoalMin = 120;
+    if(typeof c.lastPomoNudge !== 'number') c.lastPomoNudge = 0;
+    if(typeof c.birthday !== 'string') c.birthday = '';
+    if(!c.lastSelfDiaryDate) c.lastSelfDiaryDate = null;
+    if(!c.lastFestivalDate) c.lastFestivalDate = null;
+    if(typeof c.lastBackgroundNotifAt !== 'number') c.lastBackgroundNotifAt = 0;
+    if(!c.money || typeof c.money !== 'object') c.money = { budget: 3000, logs: [] };
+    if(!c.wordBook || typeof c.wordBook !== 'object') c.wordBook = { currentBook: null, learnedCount: 0 };
+    if(!Array.isArray(c.money.logs)) c.money.logs = [];
+    return c;
+  });
+  if(!GlobalState.characters.length){
+    const c = newCharacterData('c_default');
+    GlobalState.characters = [c]; GlobalState.currentCharId = c.id;
+  }
+  if(!GlobalState.currentCharId || !GlobalState.characters.find(c=>c.id===GlobalState.currentCharId)){
+    GlobalState.currentCharId = GlobalState.characters[0].id;
+  }
+}
+function saveGame(){
+  try{
+    const data = buildSaveObject();
+    const str = JSON.stringify(data);
+    try{ localStorage.setItem('dream_save_bak', localStorage.getItem('dream_save')||''); localStorage.setItem('dream_save', str); }catch(e){}
+    idbSet('dream_save', data).catch(()=>{});
+  }catch(e){ console.warn('存档失败', e); }
+}
+let saveTimer = null;
+function saveGameDebounced(){
+  if(saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>{ saveGame(); }, 1200);
+}
+async function loadGame(){
+  try{
+    let d = null;
+    try{ d = await idbGet('dream_save'); }catch(e){}
+    if(!d){ const raw = localStorage.getItem('dream_save') || localStorage.getItem('dream_save_bak'); if(raw) d = JSON.parse(raw); }
+    if(!d) return false;
+    applySaveObject(d);
+    return true;
+  }catch(e){ console.warn('读档失败', e); return false; }
+}
+
+/* ============ 导出 / 导入 ============ */
+function exportSave(){
+  const payload = {
+    app: 'yunqi', version: GlobalState.version,
+    exportedAt: new Date().toISOString(),
+    api: {baseUrl:API.baseUrl, key:API.key, model:API.model, fallbackModels:GlobalState.fallbackModels, useFallback:GlobalState.useFallback},
+    global: {
+      mainColor: GlobalState.mainColor, bgColor: GlobalState.bgColor,
+      background: GlobalState.background, userImage: GlobalState.userImage,
+      userShow: GlobalState.userShow, userX: GlobalState.userX, userY: GlobalState.userY,
+      userBubblePos: GlobalState.userBubblePos,
+      weather: GlobalState.weather, weatherManualCity: GlobalState.weatherManualCity,
+      currentCharId: GlobalState.currentCharId, characters: GlobalState.characters,
+      lastTick: lastTick,
+    }
+  };
+  const str = JSON.stringify(payload, null, 2);
+  const filename = `yunqi_save_${todayStr()}.json`;
+  window.__lastExportFilename = filename;
+  window.__lastExportContent = str;
+  const modal = document.getElementById('modalContent');
+  const preview = str.length > 8000 ? str.slice(0, 8000) + '\n...(太长已截断，完整内容已保存，请用「复制」按钮)' : str;
+  modal.innerHTML=`
+    <h2>导出存档 <span class="close" onclick="closeSettings()">×</span></h2>
+    <p style="font-size:12px;color:var(--text-soft);margin-bottom:10px;">
+      点下面「下载 json 文件」，会保存到手机的「文档」文件夹。<br>
+      如果没反应，用「复制」按钮。
+    </p>
+    <button class="btn" onclick="downloadSaveFile()">📥 下载 .json 文件</button>
+    <button class="btn ghost" onclick="copyExportToClipboard()" style="margin-top:8px;">📋 复制全部内容到剪贴板</button>
+    <div style="margin-top:12px;font-size:12px;color:var(--text-soft);">预览（前 8000 字）：</div>
+    <textarea readonly id="exportPreview" style="min-height:160px;font-size:11px;margin-top:6px;font-family:monospace;" onclick="this.select()">${preview.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</textarea>
+    <p style="font-size:11px;color:var(--text-soft);margin-top:6px;text-align:center;">长按文本框可全选</p>
+    <button class="btn ghost" onclick="closeSettings()">返回设置</button>
+  `;
+  openModal();
+}
+async function downloadSaveFile(){
+  const str = window.__lastExportContent || '';
+  const filename = window.__lastExportFilename || `yunqi_save_${todayStr()}.json`;
+  if(!str){ alert('没有内容可下载'); return; }
+  const res = await saveFileToLocal(filename, str);
+  if(res){
+    alert('已保存到手机的「文档」文件夹（或下载文件夹），文件名：' + filename);
+    return;
+  }
+  try{
+    const blob = new Blob([str], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 3000);
+    alert('已触发下载，请到手机「下载」文件夹查看。如果没看到，用「复制」按钮。');
+  }catch(e){ alert('下载失败：' + e.message + '，请用「复制」按钮。'); }
+}
+function copyExportToClipboard(){
+  const str = window.__lastExportContent || '';
+  if(!str){ alert('没有内容可复制'); return; }
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(str).then(()=>{
+        alert('已复制到剪贴板，可以粘贴到备忘录或微信里保存。');
+      }).catch(()=>{ fallbackCopy(str); });
+    } else {
+      fallbackCopy(str);
+    }
+  }catch(e){ fallbackCopy(str); }
+}
+function fallbackCopy(str){
+  const ta = document.createElement('textarea');
+  ta.value = str;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  try{
+    const ok = document.execCommand('copy');
+    alert(ok ? '已复制到剪贴板。' : '复制失败，请长按上方文本框全选复制。');
+  }catch(e){ alert('复制失败，请长按上方文本框全选复制。'); }
+  document.body.removeChild(ta);
+}
+function importSave(e){
+  const file = e.target.files[0]; if(!file)return;
+  const reader = new FileReader();
+  reader.onload = async ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if(!data.global && !data.save) throw new Error('文件格式不正确');
+      if(!confirm('导入会覆盖当前存档，确定吗？')) return;
+      if(data.api){
+        API.baseUrl = data.api.baseUrl || ''; API.key = data.api.key || ''; API.model = data.api.model || '';
+        if(data.api.fallbackModels) GlobalState.fallbackModels = data.api.fallbackModels;
+        if(typeof data.api.useFallback==='boolean') GlobalState.useFallback = data.api.useFallback;
+        saveAPIConfig();
+      }
+      if(data.global){
+        GlobalState.mainColor = data.global.mainColor || '#ff8fab';
+        GlobalState.bgColor = data.global.bgColor || '#ffe0e8';
+        GlobalState.background = data.global.background || null;
+        GlobalState.userImage = data.global.userImage || null;
+        GlobalState.userShow = !!data.global.userShow;
+        GlobalState.userX = typeof data.global.userX === 'number' ? data.global.userX : 0.5;
+        GlobalState.userY = typeof data.global.userY === 'number' ? data.global.userY : 0.88;
+        GlobalState.userBubblePos = data.global.userBubblePos || 'center';
+        GlobalState.weather = data.global.weather || '晴';
+        GlobalState.weatherManualCity = data.global.weatherManualCity || '';
+        GlobalState.currentCharId = data.global.currentCharId || null;
+        GlobalState.characters = Array.isArray(data.global.characters) ? data.global.characters : [];
+      } else if(data.save){
+        const oldChar = data.save;
+        const c = newCharacterData(oldChar.id || ('c_'+Date.now()));
+        for(const k in oldChar){ if(k in c) c[k] = oldChar[k]; }
+        GlobalState.characters = [c]; GlobalState.currentCharId = c.id;
+      }
+      if(data.global && data.global.lastTick) lastTick = data.global.lastTick;
+      applySaveObject(buildSaveObject());
+      applyMainColor(GlobalState.mainColor);
+      saveGame();
+      try{ await idbSet('dream_save', buildSaveObject()); }catch(e){}
+      alert('导入成功，即将刷新页面。');
+      location.reload();
+    } catch(err) { alert('导入失败：' + err.message); }
+  };
+  reader.readAsText(file);
+}
+
+/* ============ 初始化 ============ */
+setInterval(saveGame, 30000);
+window.addEventListener('beforeunload', ()=>{ try{ saveGame(); }catch(e){} });
+window.addEventListener('resize',()=>{ positionCharacter(); positionUser(); positionPet(); repositionAllBubblesDebounced(); });
+function firstTimeSetup(){
+  const modal=document.getElementById('modalContent');
+  modal.innerHTML=`
+    <h2>欢迎来到云栖阁 <span class="close" onclick="closeModal()">×</span></h2>
+    <p style="font-size:13px;color:var(--text-soft);margin-bottom:16px;">先上传他的图片，再填一下 API 吧。</p>
+    <button class="btn" onclick="closeModal();openSettings()">开始设置</button>
+    <button class="btn ghost" onclick="closeModal()">先随便看看</button>
+  `;
+  openModal();
+}
+async function boot(){
+  loadAPIConfig();
+  const hasSave = await loadGame();
+  if(!GlobalState.characters || !GlobalState.characters.length){
+    const c = newCharacterData('c_default');
+    GlobalState.characters = [c]; GlobalState.currentCharId = c.id;
+  }
+  if(!GlobalState.currentCharId || !GlobalState.characters.find(c=>c.id===GlobalState.currentCharId)){
+    GlobalState.currentCharId = GlobalState.characters[0].id;
+  }
+  Current = GlobalState.characters.find(c=>c.id===GlobalState.currentCharId);
+  applyMainColor(GlobalState.mainColor || '#ff8fab');
+  pickRandomOutfit();
+  if(Current && Current.pet && Current.pet.has && !Current.pet.nextWalkAt){
+    scheduleNextPetWalk();
+  }
+  setTimeout(()=>{ requestNotifPermission(); }, 2000);
+  saveGame();
+  renderBackground(); renderCharacter(); renderUser(); renderPet();
+  renderWeather(); updateStats(); updateRelationUI(); renderQuick();
+  bindChat(); bindToolbar(); bindStage();
+  startIdleWalk(); startTrackLoop(); checkSleepState();
+  setTimeout(()=>{ positionCharacter(); positionUser(); positionPet(); repositionAllBubbles(); },100);
+  updateWeatherReal(true);
+  setInterval(()=>{ updateWeatherReal(true); checkMeal(); checkSleepState(); updateTrackBar(); }, 3600000);
+  setInterval(()=>{ checkMeal(); checkSleepState(); updateTrackBar(); }, 60000);
+  if(!isNoticeSeen()) setTimeout(()=>{ openNotice(); }, 500);
+  setTimeout(()=>{ nudgeStudy(); }, 3000);
+  setTimeout(()=>{ checkFestival(); }, 4000);
+  setTimeout(()=>{ checkSelfDiary(); }, 6000);
+  if(!hasSave){
+    setTimeout(()=>{ if(API.ready)proactiveTalk('greet').catch(()=>{}); else say('先去设置里填 API 和上传图片吧。','tip'); },1200);
+    setTimeout(firstTimeSetup,2500);
+  }else{
+    setTimeout(()=>{ if(Current.sick)say(`${Current.name}还病着，需要照顾。`,'them'); else timeGreeting(); },1000);
+  }
+}
+
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden){
+    GlobalState.lastBackgroundAt = Date.now();
+    setTimeout(()=>{ tryBackgroundAINotification(); }, 3000);
+  }else{
+    if(GlobalState.lastBackgroundAt && Date.now() - GlobalState.lastBackgroundAt > 60*1000){
+      updateTrackBar();
+      updateStats();
+    }
+  }
+});
+window.addEventListener('blur', ()=>{
+  GlobalState.lastBackgroundAt = Date.now();
+  setTimeout(()=>{ tryBackgroundAINotification(); }, 3000);
+});
+
+function startIdleWalk(){
+  setInterval(()=>{
+    const wrap=document.getElementById('charWrap');
+    if(!wrap||!Current)return;
+    if(wrap.classList.contains('dragging'))return;
+    if(!Current.image && !getCurrentOutfitImg())return;
+    if(Current.isAway || Current.focusMode)return;
+    if(Math.random()>0.5)return;
+    walkTo(0.2+Math.random()*0.6);
+  },12000);
+}
+boot();
 </script>
 </body>
 </html>
