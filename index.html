@@ -483,6 +483,7 @@ function newCharacterData(id){
     lastFestivalDate: null,
     lastBackgroundNotifAt: 0,
     money: { budget: 3000, logs: [] },
+    lastMoneyNudgeDate: null,
     wordBook: { currentBook: null, learnedCount: 0 },
     subjectAnswer: null,
   };
@@ -1191,9 +1192,13 @@ function repositionAllBubblesDebounced(){
 function say(text,who='them',opts={}){
   const box=document.getElementById('bubbles'), stage=document.getElementById('stage');
   if(!box||!stage)return;
+  
+  let cleanText = text.replace(/\[[^\]]+\]/g, '').trim();
+  if(!cleanText && !opts.kaomoji) return;
+
   const div=document.createElement('div');
   div.className='bubble '+who;
-  const body=document.createElement('div'); body.textContent=text; div.appendChild(body);
+  const body=document.createElement('div'); body.textContent=cleanText; div.appendChild(body);
   if(opts.kaomoji){ const k=document.createElement('div'); k.className='kaomoji'; k.textContent=opts.kaomoji; div.appendChild(k); }
   div.style.left = '-9999px'; div.style.top = '-9999px';
   box.appendChild(div);
@@ -2598,7 +2603,7 @@ function openStudyMenu(){
     <div class="game-item" onclick="closeModal();openTimer()"><div><div class="g-name">⏱️ 番茄钟</div><div class="g-desc">专注一段时间，让角色陪你学习</div></div><div class="g-arrow">›</div></div>
     <div class="game-item" onclick="closeModal();openWordBook()"><div><div class="g-name">📖 背单词</div><div class="g-desc">选课本，学单词，答对就换下一个</div></div><div class="g-arrow">›</div></div>
     <div class="game-item" onclick="closeModal();openEnglishReading()"><div><div class="g-name">📄 英语阅读</div><div class="g-desc">读一段短文，也算作专注时间</div></div><div class="g-arrow">›</div></div>
-    <div class="game-item" onclick="closeModal();openSubjectPractice()"><div><div class="g-name">✏️ 其他学科</div><div class="g-desc">数学、历史等练习</div></div><div class="g-arrow">›</div></div>
+    <div class="game-item" onclick="closeModal();openSubjectPractice()"><div><div class="g-name">✏️ 其他学科</div><div class="g-desc">高中及以上难度的数学/物理/历史等</div></div><div class="g-arrow">›</div></div>
   `;
   openModal();
 }
@@ -2715,12 +2720,14 @@ function openSubjectPractice() {
   const modal = document.getElementById('modalContent');
   modal.innerHTML = `
     <h2>其他学科 <span class="close" onclick="closeModal()">×</span></h2>
-    <div class="field"><label>选择科目</label>
+    <div class="field"><label>选择学科</label>
       <select id="subjectSelect">
-        <option value="数学">数学</option>
-        <option value="历史">历史</option>
-        <option value="地理">地理</option>
-        <option value="物理">物理</option>
+        <option value="数学">数学（高中数学及以上难度）</option>
+        <option value="物理">物理（高中物理及以上难度）</option>
+        <option value="化学">化学（高中化学及以上难度）</option>
+        <option value="历史">历史（高中历史及以上难度）</option>
+        <option value="地理">地理（高中地理及以上难度）</option>
+        <option value="生物">生物（高中生物及以上难度）</option>
       </select>
     </div>
     <button class="btn" onclick="startSubjectPractice()">开始练习</button>
@@ -2741,13 +2748,13 @@ async function startSubjectPractice() {
   `;
   try {
     const reply = await callAI([
-      {role:'system', content:'你是学科老师。请出一道单选题，只输出 JSON：{"q":"题目","a":"答案"}。'},
-      {role:'user', content:`请出一道${subject}的基础单选题。`}
-    ], {maxTokens:200, temperature:0.9});
-    let data = {q:'1+1=?', a:'2'};
+      {role:'system', content:'你是一个严厉的学科老师。只输出 JSON，不要别的文字。'},
+      {role:'user', content:`请出一道【${subject}】的题目。难度要求：必须是高中及以上难度，绝对不要出1+1这种小学生题目。如果是数学，请出函数、几何、导数等题目；如果是物理，请出力学、电磁学等题目。输出 JSON：{"q":"题目内容（可以包含选项 A、B、C、D）","a":"正确答案（尽量简短，比如 A 或 具体数值）"}。`}
+    ], {maxTokens:300, temperature:0.9});
+    let data = {q:'题目加载失败，请重试。', a:'未知'};
     try { data = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); } catch(e){}
     Current.subjectAnswer = data.a;
-    document.getElementById('subjectPrompt').textContent = data.q;
+    document.getElementById('subjectPrompt').innerHTML = data.q.replace(/\n/g, '<br>');
     document.getElementById('subjectInput').focus();
   } catch(e) {
     document.getElementById('subjectPrompt').textContent = '生成失败：' + e.message;
@@ -2757,12 +2764,14 @@ function checkSubjectAnswer() {
   const input = document.getElementById('subjectInput');
   const ans = input.value.trim();
   if (!ans || !Current.subjectAnswer) return;
-  if (ans === Current.subjectAnswer || Current.subjectAnswer.includes(ans)) {
+  const correct = Current.subjectAnswer.toLowerCase();
+  const userAns = ans.toLowerCase();
+  if (userAns === correct || correct.includes(userAns) || userAns.includes(correct) || userAns.substring(0,1) === correct.substring(0,1)) {
     say('答对了！', 'tip');
-    addRelationValue(1);
+    addRelationValue(2);
     closeModal();
   } else {
-    say('再想想？', 'tip');
+    say('再想想？这个题有点难度哦。', 'tip');
   }
 }
 
@@ -3051,9 +3060,17 @@ function openTruthOrDare(target) {
 async function doTruthOrDare(type, target) {
   closeModal();
   if (!API.ready) return;
+
+  let userCommand = '';
+  if (target === 'ai') {
+    userCommand = prompt(`你赢了！你想让他做什么？`, type === 'truth' ? '请问一个真心话问题' : '请完成一个大冒险任务');
+    if (!userCommand) return;
+  }
+
   const sysPrompt = target === 'ai'
-    ? `【场景】你们在玩真心话大冒险，你输了，对方要求你进行【${type === 'truth' ? '真心话' : '大冒险'}】。请以你的身份，完成这个任务，1~2 句话。`
-    : `【场景】你们在玩真心话大冒险，你赢了，对方要求你进行【${type === 'truth' ? '真心话' : '大冒险'}】。请你以裁判的身份，给对方出一道${type === 'truth' ? '真心话问题' : '大冒险任务'}，1 句话。`;
+    ? `【系统强制指令】你们在玩真心话大冒险，你输了。对方要求你进行【${type === 'truth' ? '真心话' : '大冒险'}】。对方的具体命令是：「${userCommand}」。你必须立刻乖乖照做，只给出你执行命令的反应和回答，绝对禁止说“好的”“来吧”这种废话，1~2句话。`
+    : `【系统强制指令】你们在玩真心话大冒险，你赢了。对方必须接受惩罚。请你立刻以裁判的身份，向对方提出一个【${type === 'truth' ? '真心话问题' : '大冒险任务'}】。只能提问，绝对不能写任何铺垫、夸奖或废话，直接抛出问题，1句话。`;
+
   const reply = await callAI([
     {role:'system', content: buildSystemPrompt('') + '\n\n' + sysPrompt},
     {role:'user', content:'【系统触发】'}
@@ -3067,7 +3084,9 @@ async function doTruthOrDare(type, target) {
 /* ============ 记账模式 ============ */
 function openMoney() {
   if(!Current) return;
-  const m = Current.money || { budget: 3000, logs: [] };
+  if(!Current.money) Current.money = { budget: 3000, logs: [] };
+  if(!Current.money.logs) Current.money.logs = [];
+  const m = Current.money;
   const totalSpent = m.logs.reduce((a,b) => a + (b.amount||0), 0);
   const percent = Math.min(100, Math.round((totalSpent / m.budget) * 100)) || 0;
   const modal = document.getElementById('modalContent');
@@ -3083,7 +3102,10 @@ function openMoney() {
       </div>
       <div style="font-size:11px; color:var(--text-soft); margin-top:4px; text-align:right;">剩余：🪙 ${m.budget - totalSpent}（${percent}%）</div>
     </div>
-    <div class="field"><label>设置本月额度</label><input type="number" id="moneyBudget" value="${m.budget}" min="0"></div>
+    <div class="field"><label>设置本月额度</label>
+      <input type="number" id="moneyBudget" value="${m.budget}" min="0">
+      <button class="btn ghost" onclick="saveMoneyBudget()">保存额度</button>
+    </div>
     <div class="field"><label>记一笔账</label>
       <input id="moneyAmount" type="number" placeholder="金额" style="margin-bottom:6px;">
       <input id="moneyDesc" placeholder="买了什么？" style="margin-bottom:6px;">
@@ -3095,21 +3117,38 @@ function openMoney() {
   `;
   openModal();
 }
+function saveMoneyBudget() {
+  if(!Current) return;
+  const b = parseFloat(document.getElementById('moneyBudget').value);
+  if (b < 0) { say('额度不能是负数哦', 'tip'); return; }
+  Current.money.budget = b;
+  saveGame();
+  openMoney();
+  say('本月额度已更新。', 'tip');
+}
 function addMoneyLog() {
   if(!Current) return;
   const amount = parseFloat(document.getElementById('moneyAmount').value);
   const desc = document.getElementById('moneyDesc').value.trim();
   if (!amount || amount <= 0 || !desc) { say('请填写有效的金额和描述', 'tip'); return; }
-  if (!Current.money) Current.money = { budget: 3000, logs: [] };
   Current.money.logs.push({ date: todayStr(), amount, desc });
+  saveGame();
+  
   const totalSpent = Current.money.logs.reduce((a,b) => a + (b.amount||0), 0);
-  if (totalSpent / Current.money.budget > 0.8) {
-    const sys = buildSystemPrompt('') + `\n【场景】对方这个月已经花了 ${totalSpent} 金币，预算只有 ${Current.money.budget}。请以你的身份，提醒他注意节制，1 句话。`;
+  const percent = totalSpent / Current.money.budget;
+  
+  if (percent > 0.8 && Current.lastMoneyNudgeDate !== todayStr()) {
+    Current.lastMoneyNudgeDate = todayStr();
+    const sys = buildSystemPrompt('') + `\n\n【场景】对方这个月已经花了 ${totalSpent} 金币，预算只有 ${Current.money.budget}（已花 ${Math.round(percent*100)}%）。请以你的身份，提醒他注意节制，语气可以稍微心疼或者无奈一点，1 句话。`;
     callAI([{role:'system', content: sys}]).then(reply => {
-      if (reply) say(parseEmotion(reply).clean, 'them');
+      if (reply) {
+        let {clean} = parseEmotion(reply);
+        say(clean, 'them');
+      }
     });
   }
-  saveGame(); openMoney();
+  
+  openMoney();
 }
 
 /* ============ 设置 / 其他辅助功能 ============ */
@@ -3505,8 +3544,9 @@ function applySaveObject(d){
     if(!c.lastFestivalDate) c.lastFestivalDate = null;
     if(typeof c.lastBackgroundNotifAt !== 'number') c.lastBackgroundNotifAt = 0;
     if(!c.money || typeof c.money !== 'object') c.money = { budget: 3000, logs: [] };
-    if(!c.wordBook || typeof c.wordBook !== 'object') c.wordBook = { currentBook: null, learnedCount: 0 };
     if(!Array.isArray(c.money.logs)) c.money.logs = [];
+    if(typeof c.lastMoneyNudgeDate === 'undefined') c.lastMoneyNudgeDate = null;
+    if(!c.wordBook || typeof c.wordBook !== 'object') c.wordBook = { currentBook: null, learnedCount: 0 };
     return c;
   });
   if(!GlobalState.characters.length){
