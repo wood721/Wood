@@ -2625,7 +2625,7 @@ function openWordBook(){
         <option value="CET4">四级核心词汇</option>
         <option value="CET6">六级核心词汇</option>
         <option value="IELTS">雅思核心词汇</option>
-        <option value="Daily">日常口语词汇</option>
+        <option value="High School 3500">高中英语3500词</option>
       </select>
     </div>
     <div class="field"><label>模式选择</label>
@@ -2665,7 +2665,7 @@ async function nextWord() {
   try {
     const reply = await callAI([
       {role:'system', content:'你是英语单词老师。只输出 JSON，不要别的文字。'},
-      {role:'user', content:`请从「${wordGameState.book}」词库中随机选一个英语单词，给出它的中文释义。输出 JSON：{"en":"单词","zh":"中文意思"}。不要重复出题。`}
+      {role:'user', content:`请从「${wordGameState.book}」词库中随机选一个英语单词（务必不要选“apple”这种过于常见的，要符合这个词汇等级），给出它的中文释义。输出 JSON：{"en":"单词","zh":"中文意思"}。`}
     ], {maxTokens:100, temperature:0.7});
     
     let wordData = {en: 'apple', zh: '苹果'};
@@ -3259,11 +3259,32 @@ async function doTruthOrDare(type, target) {
   if (target === 'ai') {
     userCommand = prompt(`你赢了！你想让他做什么？`, type === 'truth' ? '请问一个真心话问题' : '请完成一个大冒险任务');
     if (!userCommand) return;
+  } else {
+    const question = await callAI([
+      {role:'system', content: buildSystemPrompt('') + `\n【系统强制指令】你们在玩真心话大冒险，你赢了。对方必须接受惩罚。请你立刻以裁判的身份，向对方提出一个【${type === 'truth' ? '真心话问题' : '大冒险任务'}】。只能提问，绝对不能写铺垫、夸奖或废话，直接抛出问题，1句话。`},
+      {role:'user', content:'【系统触发】'}
+    ]);
+    if (question) {
+      say(parseEmotion(question).clean, 'them');
+      setTimeout(() => {
+        const answer = prompt('请回答他的问题：');
+        if (answer) {
+          say(`（你回答：${answer}）`, 'you');
+          callAI([
+            {role:'system', content: buildSystemPrompt('') + `\n【场景】你们在玩真心话大冒险，你刚刚问了对方问题，对方回答：「${answer}」。请以你的身份，对对方的回答做出简单的回应，1句话。不要提到"设定""规则"，不要用括号写动作。`},
+            {role:'user', content:'【系统触发】'}
+          ]).then(reply => {
+            if (reply) say(parseEmotion(reply).clean, 'them');
+          });
+        }
+      }, 800);
+    }
+    return;
   }
 
-  const sysPrompt = target === 'ai'
-    ? `【系统强制指令】你们在玩真心话大冒险，你输了。对方要求你进行【${type === 'truth' ? '真心话' : '大冒险'}】。对方的具体命令是：「${userCommand}」。你必须立刻乖乖照做，只给出你执行命令的反应和回答，绝对禁止说“好的”“来吧”这种废话，1~2句话。`
-    : `【系统强制指令】你们在玩真心话大冒险，你赢了。对方必须接受惩罚。请你立刻以裁判的身份，向对方提出一个【${type === 'truth' ? '真心话问题' : '大冒险任务'}】。只能提问，绝对不能写任何铺垫、夸奖或废话，直接抛出问题，1句话。`;
+  const sysPrompt = `【系统强制指令】你们在玩真心话大冒险，你输了。对方要求你进行【${type === 'truth' ? '真心话' : '大冒险'}】。对方的具体命令是：「${userCommand}」。
+你必须立刻乖乖照做，只给出你执行命令的反应和回答，绝对禁止说“好的”“来吧”这种废话，1~2句话。
+如果是“大冒险”，且命令涉及外出、买东西、工作等动作，你必须同意并表现出准备出门或已经出门的样子。`;
 
   const reply = await callAI([
     {role:'system', content: buildSystemPrompt('') + '\n\n' + sysPrompt},
@@ -3272,6 +3293,21 @@ async function doTruthOrDare(type, target) {
   if (reply) {
     let {clean, emo, label} = parseEmotion(reply);
     say(clean, 'them');
+  }
+
+  if (type === 'dare' && target === 'ai') {
+    const lowerCmd = userCommand.toLowerCase();
+    if (lowerCmd.includes('打工') || lowerCmd.includes('上班') || lowerCmd.includes('出门') || lowerCmd.includes('买')) {
+      if (!Current.isAway && !Current.sick && Current.stats.energy >= 30) {
+        Current.isAway = true;
+        Current.stats.energy -= 15;
+        Current.awayUntil = Date.now() + (5 + Math.floor(Math.random()*6)) * 60000;
+        logTrack('外面', '大冒险');
+        updateTrackBar();
+        say('（他答应了大冒险，出门去了。）', 'action');
+        saveGameDebounced();
+      }
+    }
   }
 }
 
