@@ -2665,8 +2665,8 @@ async function nextWord() {
   try {
     const reply = await callAI([
       {role:'system', content:'你是英语单词老师。只输出 JSON，不要别的文字。'},
-      {role:'user', content:`请从「${wordGameState.book}」词库中随机选一个英语单词（务必不要选“apple”这种过于常见的，要符合这个词汇等级），给出它的中文释义。输出 JSON：{"en":"单词","zh":"中文意思"}。`}
-    ], {maxTokens:100, temperature:0.7});
+      {role:'user', content:`请从「${wordGameState.book}」词库中随机选一个英语单词，给出它的中文释义。禁止出“apple”、“cat”这类常见词汇，必须符合该词库的难度。只输出 JSON 格式，不要有任何多余的 Markdown 符号或换行：{"en":"单词","zh":"中文意思"}。`}
+    ], {maxTokens: 400, temperature: 1.2});
     
     let wordData = {en: 'apple', zh: '苹果'};
     try { wordData = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); } catch(e){}
@@ -2899,7 +2899,7 @@ async function startSubjectPractice() {
     const reply = await callAI([
       {role:'system', content:'你是一个严厉的学科老师。你只能输出纯 JSON 格式，绝对不能包含任何其他文字、标点、Markdown 代码块。'},
       {role:'user', content:`请出一道【${subject}】的题目。难度要求：必须是高中及以上难度（数学包含函数、几何、导数；物理包含力学、电磁学）。只输出 JSON 格式：{"q":"题目内容（可以包含选项 A、B、C、D，用\\n换行）","a":"正确答案（比如 A 或 具体数值）"}。`}
-    ], {maxTokens:300, temperature:0.7});
+    ], {maxTokens: 400, temperature: 1.2});
     
     let data = {q:'题目加载失败，请重试。', a:'未知'};
     try { 
@@ -3297,15 +3297,30 @@ async function doTruthOrDare(type, target) {
 
   if (type === 'dare' && target === 'ai') {
     const lowerCmd = userCommand.toLowerCase();
-    if (lowerCmd.includes('打工') || lowerCmd.includes('上班') || lowerCmd.includes('出门') || lowerCmd.includes('买')) {
-      if (!Current.isAway && !Current.sick && Current.stats.energy >= 30) {
+    if (lowerCmd.includes('打工') || lowerCmd.includes('上班') || lowerCmd.includes('出门') || lowerCmd.includes('买') || lowerCmd.includes('赚钱')) {
+      if (!Current.isAway && !Current.sick && Current.stats.energy >= 20) {
         Current.isAway = true;
         Current.stats.energy -= 15;
         Current.awayUntil = Date.now() + (5 + Math.floor(Math.random()*6)) * 60000;
-        logTrack('外面', '大冒险');
+        logTrack('外面', '大冒险·打工');
         updateTrackBar();
         say('（他答应了大冒险，出门去了。）', 'action');
-        saveGameDebounced();
+        saveGame();
+        
+        setTimeout(() => {
+          if (!Current) return;
+          Current.isAway = false;
+          Current.awayUntil = null;
+          updateTrackBar();
+          const earn = Math.floor(30 + Math.random()*50);
+          Current.coin += earn;
+          say(`“大冒险结束，赚了 ${earn} 金币回来啦。”`, 'them');
+          showInAppNotif(`赚了 ${earn} 金币`);
+          walkTo(0.5);
+          updateStats(); saveGame();
+        }, 5000);
+      } else {
+        say('（他现在不太方便出门，下次再让他去吧。）', 'tip');
       }
     }
   }
