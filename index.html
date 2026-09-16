@@ -813,6 +813,52 @@ function saveRelationSetting(){
   saveGame(); updateRelationUI(); closeModal();
 }
 
+/* ============ 角色切换（🌟 新增） ============ */
+function openCharSwitch(){
+  if(!Current) return;
+  const modal=document.getElementById('modalContent');
+  modal.innerHTML=`
+    <h2>角色列表 <span class="close" onclick="closeModal()">×</span></h2>
+    ${GlobalState.characters.map(c=>`
+      <div class="char-list-item ${c.id===GlobalState.currentCharId?'active':''}" onclick="switchChar('${c.id}')">
+        ${c.image?`<img src="${c.image}">`:'<div class="avatar-placeholder">👤</div>'}
+        <div class="info"><div class="n">${c.name||'他'}</div><div class="d">${getRelationName(c.relationType)}</div></div>
+        ${GlobalState.characters.length>1?`<button class="del-btn" onclick="event.stopPropagation();deleteChar('${c.id}')">删除</button>`:''}
+      </div>
+    `).join('')}
+    <button class="btn" onclick="createNewChar()">+ 新建角色</button>
+  `;
+  openModal();
+}
+function switchChar(id){
+  const c = GlobalState.characters.find(x=>x.id===id);
+  if(!c) return;
+  GlobalState.currentCharId = id;
+  Current = c;
+  saveGame(); closeModal();
+  applyMainColor(GlobalState.mainColor);
+  updateStats(); updateRelationUI();
+  renderBackground(); renderCharacter(); renderUser(); renderPet();
+  updateTrackBar();
+}
+function createNewChar(){
+  const c = newCharacterData('c_'+Date.now()+'_'+Math.random().toString(36).slice(2,6));
+  GlobalState.characters.push(c);
+  GlobalState.currentCharId = c.id;
+  Current = c;
+  saveGame(); closeModal(); openSettings();
+}
+function deleteChar(id){
+  if(GlobalState.characters.length <= 1){ say('至少要保留一个角色。','tip'); return; }
+  if(!confirm('确定删除这个角色吗？')) return;
+  GlobalState.characters = GlobalState.characters.filter(c=>c.id!==id);
+  if(GlobalState.currentCharId === id){
+    GlobalState.currentCharId = GlobalState.characters[0].id;
+    Current = GlobalState.characters[0];
+  }
+  saveGame(); openCharSwitch(); updateStats(); updateRelationUI(); renderCharacter();
+}
+
 /* ============ 生理期 / 作息 ============ */
 function isPeriodNow(){
   if(!Current) return false;
@@ -851,10 +897,15 @@ function renderWeatherFx(){
   }
 }
 function isNightTime(){ const h=new Date().getHours(); return (h>=23 || h<6); }
+// 🌟 修复：刷新页面后也把 DOM 状态同步到角色状态
 function checkSleepState(){
   if(!Current) return;
-  const was=Current.isSleeping, now=isNightTime();
   const a=document.getElementById('charAnim'), w=document.getElementById('charWrap');
+  // 先强制同步 DOM
+  if(Current.isSleeping){ if(a)a.classList.add('sleeping'); if(w)w.classList.add('sleeping'); }
+  else { if(a)a.classList.remove('sleeping'); if(w)w.classList.remove('sleeping'); }
+
+  const was=Current.isSleeping, now=isNightTime();
   if(now && !was){ Current.isSleeping=true; if(a)a.classList.add('sleeping'); if(w)w.classList.add('sleeping'); }
   else if(!now && was){ Current.isSleeping=false; if(a)a.classList.remove('sleeping'); if(w)w.classList.remove('sleeping'); }
 }
@@ -1093,7 +1144,8 @@ function buildSystemPrompt(userInput){
 function buildMessages(userInput){
   if(!Current) return [];
   const msgs=[{role:'system',content:buildSystemPrompt(userInput)}];
-  Current.chatLog.slice(-3).forEach(m=>msgs.push({role:m.role,content:m.text}));
+  // 🌟 记忆加长：3 条 → 10 条
+  Current.chatLog.slice(-10).forEach(m=>msgs.push({role:m.role,content:m.text}));
   msgs.push({role:'user',content:userInput});
   return msgs;
 }
@@ -1197,6 +1249,19 @@ function repositionAllBubbles(){
     const top = Math.max(4, userTopY - 8 - fromBottom * BUBBLE_LINE_HEIGHT - h);
     el.style.left = left + 'px'; el.style.top = top + 'px';
   });
+
+  // 🌟 新增：tip / err 类气泡也要定位，否则永远卡在 -9999px 看不见
+  const sysBubbles = Array.from(box.children).filter(c =>
+    c.classList.contains('tip') || c.classList.contains('err')
+  );
+  sysBubbles.forEach((el, i)=>{
+    const w = el.offsetWidth || 220, h = el.offsetHeight || 40;
+    const left = Math.max(4, (stageRect.width - w) / 2);
+    const fromBottom = (sysBubbles.length - 1 - i);
+    const top = Math.max(4, stageRect.height - 20 - fromBottom * BUBBLE_LINE_HEIGHT - h);
+    el.style.left = left + 'px';
+    el.style.top  = top + 'px';
+  });
 }
 let bubbleTimer = null;
 function repositionAllBubblesDebounced(){
@@ -1207,8 +1272,11 @@ function say(text,who='them',opts={}){
   if (text === null || text === undefined) return;
   const box=document.getElementById('bubbles'), stage=document.getElementById('stage');
   if(!box||!stage)return;
-  
-  let cleanText = String(text).replace(/\[[^\]]+\]/g, '').trim();
+
+  // 🌟 你说的话原样保留（不剥方括号）；AI 的话才剥掉情绪/背景等标签
+  let cleanText = (who === 'you')
+    ? String(text).trim()
+    : String(text).replace(/\[[^\]]+\]/g, '').trim();
   if(!cleanText && !opts.kaomoji) return;
 
   const div=document.createElement('div');
@@ -1463,7 +1531,6 @@ function bindCharTouch(wrap){
   function onDown(e){
     if(e.target.closest('#charPlaceholder'))return;
     if(Current && (Current.isAway || Current.focusMode))return;
-    // 🌟 核心修复：不要直接 e.preventDefault()，否则浏览器无法触发 pointermove
     e.stopPropagation();
     charPressed = true;
     const rect = wrap.getBoundingClientRect();
@@ -1488,7 +1555,7 @@ function bindCharTouch(wrap){
   }
   function onMove(e){
     if(!dragging)return;
-    e.preventDefault(); // 🌟 拖拽过程中才阻止滚动
+    e.preventDefault();
     const stage=document.getElementById('stage'), rect=stage.getBoundingClientRect();
     const dx=(e.clientX-startX)/rect.width, dy=(e.clientY-startY)/rect.height;
     if(Math.abs(dx)>0.01||Math.abs(dy)>0.01)moved=true;
@@ -1556,9 +1623,11 @@ async function triggerTouchAction(action){
       {role:'user',content:'【系统触发】'},
     ]);
     if(reply && typeof reply === 'string'){
-      let{clean,emo,label}=parseEmotion(reply);
-      const bg=parseBgColor(clean); clean=bg.clean;
-      const km=parseKaomoji(clean); clean=km.clean;
+      // 🌟 顺序：背景色 → 颜文字 → 情绪
+      let str = reply;
+      const bg = parseBgColor(str);   str = bg.clean;
+      const km = parseKaomoji(str);   str = km.clean;
+      const {clean, emo, label} = parseEmotion(str);
       if(bg.color)applyBgColor(bg.color);
       say(clean,'them',{kaomoji:km.kaomoji});
       applyEmotion(emo,label);
@@ -1713,9 +1782,11 @@ async function petAIReply(scene){
       {role:'user',content:'【系统触发】'},
     ]);
     if(reply && typeof reply === 'string'){
-      let{clean,emo,label}=parseEmotion(reply);
-      const bg=parseBgColor(clean); clean=bg.clean;
-      const km=parseKaomoji(clean); clean=km.clean;
+      // 🌟 顺序：背景色 → 颜文字 → 情绪
+      let str = reply;
+      const bg = parseBgColor(str);   str = bg.clean;
+      const km = parseKaomoji(str);   str = km.clean;
+      const {clean, emo, label} = parseEmotion(str);
       if(bg.color)applyBgColor(bg.color);
       say(clean,'them',{kaomoji:km.kaomoji});
       applyEmotion(emo,label);
@@ -1826,9 +1897,11 @@ function checkReturnHome(){
           {role:'user',content:'【系统触发】'},
         ]).then(reply=>{
           if(reply && typeof reply === 'string'){
-            let{clean,emo,label}=parseEmotion(reply);
-            const bg=parseBgColor(clean); clean=bg.clean;
-            const km=parseKaomoji(clean); clean=km.clean;
+            // 🌟 顺序：背景色 → 颜文字 → 情绪
+            let str = reply;
+            const bg = parseBgColor(str);   str = bg.clean;
+            const km = parseKaomoji(str);   str = km.clean;
+            const {clean, emo, label} = parseEmotion(str);
             if(bg.color)applyBgColor(bg.color);
             say(clean,'them',{kaomoji:km.kaomoji});
             applyEmotion(emo,label);
@@ -1875,9 +1948,11 @@ function nudgeStudy(){
     {role:'user',content:'【系统触发】'},
   ]).then(reply=>{
     if(reply && typeof reply === 'string'){
-      let{clean,emo,label}=parseEmotion(reply);
-      const bg=parseBgColor(clean); clean=bg.clean;
-      const km=parseKaomoji(clean); clean=km.clean;
+      // 🌟 顺序：背景色 → 颜文字 → 情绪
+      let str = reply;
+      const bg = parseBgColor(str);   str = bg.clean;
+      const km = parseKaomoji(str);   str = km.clean;
+      const {clean, emo, label} = parseEmotion(str);
       if(bg.color)applyBgColor(bg.color);
       say(clean,'them',{kaomoji:km.kaomoji});
       applyEmotion(emo,label);
@@ -1920,9 +1995,11 @@ function checkFestival(){
       {role:'user',content:'【系统触发】'},
     ]).then(reply=>{
       if(reply && typeof reply === 'string'){
-        let{clean,emo,label}=parseEmotion(reply);
-        const bg=parseBgColor(clean); clean=bg.clean;
-        const km=parseKaomoji(clean); clean=km.clean;
+        // 🌟 顺序：背景色 → 颜文字 → 情绪
+        let str = reply;
+        const bg = parseBgColor(str);   str = bg.clean;
+        const km = parseKaomoji(str);   str = km.clean;
+        const {clean, emo, label} = parseEmotion(str);
         if(bg.color)applyBgColor(bg.color);
         say(clean,'them',{kaomoji:km.kaomoji});
         applyEmotion(emo,label);
@@ -2142,22 +2219,26 @@ function openGift(){
 function needApiTip(){ say('先去「设置」里填 API，我才能说话。', 'tip'); }
 async function chat(userText){
   if(!Current) return;
+
+  // 🌟 先把你说的话显示出来，再做其它判断（避免"发出去没反应"的错觉）
+  say(userText,'you');
+
   if(Current.isAway){ say('他现在在外面，等他回来吧。','tip'); return; }
   if(Current.focusMode){ say('专注中，先专心。','tip'); return; }
   if(!API.ready){ needApiTip(); return; }
-  say(userText,'you');
+
   Current.chatLog.push({role:'user',text:userText,time:Date.now()});
   try {
     const reply=await callAI(buildMessages(userText));
-    // 🌟 核心修复：安全地判断 reply 是否为空
     if (reply === null || reply === undefined || String(reply).trim() === '') {
       say('（他好像走神了，没说出话来，你再说一次？）','tip');
       return;
     }
-    let replyStr = String(reply);
-    let{clean,emo,label}=parseEmotion(replyStr);
-    const bg=parseBgColor(clean); clean=bg.clean;
-    const km=parseKaomoji(clean); clean=km.clean;
+    // 🌟 顺序：背景色 → 颜文字 → 情绪
+    let str = String(reply);
+    const bg = parseBgColor(str);   str = bg.clean;
+    const km = parseKaomoji(str);   str = km.clean;
+    const {clean, emo, label} = parseEmotion(str);
     if(bg.color)applyBgColor(bg.color);
     say(clean,'them',{kaomoji:km.kaomoji});
     applyEmotion(emo,label);
@@ -2167,7 +2248,6 @@ async function chat(userText){
     Current.lastInteract=Date.now();
     Current.lastChatDate=todayStr();
   } catch(e) {
-    // 网络报错也要把话说出来，不要让用户觉得按了没反应
     say(`（网络卡住了：${e.message}）`, 'err');
   }
 }
@@ -2194,9 +2274,11 @@ async function proactiveTalk(type='idle'){
       {role:'user',content:'【系统触发】'},
     ]);
     if(reply && typeof reply === 'string'){
-      let{clean,emo,label}=parseEmotion(reply);
-      const bg=parseBgColor(clean); clean=bg.clean;
-      const km=parseKaomoji(clean); clean=km.clean;
+      // 🌟 顺序：背景色 → 颜文字 → 情绪
+      let str = reply;
+      const bg = parseBgColor(str);   str = bg.clean;
+      const km = parseKaomoji(str);   str = km.clean;
+      const {clean, emo, label} = parseEmotion(str);
       if(bg.color)applyBgColor(bg.color);
       say(clean,'them',{kaomoji:km.kaomoji});
       applyEmotion(emo,label);
@@ -2270,9 +2352,11 @@ async function doTouch(type){
       {role:'user',content:'【系统触发】'},
     ]);
     if(reply && typeof reply === 'string'){
-      let{clean,emo,label}=parseEmotion(reply);
-      const bg=parseBgColor(clean); clean=bg.clean;
-      const km=parseKaomoji(clean); clean=km.clean;
+      // 🌟 顺序：背景色 → 颜文字 → 情绪
+      let str = reply;
+      const bg = parseBgColor(str);   str = bg.clean;
+      const km = parseKaomoji(str);   str = km.clean;
+      const {clean, emo, label} = parseEmotion(str);
       if(bg.color)applyBgColor(bg.color);
       say(clean,'them',{kaomoji:km.kaomoji});
       applyEmotion(emo,label);
@@ -2408,9 +2492,11 @@ function togglePomo(){
           {role:'user',content:'【系统触发】'},
         ]).then(reply=>{
           if(reply && typeof reply === 'string'){
-            let{clean,emo,label}=parseEmotion(reply);
-            const bg=parseBgColor(clean); clean=bg.clean;
-            const km=parseKaomoji(clean); clean=km.clean;
+            // 🌟 顺序：背景色 → 颜文字 → 情绪
+            let str = reply;
+            const bg = parseBgColor(str);   str = bg.clean;
+            const km = parseKaomoji(str);   str = km.clean;
+            const {clean, emo, label} = parseEmotion(str);
             if(bg.color)applyBgColor(bg.color);
             say(clean,'them',{kaomoji:km.kaomoji});
             applyEmotion(emo,label);
@@ -2519,9 +2605,11 @@ function endSleep(){
         {role:'user',content:'【系统触发】'},
       ]).then(reply=>{
         if(reply && typeof reply === 'string'){
-          let{clean,emo,label}=parseEmotion(reply);
-          const bg=parseBgColor(clean); clean=bg.clean;
-          const km=parseKaomoji(clean); clean=km.clean;
+          // 🌟 顺序：背景色 → 颜文字 → 情绪
+          let str = reply;
+          const bg = parseBgColor(str);   str = bg.clean;
+          const km = parseKaomoji(str);   str = km.clean;
+          const {clean, emo, label} = parseEmotion(str);
           if(bg.color)applyBgColor(bg.color);
           say(clean,'them',{kaomoji:km.kaomoji});
           applyEmotion(emo,label);
@@ -4001,8 +4089,9 @@ function bindChat(){
   const btn=document.getElementById('sendBtn');
   const send=()=>{
     const t=input.value.trim(); if(!t)return;
-    if(!API.ready){ needApiTip(); return; }
-    input.value=''; chat(t);
+    // 🌟 不在外面提前 return，交给 chat() 内部处理（保证你说的话一定能显示）
+    input.value='';
+    chat(t);
   };
   btn.onclick=send;
   input.addEventListener('keydown',e=>{ if(e.key==='Enter')send(); });
@@ -4016,9 +4105,11 @@ function bindChat(){
       {role:'user',content:'【系统触发】'},
     ]).then(reply => {
       if (reply && typeof reply === 'string') {
-        let {clean, emo, label} = parseEmotion(reply);
-        const bg = parseBgColor(clean); clean = bg.clean;
-        const km = parseKaomoji(clean); clean = km.clean;
+        // 🌟 顺序：背景色 → 颜文字 → 情绪
+        let str = reply;
+        const bg = parseBgColor(str);   str = bg.clean;
+        const km = parseKaomoji(str);   str = km.clean;
+        const {clean, emo, label} = parseEmotion(str);
         if (bg.color) applyBgColor(bg.color);
         say(clean, 'them', {kaomoji: km.kaomoji});
         applyEmotion(emo, label);
@@ -4288,8 +4379,8 @@ async function boot(){
     GlobalState.currentCharId = GlobalState.characters[0].id;
   }
   Current = GlobalState.characters.find(c=>c.id===GlobalState.currentCharId);
-  
-  // 🌟 新增：重启后检查他是不是卡在外面了
+
+  // 重启后检查他是不是卡在外面了
   if (Current.isAway && (!Current.awayUntil || Date.now() > Current.awayUntil)) {
     Current.isAway = false;
     Current.awayUntil = null;
