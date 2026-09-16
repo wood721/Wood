@@ -2674,9 +2674,13 @@ async function nextWord() {
   `;
   try {
     const reply = await callAI([
-      {role:'system', content:'你是英语单词老师。只输出 JSON，不要别的文字。'},
-      {role:'user', content:`请从「${wordGameState.book}」词库中随机选一个英语单词，给出它的中文释义、音标。禁止出“apple”、“cat”这类常见词汇，必须符合该词库的难度。只输出 JSON 格式，不要有任何多余的 Markdown 符号或换行：{"en":"单词","zh":"中文意思","phonetic":"音标"}。`}
-    ], {maxTokens: 500, temperature: 0.3});
+      {role:'system', content:'你是英语单词老师。你只能输出纯 JSON，绝对不能包含任何其他文字、标点或 Markdown 代码块。'},
+      {role:'user', content:`请从「${wordGameState.book}」词库中随机选一个英语单词，给出它的中文释义、音标。
+【极其重要的强制要求】：绝对不能出“apple”、“cat”、“dog”这类极为常见的词汇。必须符合该词库的难度。
+【输出格式】：只输出 JSON，格式如下，不要有任何多余的换行或空格：
+{"en":"单词","zh":"中文意思","phonetic":"音标"}
+示例：{"en":"abandon","zh":"放弃","phonetic":"/əˈbæn.dən/"}`}
+    ], {maxTokens: 400, temperature: 1.2});
     
     let wordData = {en: 'apple', zh: '苹果', phonetic: '/ˈæp.əl/'};
     try { wordData = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); } catch(e){}
@@ -2846,14 +2850,14 @@ function openEnglishReading() {
     <h2>英语阅读 <span class="close" onclick="closeModal()">×</span></h2>
     <div class="game-panel">
       <div class="g-status">正在生成文章…</div>
-      <div class="g-content" id="readingText" style="min-height:100px;"></div>
+      <div class="g-content" id="readingText" style="min-height:100px;">请稍候…</div>
       <div class="g-input-row"><button onclick="finishReading()">阅读完成</button><button onclick="closeModal()">退出</button></div>
     </div>
   `;
   openModal();
   
   callAI([
-    {role:'system', content:'你是一位高中英语老师。请写一篇完整的英语短文。只输出英文正文，不要任何中文解释、不要Markdown代码块。'},
+    {role:'system', content:'你是一位高中英语老师。请写一篇完整的英语短文，只输出英文正文，不要任何中文解释、不要Markdown代码块。文章必须有头有尾，字数在150词左右。'},
     {role:'user', content:'请生成一篇 150 字左右的高中难度英语短文，主题可以是人与自然、科技发展或日常生活。文章必须完整，包含开头、中间和结尾。'}
   ], {maxTokens: 1000, temperature: 0.8}).then(reply => {
     document.getElementById('readingText').textContent = reply || '生成失败。';
@@ -2912,12 +2916,14 @@ async function startSubjectPractice() {
     const reply = await callAI([
       {role:'system', content:'你是一个中国高中老师。你必须用纯中文出题。你只能输出纯 JSON 格式，绝对不能包含任何其他文字、标点、Markdown 代码块。'},
       {role:'user', content:`请出一道【${subject}】的题目。难度要求：必须是高中及以上难度。
-要求：
-1. 如果是数学，包含函数、几何、导数等；物理包含力学、电磁学等。
-2. 题目必须是用中文写的完整题目，题干清晰。
+【极其重要的强制要求】：
+1. 题目必须完全使用中文书写，绝对不能出现任何英文（除了数学公式和字母）。
+2. 题目必须是完整的选择题或填空题，包含题干和选项。
 3. 只输出 JSON 格式，不要有任何废话。
-格式：{"q":"题目内容（可以包含选项 A、B、C、D，用\\n换行）","a":"正确答案（比如 A 或 具体数值）"}。
-示例：{"q":"已知函数 f(x) = x^2 + 2x + 1，求 f(1) 的值。\\nA. 1\\nB. 2\\nC. 4\\nD. 5","a":"C"}。`}
+【JSON 格式】：
+{"q":"题目内容（包含选项 A、B、C、D，用\\n换行）","a":"正确答案（比如 A 或 具体数值）"}
+【示例】：
+{"q":"已知函数 f(x) = x^2 + 2x + 1，求 f(1) 的值。\\nA. 1\\nB. 2\\nC. 4\\nD. 5","a":"C"}`}
     ], {maxTokens: 800, temperature: 0.5});
     
     let data = {q:'题目加载失败，请重试。', a:'未知'};
