@@ -2141,7 +2141,11 @@ async function chat(userText){
   Current.chatLog.push({role:'user',text:userText,time:Date.now()});
   try {
     const reply=await callAI(buildMessages(userText));
-    if(!reply){ say('（他没回应，可能模型返回了空内容。）','err'); return; }
+    // 🌟 核心修复：如果 AI 返回了空内容，不要崩，提示用户
+    if(!reply || typeof reply !== 'string' || reply.trim() === ''){
+      say('（他好像走神了，没说出话来，你再说一次？）','tip');
+      return;
+    }
     let{clean,emo,label}=parseEmotion(reply);
     const bg=parseBgColor(clean); clean=bg.clean;
     const km=parseKaomoji(clean); clean=km.clean;
@@ -2153,7 +2157,10 @@ async function chat(userText){
     saveGameDebounced();
     Current.lastInteract=Date.now();
     Current.lastChatDate=todayStr();
-  } catch(e) { say(`API报错：${e.message}`, 'err'); }
+  } catch(e) {
+    // 网络报错也要把话说出来，不要让用户觉得按了没反应
+    say(`（网络卡住了：${e.message}）`, 'err');
+  }
 }
 async function proactiveTalk(type='idle'){
   if(!API.ready||!Current)return;
@@ -2177,7 +2184,7 @@ async function proactiveTalk(type='idle'){
       ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
       {role:'user',content:'【系统触发】'},
     ]);
-    if(reply){
+    if(reply && typeof reply === 'string'){
       let{clean,emo,label}=parseEmotion(reply);
       const bg=parseBgColor(clean); clean=bg.clean;
       const km=parseKaomoji(clean); clean=km.clean;
@@ -2253,7 +2260,7 @@ async function doTouch(type){
       ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
       {role:'user',content:'【系统触发】'},
     ]);
-    if(reply){
+    if(reply && typeof reply === 'string'){
       let{clean,emo,label}=parseEmotion(reply);
       const bg=parseBgColor(clean); clean=bg.clean;
       const km=parseKaomoji(clean); clean=km.clean;
@@ -2302,7 +2309,7 @@ async function saveDiary(){
       {role:'system',content:sys},
       {role:'user',content:'【系统触发】'},
     ]);
-    if(reply){
+    if(reply && typeof reply === 'string'){
       const clean = parseEmotion(reply).clean;
       Current.diary.his.push({date:today,text:clean,replied:true});
       say('他也在日记里写了一段话。','them');
@@ -2391,7 +2398,7 @@ function togglePomo(){
           ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
           {role:'user',content:'【系统触发】'},
         ]).then(reply=>{
-          if(reply){
+          if(reply && typeof reply === 'string'){
             let{clean,emo,label}=parseEmotion(reply);
             const bg=parseBgColor(clean); clean=bg.clean;
             const km=parseKaomoji(clean); clean=km.clean;
@@ -2451,7 +2458,7 @@ async function startSleep(){
         {role:'system',content:buildSystemPrompt('')+'\n\n【场景】对方要睡了。\n【要求】轻声说一句晚安，1句，温柔一点。不要用括号写动作。'},
         {role:'user',content:'【系统触发】'},
       ]);
-      if(reply)text.textContent=parseEmotion(reply).clean;
+      if(reply && typeof reply === 'string')text.textContent=parseEmotion(reply).clean;
     } catch(e) {}
   }
   const anim=document.getElementById('charAnim'), wrap=document.getElementById('charWrap');
@@ -2481,7 +2488,7 @@ async function tellSleepStory(){
       {role:'system',content:buildSystemPrompt('')+'\n\n【场景】对方想听你讲一个晚安故事。\n【要求】用 3~5 句话讲一个温柔的、安静的、适合睡前听的小故事。不要加情绪标签，不要用括号写动作。'},
       {role:'user',content:'【系统触发】'},
     ]);
-    if(reply) text.textContent = parseEmotion(reply).clean;
+    if(reply && typeof reply === 'string') text.textContent = parseEmotion(reply).clean;
   } catch(e){ text.textContent = '（故事讲不出来，网络有点卡。）'; }
 }
 function endSleep(){
@@ -2502,7 +2509,7 @@ function endSleep(){
         ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
         {role:'user',content:'【系统触发】'},
       ]).then(reply=>{
-        if(reply){
+        if(reply && typeof reply === 'string'){
           let{clean,emo,label}=parseEmotion(reply);
           const bg=parseBgColor(clean); clean=bg.clean;
           const km=parseKaomoji(clean); clean=km.clean;
@@ -2683,7 +2690,9 @@ async function nextWord() {
     ], {maxTokens: 400, temperature: 1.2});
     
     let wordData = {en: 'apple', zh: '苹果', phonetic: '/ˈæp.əl/'};
-    try { wordData = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); } catch(e){}
+    if(reply && typeof reply === 'string'){
+      try { wordData = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); } catch(e){}
+    }
     wordGameState.currentWord = wordData;
     
     if (isEn2Zh) {
@@ -2719,7 +2728,7 @@ async function checkWordAnswer() {
       say('（他看你背完了 10 个单词，凑过来说：）', 'action');
       const sys = buildSystemPrompt('') + `\n【场景】对方已经连续背完了 10 个单词，并全部答对。请以你的身份，夸奖他一句，1 句话。`;
       callAI([{role:'system', content: sys}]).then(reply => {
-        if (reply) { let {clean} = parseEmotion(reply); say(clean, 'them'); }
+        if (reply && typeof reply === 'string') { let {clean} = parseEmotion(reply); say(clean, 'them'); }
       });
     }
     setTimeout(() => nextWord(), 500);
@@ -2860,7 +2869,7 @@ function openEnglishReading() {
     {role:'system', content:'你是一位高中英语老师。请写一篇完整的英语短文，只输出英文正文，不要任何中文解释、不要Markdown代码块。文章必须有头有尾，字数在150词左右。'},
     {role:'user', content:'请生成一篇 150 字左右的高中难度英语短文，主题可以是人与自然、科技发展或日常生活。文章必须完整，包含开头、中间和结尾。'}
   ], {maxTokens: 1000, temperature: 0.8}).then(reply => {
-    document.getElementById('readingText').textContent = reply || '生成失败。';
+    document.getElementById('readingText').textContent = (reply && typeof reply === 'string') ? reply : '生成失败，请重试。';
   }).catch(e => {
     document.getElementById('readingText').textContent = '生成失败：' + e.message;
   });
@@ -2875,7 +2884,7 @@ function finishReading() {
     if (API.ready) {
       const sys = buildSystemPrompt('') + '\n【场景】对方刚读完一篇英语文章。请以你的身份夸奖一句。';
       callAI([{role:'system', content: sys}]).then(reply => {
-        if (reply) say(parseEmotion(reply).clean, 'them');
+        if (reply && typeof reply === 'string') say(parseEmotion(reply).clean, 'them');
       });
     }
   }
@@ -2924,18 +2933,34 @@ async function startSubjectPractice() {
 {"q":"题目内容（包含选项 A、B、C、D，用\\n换行）","a":"正确答案（比如 A 或 具体数值）"}
 【示例】：
 {"q":"已知函数 f(x) = x^2 + 2x + 1，求 f(1) 的值。\\nA. 1\\nB. 2\\nC. 4\\nD. 5","a":"C"}`}
-    ], {maxTokens: 800, temperature: 0.5});
+    ], {maxTokens: 800, temperature: 0.5, timeout: 90000});
     
+    if (!reply || typeof reply !== 'string') {
+      document.getElementById('subjectPrompt').innerHTML = '生成失败：AI 没有返回任何内容，请点击“开始练习”重试。';
+      return;
+    }
+
     let data = {q:'题目加载失败，请重试。', a:'未知'};
     try { 
-      data = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); 
+      const match = reply.match(/\{[\s\S]*\}/);
+      if (match) {
+        data = JSON.parse(match[0]); 
+      } else {
+        data.q = reply;
+        data.a = '未知';
+      }
     } catch(e){
       data.q = reply;
       data.a = '未知';
     }
     
+    if (!data.q) {
+      document.getElementById('subjectPrompt').innerHTML = '生成失败：题目内容为空，请重试。';
+      return;
+    }
+    
     Current.subjectAnswer = data.a;
-    document.getElementById('subjectPrompt').innerHTML = data.q.replace(/\n/g, '<br>');
+    document.getElementById('subjectPrompt').innerHTML = String(data.q).replace(/\n/g, '<br>');
     document.getElementById('subjectInput').focus();
   } catch(e) {
     document.getElementById('subjectPrompt').textContent = '生成失败：' + e.message;
@@ -2983,7 +3008,7 @@ async function checkSubjectAnswer() {
       {role:'system', content: buildSystemPrompt('') + '\n\n' + sysPrompt},
       {role:'user', content:'【系统触发】'}
     ]);
-    if (reply) {
+    if (reply && typeof reply === 'string') {
       let {clean} = parseEmotion(reply);
       say(clean, 'them');
     }
@@ -3047,7 +3072,10 @@ async function initTurtleGame(){
       {role:'user',content:'请生成一个海龟汤谜题。要求：故事必须原创，不要用"酒吧点水"、"一个人走进酒吧"、"电梯里的女人"这类常见例子。要有点新意。输出 JSON：{"story":"故事开头（1-2句，诡异但不恐怖，适合情侣玩）","answer":"真相（1-2句）"}。' + hint}
     ], {maxTokens:300, temperature:1.0});
     let story='', answer='';
-    try{ const j = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); story=j.story||'一个人走进酒吧，点了一杯水，酒保却拔出了一把枪。'; answer=j.answer||'他打嗝，酒保用枪吓他。'; }catch(e){ story='一个人走进酒吧，点了一杯水，酒保却拔出了一把枪。'; answer='他打嗝，酒保用枪吓他。'; }
+    if(reply && typeof reply === 'string'){
+      try{ const j = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); story=j.story||''; answer=j.answer||''; }catch(e){}
+    }
+    if(!story){ story='一个人走进酒吧，点了一杯水，酒保却拔出了一把枪。'; answer='他打嗝，酒保用枪吓他。'; }
     rememberGame(story.slice(0,30));
     Current.game.subState.story = story; Current.game.subState.answer = answer; Current.game.subState.log = [];
     document.getElementById('turtleStory').textContent = story;
@@ -3067,7 +3095,7 @@ async function turtleAsk(){
       {role:'system',content:`你是海龟汤主持人。谜题：${s.story}。真相：${s.answer}。玩家会问是/不是问题，你只能回答"是"、"不是"、"无关"三者之一，不要多说。`},
       {role:'user',content:q}
     ], {maxTokens:20, temperature:0.1});
-    s.log.push('他：'+(reply||'无关').trim());
+    s.log.push('他：'+((reply && typeof reply === 'string') ? reply.trim() : '无关'));
     document.getElementById('turtleLog').textContent = s.log.join('\n');
   }catch(e){ s.log.push('他：（网络出错）'); document.getElementById('turtleLog').textContent = s.log.join('\n'); }
 }
@@ -3147,7 +3175,9 @@ async function initTwentyGame(){
       {role:'user',content:'请想一个常见的物品。要求：不要用"苹果"、"手机"、"书"这类烂大街的，换点有新意的日常物品。输出 JSON：{"item":"物品名"}。' + hint}
     ], {maxTokens:50, temperature:1.1});
     let item='苹果';
-    try{ const j = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); item = j.item || '苹果'; }catch(e){}
+    if(reply && typeof reply === 'string'){
+      try{ const j = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); item = j.item || '苹果'; }catch(e){}
+    }
     rememberGame(item);
     Current.game.subState.item = item;
     document.getElementById('twentyStatus').textContent = '他已经想好了。开始问吧（还剩 20 个问题）';
@@ -3168,7 +3198,7 @@ async function twentyAsk(){
       {role:'system',content:`你想的东西是：${s.item}。玩家会问是/不是问题，你只能回答"是"、"不是"、"无关"。不要多说。`},
       {role:'user',content:q}
     ], {maxTokens:15, temperature:0.1});
-    s.log.push('他答：'+(reply||'无关').trim());
+    s.log.push('他答：'+((reply && typeof reply === 'string') ? reply.trim() : '无关'));
     document.getElementById('twentyLog').textContent = s.log.join('\n');
   }catch(e){ s.log.push('他答：（网络出错）'); document.getElementById('twentyLog').textContent = s.log.join('\n'); }
   document.getElementById('twentyStatus').textContent = `还剩 ${s.max - s.questions} 个问题`;
@@ -3214,7 +3244,7 @@ async function storySend(){
       {role:'system',content:'你们在玩接龙编故事。根据前面的内容，接一句（1-2句），延续故事，别结束太快。只输出你要接的话。'},
       {role:'user',content:'当前故事：\n'+history+'\n\n请接一句。'}
     ], {maxTokens:120, temperature:0.9});
-    if(reply){ s.turns.push('他：'+reply.trim()); document.getElementById('storyLog').textContent = s.turns.join('\n'); }
+    if(reply && typeof reply === 'string'){ s.turns.push('他：'+reply.trim()); document.getElementById('storyLog').textContent = s.turns.join('\n'); }
   }catch(e){ s.turns.push('他：（网络出错）'); document.getElementById('storyLog').textContent = s.turns.join('\n'); }
 }
 function storyEnd(){
@@ -3369,7 +3399,7 @@ async function doTruthOrDare(type, target) {
       {role:'system', content: buildSystemPrompt('') + `\n【系统强制指令】你们在玩真心话大冒险，你赢了。对方必须接受惩罚。请你立刻以裁判的身份，向对方提出一个【${type === 'truth' ? '真心话问题' : '大冒险任务'}】。只能提问，绝对不能写铺垫、夸奖或废话，直接抛出问题，1句话。`},
       {role:'user', content:'【系统触发】'}
     ]);
-    if (question) {
+    if (question && typeof question === 'string') {
       say(parseEmotion(question).clean, 'them');
       setTimeout(() => {
         const answer = prompt('请回答他的问题：');
@@ -3379,7 +3409,7 @@ async function doTruthOrDare(type, target) {
             {role:'system', content: buildSystemPrompt('') + `\n【场景】你们在玩真心话大冒险，你刚刚问了对方问题，对方回答：「${answer}」。请以你的身份，对对方的回答做出简单的回应，1句话。不要提到"设定""规则"，不要用括号写动作。`},
             {role:'user', content:'【系统触发】'}
           ]).then(reply => {
-            if (reply) say(parseEmotion(reply).clean, 'them');
+            if (reply && typeof reply === 'string') say(parseEmotion(reply).clean, 'them');
           });
         }
       }, 800);
@@ -3395,7 +3425,7 @@ async function doTruthOrDare(type, target) {
     {role:'system', content: buildSystemPrompt('') + '\n\n' + sysPrompt},
     {role:'user', content:'【系统触发】'}
   ]);
-  if (reply) {
+  if (reply && typeof reply === 'string') {
     let {clean, emo, label} = parseEmotion(reply);
     say(clean, 'them');
   }
@@ -3478,7 +3508,7 @@ function addMoneyLog() {
     Current.lastMoneyNudgeDate = todayStr();
     const sys = buildSystemPrompt('') + `\n\n【场景】对方这个月已经花了 ${totalSpent} 金币，预算只有 ${Current.money.budget}（已花 ${Math.round(percent*100)}%）。请以你的身份，提醒他注意节制，语气可以稍微心疼或者无奈一点，1 句话。`;
     callAI([{role:'system', content: sys}]).then(reply => {
-      if (reply) {
+      if (reply && typeof reply === 'string') {
         let {clean} = parseEmotion(reply);
         say(clean, 'them');
       }
@@ -3976,7 +4006,7 @@ function bindChat(){
       ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
       {role:'user',content:'【系统触发】'},
     ]).then(reply => {
-      if (reply) {
+      if (reply && typeof reply === 'string') {
         let {clean, emo, label} = parseEmotion(reply);
         const bg = parseBgColor(clean); clean = bg.clean;
         const km = parseKaomoji(clean); clean = km.clean;
