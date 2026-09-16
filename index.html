@@ -2665,15 +2665,15 @@ async function nextWord() {
   try {
     const reply = await callAI([
       {role:'system', content:'你是英语单词老师。只输出 JSON，不要别的文字。'},
-      {role:'user', content:`请从「${wordGameState.book}」词库中随机选一个英语单词，给出它的中文释义。禁止出“apple”、“cat”这类常见词汇，必须符合该词库的难度。只输出 JSON 格式，不要有任何多余的 Markdown 符号或换行：{"en":"单词","zh":"中文意思"}。`}
-    ], {maxTokens: 400, temperature: 1.2});
+      {role:'user', content:`请从「${wordGameState.book}」词库中随机选一个英语单词，给出它的中文释义。禁止出“apple”、“cat”这类常见词汇，必须符合该词库的难度。只输出 JSON 格式，不要有任何多余的 Markdown 符号或换行：{"en":"单词","zh":"中文意思","phonetic":"音标"}。`}
+    ], {maxTokens: 400, temperature: 0.3});
     
-    let wordData = {en: 'apple', zh: '苹果'};
+    let wordData = {en: 'apple', zh: '苹果', phonetic: '/ˈæp.əl/'};
     try { wordData = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); } catch(e){}
     wordGameState.currentWord = wordData;
     
     if (isEn2Zh) {
-      document.getElementById('wordPrompt').innerHTML = `<b style="font-size:24px;">${wordData.en}</b><br><span style="color:var(--text-soft);font-size:12px;">请输入中文意思</span>`;
+      document.getElementById('wordPrompt').innerHTML = `<b style="font-size:24px;">${wordData.en}</b><br><span style="color:var(--text-soft);font-size:12px;">${wordData.phonetic||''}</span><br><span style="color:var(--text-soft);font-size:12px;">请输入中文意思</span>`;
     } else {
       document.getElementById('wordPrompt').innerHTML = `<b style="font-size:20px;">${wordData.zh}</b><br><span style="color:var(--text-soft);font-size:12px;">请输入英文单词</span>`;
     }
@@ -2746,7 +2746,7 @@ function openWrongWords() {
         <div class="shop-item" style="cursor:default;">
           <div class="info">
             <b style="font-size:15px; color:var(--main-dark);">${w.en}</b>
-            <small>${w.zh}</small>
+            <small>${w.phonetic||''} ${w.zh}</small>
           </div>
           <button style="background:#e08a8a;" onclick="removeWrongWord(${i})">删除</button>
         </div>
@@ -2802,7 +2802,7 @@ function showReviewWord() {
       <div class="g-log" id="wordLog">已复习 ${wordGameState.reviewIndex} 个</div>
     </div>
   `;
-  document.getElementById('wordPrompt').innerHTML = `<b style="font-size:24px;">${word.en}</b><br><span style="color:var(--text-soft);font-size:12px;">请输入中文意思</span>`;
+  document.getElementById('wordPrompt').innerHTML = `<b style="font-size:24px;">${word.en}</b><br><span style="color:var(--text-soft);font-size:12px;">${word.phonetic||''}</span><br><span style="color:var(--text-soft);font-size:12px;">请输入中文意思</span>`;
   document.getElementById('wordInput').focus();
   openModal();
 }
@@ -2842,9 +2842,9 @@ function openEnglishReading() {
   `;
   openModal();
   callAI([
-    {role:'system', content:'你是英语阅读老师。请输出一篇 100 字左右的英语短文，主题日常，难度中等。只输出英文正文。'},
+    {role:'system', content:'你是英语阅读老师。请输出一篇 150 字左右的高中难度的英语短文，主题可以是人与自然、科技发展或日常生活。只输出英文正文。'},
     {role:'user', content:'请生成一篇英语阅读文章。'}
-  ], {maxTokens:300, temperature:0.8}).then(reply => {
+  ], {maxTokens:400, temperature:0.8}).then(reply => {
     document.getElementById('readingText').textContent = reply || '生成失败。';
   });
 }
@@ -2899,7 +2899,7 @@ async function startSubjectPractice() {
     const reply = await callAI([
       {role:'system', content:'你是一个严厉的学科老师。你只能输出纯 JSON 格式，绝对不能包含任何其他文字、标点、Markdown 代码块。'},
       {role:'user', content:`请出一道【${subject}】的题目。难度要求：必须是高中及以上难度（数学包含函数、几何、导数；物理包含力学、电磁学）。只输出 JSON 格式：{"q":"题目内容（可以包含选项 A、B、C、D，用\\n换行）","a":"正确答案（比如 A 或 具体数值）"}。`}
-    ], {maxTokens: 400, temperature: 1.2});
+    ], {maxTokens: 400, temperature: 0.3});
     
     let data = {q:'题目加载失败，请重试。', a:'未知'};
     try { 
@@ -2979,6 +2979,7 @@ function openGameMenu(){
     <div class="game-item" onclick="startRPS()"><div><div class="g-name">✊ 石头剪刀布</div><div class="g-desc">赢了让 AI 真心话大冒险</div></div><div class="g-arrow">›</div></div>
     <div class="game-item" onclick="startSudoku()"><div><div class="g-name">🧩 数独</div><div class="g-desc">经典 9x9，考验逻辑的时候到了</div></div><div class="g-arrow">›</div></div>
     <div class="game-item" onclick="startMaze()"><div><div class="g-name">🏃 走迷宫</div><div class="g-desc">用按钮移动，找到出口</div></div><div class="g-arrow">›</div></div>
+    <div class="game-item" onclick="startSorting()"><div><div class="g-name">📦 归纳整理</div><div class="g-desc">把散落的物品放回正确的位置</div></div><div class="g-arrow">›</div></div>
   `;
   openModal();
 }
@@ -3198,6 +3199,88 @@ function storyEnd(){
 function closeGame(){
   if(Current) Current.game = { active:false, type:null, subState:null };
   closeModal();
+}
+
+/* ============ 归纳整理小游戏 ============ */
+let sortingState = { items: [], categories: [], currentItem: null, score: 0, total: 0 };
+
+function startSorting() {
+  // 生成物品和类别
+  const pool = [
+    { cat: '水果', items: ['苹果', '香蕉', '橘子', '葡萄', '草莓'] },
+    { cat: '动物', items: ['猫', '狗', '兔子', '老虎', '大象'] },
+    { cat: '文具', items: ['铅笔', '橡皮', '尺子', '笔记本', '书包'] },
+    { cat: '交通工具', items: ['汽车', '火车', '飞机', '轮船', '自行车'] },
+    { cat: '颜色', items: ['红色', '蓝色', '绿色', '黄色', '紫色'] },
+  ];
+
+  // 随机打乱
+  const shuffled = pool.sort(() => Math.random() - 0.5).slice(0, 4);
+  sortingState.categories = shuffled.map(p => p.cat);
+  sortingState.items = [];
+  shuffled.forEach(p => {
+    p.items.sort(() => Math.random() - 0.5).slice(0, 2).forEach(item => {
+      sortingState.items.push({ name: item, cat: p.cat });
+    });
+  });
+  sortingState.items.sort(() => Math.random() - 0.5);
+  sortingState.score = 0;
+  sortingState.total = sortingState.items.length;
+  sortingState.currentIndex = 0;
+
+  renderSorting();
+}
+
+function renderSorting() {
+  const modal = document.getElementById('modalContent');
+  
+  if (sortingState.currentIndex >= sortingState.items.length) {
+    // 游戏结束
+    modal.innerHTML = `
+      <h2>📦 归纳整理 <span class="close" onclick="closeModal()">×</span></h2>
+      <div style="text-align:center; padding:20px 0;">
+        <div style="font-size:48px; margin-bottom:12px;">🎉</div>
+        <p style="font-size:16px; color:var(--text);">恭喜完成整理！</p>
+        <p style="font-size:14px; color:var(--text-soft); margin-top:8px;">你一共整理了 ${sortingState.total} 件物品</p>
+        <p style="font-size:24px; color:var(--main); font-weight:600; margin-top:16px;">得分：${sortingState.score} / ${sortingState.total}</p>
+      </div>
+      <button class="btn" onclick="startSorting()">再玩一次</button>
+      <button class="btn ghost" onclick="closeModal()">退出</button>
+    `;
+    openModal();
+    addRelationValue(2);
+    saveGame();
+    return;
+  }
+
+  const item = sortingState.items[sortingState.currentIndex];
+  modal.innerHTML = `
+    <h2>📦 归纳整理 <span class="close" onclick="closeModal()">×</span></h2>
+    <div class="game-panel" style="text-align:center;">
+      <div class="g-status">第 ${sortingState.currentIndex + 1} / ${sortingState.total} 件物品</div>
+      <div style="font-size:40px; margin:16px 0;">📦</div>
+      <div style="font-size:24px; font-weight:600; color:var(--main-dark); margin-bottom:20px;">「${item.name}」</div>
+      <p style="font-size:13px; color:var(--text-soft); margin-bottom:16px;">它属于下面哪一类？</p>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        ${sortingState.categories.map(cat => `
+          <button class="btn" onclick="checkSorting('${cat}')">${cat}</button>
+        `).join('')}
+      </div>
+    </div>
+  `;
+  openModal();
+}
+
+function checkSorting(selectedCat) {
+  const item = sortingState.items[sortingState.currentIndex];
+  if (selectedCat === item.cat) {
+    sortingState.score++;
+    say(`✅ 正确！「${item.name}」属于「${item.cat}」`, 'tip');
+  } else {
+    say(`❌ 不对哦，「${item.name}」属于「${item.cat}」`, 'tip');
+  }
+  sortingState.currentIndex++;
+  setTimeout(() => renderSorting(), 800);
 }
 
 /* ============ 真心话大冒险 / 猜拳 ============ */
