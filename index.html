@@ -1781,54 +1781,64 @@ function tryWork(){
   updateTrackBar();
   say('“我出门一趟。”','them');
   saveGame();
-  setTimeout(()=>{
-    if(!Current) return;
-    Current.isAway=false; Current.awayUntil=null;
-    updateTrackBar();
-    const earn = Math.floor((50 + Math.random()*101) * (0.7 + Current.stats.mood/200));
-    Current.coin += earn;
-    const gotGift = Math.random() < 0.5;
-    if(gotGift){
-      const gifts = ['flower','tea','cake','book','food'];
-      const gid = gifts[Math.floor(Math.random()*gifts.length)];
-      Current.inventory[gid] = (Current.inventory[gid]||0) + 1;
-    }
-    addRelationValue(2);
-    const msg = gotGift ? `“回来啦，赚了 ${earn} 金币，路上还看到这个，顺手带回来了。”` : `“回来了，赚了 ${earn} 金币。”`;
-    say(msg,'them');
-    showInAppNotif(msg.replace(/[“”]/g,''));
-    if(Current.awayNote){
-      const note = Current.awayNote;
-      Current.awayNote = null;
-      setTimeout(()=>{
-        if(API.ready){
-          const sys = buildSystemPrompt('') + '\n\n【场景】你刚回家，看到对方留在桌上的一张纸条，内容是：' + note + '\n【要求】请直接以你的身份回应这张纸条，1~2句。不要复述【场景】，不要提到"设定""规则"，不要用括号写动作。';
-          callAI([
-            {role:'system',content:sys},
-            ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
-            {role:'user',content:'【系统触发】'},
-          ]).then(reply=>{
-            if(reply){
-              let{clean,emo,label}=parseEmotion(reply);
-              const bg=parseBgColor(clean); clean=bg.clean;
-              const km=parseKaomoji(clean); clean=km.clean;
-              if(bg.color)applyBgColor(bg.color);
-              say(clean,'them',{kaomoji:km.kaomoji});
-              applyEmotion(emo,label);
-              Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
-              showInAppNotif(clean);
-              saveGameDebounced();
-            }
-          }).catch(()=>{});
-        }
-      }, 1500);
-    }
-    walkTo(0.5);
-    updateStats();saveGame();
-    if(API.ready) proactiveTalk('idle').catch(()=>{});
-  }, awayMinutes*60000);
 }
 setInterval(tryWork,5*60000);
+
+function checkReturnHome(){
+  if(!Current || !Current.isAway) return;
+  if(!Current.awayUntil) return;
+  if(Date.now() < Current.awayUntil) return;
+
+  Current.isAway = false;
+  Current.awayUntil = null;
+  updateTrackBar();
+
+  const earn = Math.floor((50 + Math.random()*101) * (0.7 + Current.stats.mood/200));
+  Current.coin += earn;
+  const gotGift = Math.random() < 0.5;
+  if(gotGift){
+    const gifts = ['flower','tea','cake','book','food'];
+    const gid = gifts[Math.floor(Math.random()*gifts.length)];
+    Current.inventory[gid] = (Current.inventory[gid]||0) + 1;
+  }
+  addRelationValue(2);
+  const msg = gotGift ? `“回来啦，赚了 ${earn} 金币，路上还看到这个，顺手带回来了。”` : `“回来了，赚了 ${earn} 金币。”`;
+  say(msg,'them');
+  showInAppNotif(msg.replace(/[“”]/g,''));
+
+  if(Current.awayNote){
+    const note = Current.awayNote;
+    Current.awayNote = null;
+    setTimeout(()=>{
+      if(API.ready){
+        const sys = buildSystemPrompt('') + '\n\n【场景】你刚回家，看到对方留在桌上的一张纸条，内容是：' + note + '\n【要求】请直接以你的身份回应这张纸条，1~2句。不要复述【场景】，不要提到"设定""规则"，不要用括号写动作。';
+        callAI([
+          {role:'system',content:sys},
+          ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
+          {role:'user',content:'【系统触发】'},
+        ]).then(reply=>{
+          if(reply){
+            let{clean,emo,label}=parseEmotion(reply);
+            const bg=parseBgColor(clean); clean=bg.clean;
+            const km=parseKaomoji(clean); clean=km.clean;
+            if(bg.color)applyBgColor(bg.color);
+            say(clean,'them',{kaomoji:km.kaomoji});
+            applyEmotion(emo,label);
+            Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
+            showInAppNotif(clean);
+            saveGameDebounced();
+          }
+        }).catch(()=>{});
+      }
+    }, 1500);
+  }
+
+  walkTo(0.5);
+  updateStats();
+  saveGame();
+  if(API.ready) proactiveTalk('idle').catch(()=>{});
+}
+setInterval(checkReturnHome, 60000);
 
 /* ============ 番茄钟催学习 ============ */
 function getTodayPomoMin(){
@@ -2665,8 +2675,8 @@ async function nextWord() {
   try {
     const reply = await callAI([
       {role:'system', content:'你是英语单词老师。只输出 JSON，不要别的文字。'},
-      {role:'user', content:`请从「${wordGameState.book}」词库中随机选一个英语单词，给出它的中文释义。禁止出“apple”、“cat”这类常见词汇，必须符合该词库的难度。只输出 JSON 格式，不要有任何多余的 Markdown 符号或换行：{"en":"单词","zh":"中文意思","phonetic":"音标"}。`}
-    ], {maxTokens: 400, temperature: 0.3});
+      {role:'user', content:`请从「${wordGameState.book}」词库中随机选一个英语单词，给出它的中文释义、音标。禁止出“apple”、“cat”这类常见词汇，必须符合该词库的难度。只输出 JSON 格式，不要有任何多余的 Markdown 符号或换行：{"en":"单词","zh":"中文意思","phonetic":"音标"}。`}
+    ], {maxTokens: 500, temperature: 0.3});
     
     let wordData = {en: 'apple', zh: '苹果', phonetic: '/ˈæp.əl/'};
     try { wordData = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); } catch(e){}
@@ -2836,16 +2846,19 @@ function openEnglishReading() {
     <h2>英语阅读 <span class="close" onclick="closeModal()">×</span></h2>
     <div class="game-panel">
       <div class="g-status">正在生成文章…</div>
-      <div class="g-content" id="readingText"></div>
+      <div class="g-content" id="readingText" style="min-height:100px;"></div>
       <div class="g-input-row"><button onclick="finishReading()">阅读完成</button><button onclick="closeModal()">退出</button></div>
     </div>
   `;
   openModal();
+  
   callAI([
-    {role:'system', content:'你是英语阅读老师。请输出一篇 150 字左右的高中难度的英语短文，主题可以是人与自然、科技发展或日常生活。只输出英文正文。'},
-    {role:'user', content:'请生成一篇英语阅读文章。'}
-  ], {maxTokens:400, temperature:0.8}).then(reply => {
+    {role:'system', content:'你是一位高中英语老师。请写一篇完整的英语短文。只输出英文正文，不要任何中文解释、不要Markdown代码块。'},
+    {role:'user', content:'请生成一篇 150 字左右的高中难度英语短文，主题可以是人与自然、科技发展或日常生活。文章必须完整，包含开头、中间和结尾。'}
+  ], {maxTokens: 1000, temperature: 0.8}).then(reply => {
     document.getElementById('readingText').textContent = reply || '生成失败。';
+  }).catch(e => {
+    document.getElementById('readingText').textContent = '生成失败：' + e.message;
   });
 }
 function finishReading() {
@@ -2897,9 +2910,15 @@ async function startSubjectPractice() {
 
   try {
     const reply = await callAI([
-      {role:'system', content:'你是一个严厉的学科老师。你只能输出纯 JSON 格式，绝对不能包含任何其他文字、标点、Markdown 代码块。'},
-      {role:'user', content:`请出一道【${subject}】的题目。难度要求：必须是高中及以上难度（数学包含函数、几何、导数；物理包含力学、电磁学）。只输出 JSON 格式：{"q":"题目内容（可以包含选项 A、B、C、D，用\\n换行）","a":"正确答案（比如 A 或 具体数值）"}。`}
-    ], {maxTokens: 400, temperature: 0.3});
+      {role:'system', content:'你是一个中国高中老师。你必须用纯中文出题。你只能输出纯 JSON 格式，绝对不能包含任何其他文字、标点、Markdown 代码块。'},
+      {role:'user', content:`请出一道【${subject}】的题目。难度要求：必须是高中及以上难度。
+要求：
+1. 如果是数学，包含函数、几何、导数等；物理包含力学、电磁学等。
+2. 题目必须是用中文写的完整题目，题干清晰。
+3. 只输出 JSON 格式，不要有任何废话。
+格式：{"q":"题目内容（可以包含选项 A、B、C、D，用\\n换行）","a":"正确答案（比如 A 或 具体数值）"}。
+示例：{"q":"已知函数 f(x) = x^2 + 2x + 1，求 f(1) 的值。\\nA. 1\\nB. 2\\nC. 4\\nD. 5","a":"C"}。`}
+    ], {maxTokens: 800, temperature: 0.5});
     
     let data = {q:'题目加载失败，请重试。', a:'未知'};
     try { 
@@ -3205,7 +3224,6 @@ function closeGame(){
 let sortingState = { items: [], categories: [], currentItem: null, score: 0, total: 0 };
 
 function startSorting() {
-  // 生成物品和类别
   const pool = [
     { cat: '水果', items: ['苹果', '香蕉', '橘子', '葡萄', '草莓'] },
     { cat: '动物', items: ['猫', '狗', '兔子', '老虎', '大象'] },
@@ -3214,7 +3232,6 @@ function startSorting() {
     { cat: '颜色', items: ['红色', '蓝色', '绿色', '黄色', '紫色'] },
   ];
 
-  // 随机打乱
   const shuffled = pool.sort(() => Math.random() - 0.5).slice(0, 4);
   sortingState.categories = shuffled.map(p => p.cat);
   sortingState.items = [];
@@ -3235,7 +3252,6 @@ function renderSorting() {
   const modal = document.getElementById('modalContent');
   
   if (sortingState.currentIndex >= sortingState.items.length) {
-    // 游戏结束
     modal.innerHTML = `
       <h2>📦 归纳整理 <span class="close" onclick="closeModal()">×</span></h2>
       <div style="text-align:center; padding:20px 0;">
@@ -3384,24 +3400,11 @@ async function doTruthOrDare(type, target) {
       if (!Current.isAway && !Current.sick && Current.stats.energy >= 20) {
         Current.isAway = true;
         Current.stats.energy -= 15;
-        Current.awayUntil = Date.now() + (5 + Math.floor(Math.random()*6)) * 60000;
+        Current.awayUntil = Date.now() + 3 * 60000;
         logTrack('外面', '大冒险·打工');
         updateTrackBar();
         say('（他答应了大冒险，出门去了。）', 'action');
         saveGame();
-        
-        setTimeout(() => {
-          if (!Current) return;
-          Current.isAway = false;
-          Current.awayUntil = null;
-          updateTrackBar();
-          const earn = Math.floor(30 + Math.random()*50);
-          Current.coin += earn;
-          say(`“大冒险结束，赚了 ${earn} 金币回来啦。”`, 'them');
-          showInAppNotif(`赚了 ${earn} 金币`);
-          walkTo(0.5);
-          updateStats(); saveGame();
-        }, 5000);
       } else {
         say('（他现在不太方便出门，下次再让他去吧。）', 'tip');
       }
