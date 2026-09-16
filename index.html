@@ -485,6 +485,7 @@ function newCharacterData(id){
     money: { budget: 3000, logs: [] },
     lastMoneyNudgeDate: null,
     wordBook: { currentBook: null, learnedCount: 0 },
+    wrongWords: [],
     subjectAnswer: null,
   };
 }
@@ -2627,26 +2628,37 @@ function openWordBook(){
         <option value="Daily">日常口语词汇</option>
       </select>
     </div>
+    <div class="field"><label>模式选择</label>
+      <select id="wordModeSelect">
+        <option value="en2zh">看英文，填中文</option>
+        <option value="zh2en">看中文，填英文</option>
+      </select>
+    </div>
     <button class="btn" onclick="startWordGame()">开始学习</button>
+    <button class="btn ghost" onclick="openWrongWords()" style="margin-top:10px;">📕 查看错题本 (${(Current.wrongWords||[]).length})</button>
   `;
   openModal();
 }
-let wordGameState = { book:null, currentWord:null, count:0, correctCount:0, isReviewing:false };
+
+let wordGameState = { book:null, mode:'en2zh', currentWord:null, count:0, correctCount:0 };
 async function startWordGame() {
   if(!API.ready) { needApiTip(); return; }
   wordGameState.book = document.getElementById('wordBookSelect').value;
+  wordGameState.mode = document.getElementById('wordModeSelect').value;
   wordGameState.count = 0;
   wordGameState.correctCount = 0;
   await nextWord();
 }
+
 async function nextWord() {
   const modal = document.getElementById('modalContent');
+  const isEn2Zh = wordGameState.mode === 'en2zh';
   modal.innerHTML = `
     <h2>背单词 <span class="close" onclick="closeModal()">×</span></h2>
     <div class="game-panel">
       <div class="g-status">正在生成单词…</div>
       <div class="g-content" id="wordPrompt"></div>
-      <div class="g-input-row"><input id="wordInput" placeholder="输入中文意思…"><button onclick="checkWordAnswer()">提交</button></div>
+      <div class="g-input-row"><input id="wordInput" placeholder="${isEn2Zh ? '输入中文意思…' : '输入英文单词…'}"><button onclick="checkWordAnswer()">提交</button></div>
       <div class="g-log" id="wordLog">已背 ${wordGameState.count} 个</div>
     </div>
   `;
@@ -2655,41 +2667,169 @@ async function nextWord() {
       {role:'system', content:'你是英语单词老师。只输出 JSON，不要别的文字。'},
       {role:'user', content:`请从「${wordGameState.book}」词库中随机选一个英语单词，给出它的中文释义。输出 JSON：{"en":"单词","zh":"中文意思"}。不要重复出题。`}
     ], {maxTokens:100, temperature:0.7});
+    
     let wordData = {en: 'apple', zh: '苹果'};
     try { wordData = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); } catch(e){}
     wordGameState.currentWord = wordData;
-    document.getElementById('wordPrompt').innerHTML = `<b style="font-size:20px;">${wordData.en}</b><br><span style="color:var(--text-soft);font-size:12px;">请输入中文意思</span>`;
+    
+    if (isEn2Zh) {
+      document.getElementById('wordPrompt').innerHTML = `<b style="font-size:24px;">${wordData.en}</b><br><span style="color:var(--text-soft);font-size:12px;">请输入中文意思</span>`;
+    } else {
+      document.getElementById('wordPrompt').innerHTML = `<b style="font-size:20px;">${wordData.zh}</b><br><span style="color:var(--text-soft);font-size:12px;">请输入英文单词</span>`;
+    }
     document.getElementById('wordInput').focus();
   } catch(e) {
     document.getElementById('wordPrompt').textContent = '生成失败：' + e.message;
   }
 }
+
 async function checkWordAnswer() {
   const input = document.getElementById('wordInput');
   const userAnswer = input.value.trim();
   if (!userAnswer || !wordGameState.currentWord) return;
-  const correct = wordGameState.currentWord.zh;
-  if (userAnswer === correct || correct.includes(userAnswer) || userAnswer.includes(correct)) {
+  
+  const isEn2Zh = wordGameState.mode === 'en2zh';
+  const correct = isEn2Zh ? wordGameState.currentWord.zh : wordGameState.currentWord.en;
+  const userAnsLower = userAnswer.toLowerCase();
+  const correctLower = correct.toLowerCase();
+
+  const isCorrect = userAnsLower === correctLower || correctLower.includes(userAnsLower) || userAnsLower.includes(correctLower);
+
+  if (isCorrect) {
     wordGameState.correctCount++;
     wordGameState.count++;
     document.getElementById('wordLog').textContent = `✅ 答对了！已背 ${wordGameState.count} 个`;
     input.value = '';
+    
     if (wordGameState.count % 10 === 0) {
       say('（他看你背完了 10 个单词，凑过来说：）', 'action');
       const sys = buildSystemPrompt('') + `\n【场景】对方已经连续背完了 10 个单词，并全部答对。请以你的身份，夸奖他一句，1 句话。`;
       callAI([{role:'system', content: sys}]).then(reply => {
-        if (reply) {
-          let {clean} = parseEmotion(reply);
-          say(clean, 'them');
-        }
+        if (reply) { let {clean} = parseEmotion(reply); say(clean, 'them'); }
       });
     }
     setTimeout(() => nextWord(), 500);
   } else {
-    document.getElementById('wordLog').textContent = `❌ 答错了，正确答案是：${correct}。再试一次。`;
+    if (!Current.wrongWords) Current.wrongWords = [];
+    const isDuplicate = Current.wrongWords.some(w => w.en === wordGameState.currentWord.en);
+    if (!isDuplicate) {
+      Current.wrongWords.push(wordGameState.currentWord);
+      saveGame();
+    }
+    
+    document.getElementById('wordLog').textContent = `❌ 答错了，正确答案是：${correct}。已记录进错题本。`;
     input.value = '';
+    setTimeout(() => nextWord(), 2000);
   }
 }
+
+function openWrongWords() {
+  if(!Current) return;
+  if(!Current.wrongWords) Current.wrongWords = [];
+  const modal = document.getElementById('modalContent');
+  
+  if (Current.wrongWords.length === 0) {
+    modal.innerHTML = `
+      <h2>错题本 <span class="close" onclick="closeModal()">×</span></h2>
+      <p style="color:var(--text-soft); font-size:14px; text-align:center; padding:20px 0;">还没有错题，继续保持！</p>
+      <button class="btn ghost" onclick="closeModal();openWordBook()">返回背单词</button>
+    `;
+    openModal();
+    return;
+  }
+
+  modal.innerHTML = `
+    <h2>错题本 <span class="close" onclick="closeModal()">×</span></h2>
+    <p style="font-size:12px; color:var(--text-soft); margin-bottom:12px;">共 ${Current.wrongWords.length} 个错词，点击可查看详细释义。</p>
+    <div style="max-height: 400px; overflow-y: auto;">
+      ${Current.wrongWords.map((w, i) => `
+        <div class="shop-item" style="cursor:default;">
+          <div class="info">
+            <b style="font-size:15px; color:var(--main-dark);">${w.en}</b>
+            <small>${w.zh}</small>
+          </div>
+          <button style="background:#e08a8a;" onclick="removeWrongWord(${i})">删除</button>
+        </div>
+      `).join('')}
+    </div>
+    <button class="btn" onclick="reviewWrongWords()" style="margin-top:16px;">🔁 复习错题</button>
+    <button class="btn ghost" onclick="closeModal();openWordBook()">返回背单词</button>
+  `;
+  openModal();
+}
+
+function removeWrongWord(index) {
+  if(!Current || !Current.wrongWords) return;
+  Current.wrongWords.splice(index, 1);
+  saveGame();
+  openWrongWords();
+}
+
+function reviewWrongWords() {
+  if (!Current || !Current.wrongWords || Current.wrongWords.length === 0) return;
+  const shuffled = [...Current.wrongWords].sort(() => Math.random() - 0.5);
+  wordGameState.isReviewing = true;
+  wordGameState.reviewQueue = shuffled;
+  wordGameState.reviewIndex = 0;
+  wordGameState.correctCount = 0;
+  
+  Current.wrongWords = []; 
+  saveGame();
+  
+  showReviewWord();
+}
+
+function showReviewWord() {
+  if (!wordGameState.isReviewing || wordGameState.reviewIndex >= wordGameState.reviewQueue.length) {
+    const modal = document.getElementById('modalContent');
+    modal.innerHTML = `
+      <h2>复习完成 <span class="close" onclick="closeModal()">×</span></h2>
+      <p style="color:var(--text-soft); font-size:14px; text-align:center; padding:20px 0;">你完成了 ${wordGameState.reviewQueue.length} 个错词的复习。</p>
+      <button class="btn ghost" onclick="closeModal();openWordBook()">返回背单词</button>
+    `;
+    openModal();
+    return;
+  }
+
+  const word = wordGameState.reviewQueue[wordGameState.reviewIndex];
+  const modal = document.getElementById('modalContent');
+  modal.innerHTML = `
+    <h2>复习错题 <span class="close" onclick="closeModal()">×</span></h2>
+    <div class="game-panel">
+      <div class="g-status">正在复习第 ${wordGameState.reviewIndex + 1} / ${wordGameState.reviewQueue.length} 个</div>
+      <div class="g-content" id="wordPrompt"></div>
+      <div class="g-input-row"><input id="wordInput" placeholder="输入中文意思…"><button onclick="checkReviewAnswer()">提交</button></div>
+      <div class="g-log" id="wordLog">已复习 ${wordGameState.reviewIndex} 个</div>
+    </div>
+  `;
+  document.getElementById('wordPrompt').innerHTML = `<b style="font-size:24px;">${word.en}</b><br><span style="color:var(--text-soft);font-size:12px;">请输入中文意思</span>`;
+  document.getElementById('wordInput').focus();
+  openModal();
+}
+
+function checkReviewAnswer() {
+  const input = document.getElementById('wordInput');
+  const userAnswer = input.value.trim();
+  const word = wordGameState.reviewQueue[wordGameState.reviewIndex];
+  if (!word) return;
+  
+  const correct = word.zh;
+  const isCorrect = userAnswer === correct || correct.includes(userAnswer) || userAnswer.includes(correct);
+  
+  if (isCorrect) {
+    document.getElementById('wordLog').textContent = `✅ 答对了！`;
+    wordGameState.reviewIndex++;
+    setTimeout(() => showReviewWord(), 800);
+  } else {
+    document.getElementById('wordLog').textContent = `❌ 答错了，正确答案是：${correct}`;
+    input.value = '';
+    Current.wrongWords.push(word);
+    saveGame();
+    wordGameState.reviewIndex++;
+    setTimeout(() => showReviewWord(), 2000);
+  }
+}
+
 function openEnglishReading() {
   const modal = document.getElementById('modalContent');
   modal.innerHTML = `
@@ -2785,44 +2925,46 @@ async function checkSubjectAnswer() {
   btn.textContent = '批改中…';
   btn.disabled = true;
 
-  const correct = Current.subjectAnswer.toLowerCase();
-  const userAns = ans.toLowerCase();
-  const isCorrect = userAns === correct || correct.includes(userAns) || userAns.includes(correct) || userAns.substring(0,1) === correct.substring(0,1);
+  const correct = String(Current.subjectAnswer).trim().toLowerCase();
+  const userAns = ans.trim().toLowerCase();
+  const isCorrect = (userAns === correct) || (correct.length === 1 && userAns === correct);
 
   if (isCorrect) {
     setTimeout(() => {
-      say('答对了！', 'tip');
+      say('答对了！你真棒。', 'tip');
       addRelationValue(2);
       closeModal();
     }, 500);
     return;
   }
 
-  const subjectName = document.getElementById('subjectSelect')?.value || '这道题';
   say(`答错了哦，正确答案是：${Current.subjectAnswer}`, 'tip');
   input.value = '';
-  btn.textContent = '提交';
+  btn.textContent = '再试一次';
   btn.disabled = false;
 
   if (!API.ready) return;
   const currentQuestion = document.getElementById('subjectPrompt').innerText;
-  const sysPrompt = `【系统强制指令】用户刚刚在做【${subjectName}】题，但答错了。
+  const subjectName = document.getElementById('subjectSelect')?.value || '这道题';
+
+  const sysPrompt = `【系统强制指令】用户刚刚在做【${subjectName}】题，答错了。
 【题目】：${currentQuestion}
 【用户的答案】：${ans}
 【正确答案】：${Current.subjectAnswer}
-请你立刻扮演严厉但耐心的老师，用 2~3 句话，简练地给用户讲讲这道题为什么选这个答案，或者正确的解题思路是什么。不要写“好的”“我来讲讲”这种废话，直接开始讲解。`;
+请你立刻扮演一个老师，用 2~3 句话，简练地讲解这道题为什么是这个答案，以及正确的解题思路。禁止写“好的”“我来讲讲”这种废话，必须直接开始讲知识点。`;
 
-  callAI([
-    {role:'system', content: buildSystemPrompt('') + '\n\n' + sysPrompt},
-    {role:'user', content:'【系统触发】'}
-  ]).then(reply => {
+  try {
+    const reply = await callAI([
+      {role:'system', content: buildSystemPrompt('') + '\n\n' + sysPrompt},
+      {role:'user', content:'【系统触发】'}
+    ]);
     if (reply) {
       let {clean} = parseEmotion(reply);
       say(clean, 'them');
     }
-  }).catch(() => {
-    say('（老师好像开小差了，没讲出来。）', 'tip');
-  });
+  } catch(e) {
+    say('（老师开小差了，没能讲出来。）', 'tip');
+  }
 }
 
 /* ============ 小游戏 ============ */
@@ -2835,6 +2977,8 @@ function openGameMenu(){
     <div class="game-item" onclick="startGame('twenty')"><div><div class="g-name">❓ 20 问</div><div class="g-desc">他想了样东西，你问 20 个问题猜</div></div><div class="g-arrow">›</div></div>
     <div class="game-item" onclick="startGame('story')"><div><div class="g-name">📖 接龙编故事</div><div class="g-desc">你一句他一句，一起编故事</div></div><div class="g-arrow">›</div></div>
     <div class="game-item" onclick="startRPS()"><div><div class="g-name">✊ 石头剪刀布</div><div class="g-desc">赢了让 AI 真心话大冒险</div></div><div class="g-arrow">›</div></div>
+    <div class="game-item" onclick="startSudoku()"><div><div class="g-name">🧩 数独</div><div class="g-desc">经典 9x9，考验逻辑的时候到了</div></div><div class="g-arrow">›</div></div>
+    <div class="game-item" onclick="startMaze()"><div><div class="g-name">🏃 走迷宫</div><div class="g-desc">用按钮移动，找到出口</div></div><div class="g-arrow">›</div></div>
   `;
   openModal();
 }
@@ -3199,6 +3343,185 @@ function addMoneyLog() {
   }
   
   openMoney();
+}
+
+/* ============ 数独 ============ */
+let sudokuState = { board: [], solution: [], selected: null, initial: [] };
+
+function startSudoku() {
+  function generateSolution() {
+    const base = 3;
+    const side = base * base;
+    const pattern = (r, c) => (base * (r % base) + Math.floor(r / base) + c) % side;
+    const shuffle = s => {
+      for (let i = s.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [s[i], s[j]] = [s[j], s[i]];
+      }
+      return s;
+    };
+    const rBase = [0, 1, 2].map(x => x * 3);
+    const rows = shuffle([...rBase]).flatMap(r => shuffle([...rBase]).map(x => r + x));
+    const cols = shuffle([...rBase]).flatMap(c => shuffle([...rBase]).map(x => c + x));
+    const nums = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    const board = rows.map(r => cols.map(c => nums[pattern(r, c)]));
+    return board;
+  }
+
+  const sol = generateSolution();
+  const puzzle = JSON.parse(JSON.stringify(sol));
+  let holes = 40;
+  while (holes > 0) {
+    const r = Math.floor(Math.random() * 9);
+    const c = Math.floor(Math.random() * 9);
+    if (puzzle[r][c] !== 0) { puzzle[r][c] = 0; holes--; }
+  }
+
+  sudokuState.board = puzzle;
+  sudokuState.solution = sol;
+  sudokuState.initial = puzzle.map(row => [...row]);
+  sudokuState.selected = null;
+
+  renderSudoku();
+}
+
+function renderSudoku() {
+  const modal = document.getElementById('modalContent');
+  let html = `<h2>🧩 数独 <span class="close" onclick="closeModal()">×</span></h2>`;
+  html += `<div style="text-align:center; margin-bottom:10px; font-size:12px; color:var(--text-soft);">点击空格，再点下方数字填入</div>`;
+  html += `<div style="display:grid; grid-template-columns:repeat(9,1fr); gap:2px; background:var(--text-soft); padding:2px; border-radius:8px; max-width:360px; margin:0 auto;">`;
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      const val = sudokuState.board[r][c];
+      const isFixed = sudokuState.initial[r][c] !== 0;
+      const isSel = sudokuState.selected && sudokuState.selected.r === r && sudokuState.selected.c === c;
+      const borderTop = (r % 3 === 0 && r !== 0) ? '2px solid var(--main-dark)' : '1px solid var(--accent)';
+      const borderLeft = (c % 3 === 0 && c !== 0) ? '2px solid var(--main-dark)' : '1px solid var(--accent)';
+      const bg = isSel ? 'var(--accent)' : (isFixed ? 'var(--bg2)' : 'var(--card)');
+      const color = isFixed ? 'var(--text)' : 'var(--main-dark)';
+      html += `<div onclick="selectSudokuCell(${r},${c})" style="
+        aspect-ratio:1; display:flex; align-items:center; justify-content:center;
+        background:${bg}; color:${color}; font-size:18px; font-weight:600; cursor:pointer;
+        border-top:${borderTop}; border-left:${borderLeft}; border-radius:4px;
+      ">${val === 0 ? '' : val}</div>`;
+    }
+  }
+  html += `</div>`;
+  html += `<div style="display:flex; justify-content:center; gap:8px; margin-top:16px; flex-wrap:wrap;">`;
+  for (let n = 1; n <= 9; n++) {
+    html += `<button onclick="setSudokuNumber(${n})" style="width:36px; height:36px; border-radius:8px; border:none; background:var(--card); color:var(--text); font-size:16px; font-weight:600; cursor:pointer;">${n}</button>`;
+  }
+  html += `</div>`;
+  html += `<div style="display:flex; justify-content:center; gap:8px; margin-top:10px;">`;
+  html += `<button class="btn ghost" onclick="setSudokuNumber(0)">擦除</button>`;
+  html += `<button class="btn ghost" onclick="startSudoku()">重开</button>`;
+  html += `</div>`;
+  modal.innerHTML = html;
+  openModal();
+}
+
+function selectSudokuCell(r, c) {
+  if (sudokuState.initial[r][c] !== 0) return;
+  sudokuState.selected = { r, c };
+  renderSudoku();
+}
+
+function setSudokuNumber(n) {
+  if (!sudokuState.selected) return;
+  const { r, c } = sudokuState.selected;
+  sudokuState.board[r][c] = n;
+  renderSudoku();
+
+  let full = true, correct = true;
+  for (let i = 0; i < 9; i++) {
+    for (let j = 0; j < 9; j++) {
+      if (sudokuState.board[i][j] === 0) full = false;
+      if (sudokuState.board[i][j] !== sudokuState.solution[i][j]) correct = false;
+    }
+  }
+  if (full && correct) {
+    setTimeout(() => {
+      say('🎉 数独完成，你真棒！', 'tip');
+      addRelationValue(3);
+      closeModal();
+    }, 300);
+  }
+}
+
+/* ============ 走迷宫 ============ */
+let mazeState = { grid: [], player: {x:1, y:1}, size: 15 };
+
+function startMaze() {
+  const size = 15;
+  const grid = Array.from({length: size}, () => Array(size).fill(1));
+  function carve(x, y) {
+    grid[y][x] = 0;
+    const dirs = [[0,2],[2,0],[0,-2],[-2,0]].sort(() => Math.random() - 0.5);
+    for (let [dx, dy] of dirs) {
+      const nx = x + dx, ny = y + dy;
+      if (nx > 0 && nx < size - 1 && ny > 0 && ny < size - 1 && grid[ny][nx] === 1) {
+        grid[y + dy/2][x + dx/2] = 0;
+        carve(nx, ny);
+      }
+    }
+  }
+  carve(1, 1);
+  grid[size - 2][size - 2] = 0;
+  mazeState.grid = grid;
+  mazeState.player = {x:1, y:1};
+  mazeState.size = size;
+  renderMaze();
+}
+
+function renderMaze() {
+  const modal = document.getElementById('modalContent');
+  const g = mazeState.grid;
+  const p = mazeState.player;
+  let html = `<h2>🏃 走迷宫 <span class="close" onclick="closeModal()">×</span></h2>`;
+  html += `<div style="text-align:center; margin-bottom:10px; font-size:12px; color:var(--text-soft);">走到右下角出口，用下方按钮移动</div>`;
+  
+  html += `<div style="display:inline-block; background:var(--bg2); padding:4px; border-radius:8px; margin:0 auto; display:block; width:fit-content;">`;
+  for (let y = 0; y < mazeState.size; y++) {
+    let row = '';
+    for (let x = 0; x < mazeState.size; x++) {
+      let cell = '';
+      if (p.x === x && p.y === y) cell = '🧍';
+      else if (x === mazeState.size - 2 && y === mazeState.size - 2) cell = '🏁';
+      const bg = g[y][x] === 1 ? 'var(--text-soft)' : 'var(--card)';
+      row += `<div style="width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; background:${bg}; font-size:12px;">${cell}</div>`;
+    }
+    html += `<div style="display:flex;">${row}</div>`;
+  }
+  html += `</div>`;
+  
+  html += `<div style="display:flex; flex-direction:column; align-items:center; margin-top:12px; gap:6px;">`;
+  html += `<button class="btn ghost" style="width:60px;" onclick="moveMaze(0,-1)">↑</button>`;
+  html += `<div style="display:flex; gap:6px;">`;
+  html += `<button class="btn ghost" style="width:60px;" onclick="moveMaze(-1,0)">←</button>`;
+  html += `<button class="btn ghost" style="width:60px;" onclick="moveMaze(0,1)">↓</button>`;
+  html += `<button class="btn ghost" style="width:60px;" onclick="moveMaze(1,0)">→</button>`;
+  html += `</div>`;
+  html += `</div>`;
+  html += `<button class="btn ghost" onclick="startMaze()" style="margin-top:10px;">重开</button>`;
+  
+  modal.innerHTML = html;
+  openModal();
+}
+
+function moveMaze(dx, dy) {
+  const p = mazeState.player;
+  const nx = p.x + dx, ny = p.y + dy;
+  if (nx < 0 || nx >= mazeState.size || ny < 0 || ny >= mazeState.size) return;
+  if (mazeState.grid[ny][nx] === 1) return;
+  p.x = nx; p.y = ny;
+  renderMaze();
+  if (nx === mazeState.size - 2 && ny === mazeState.size - 2) {
+    setTimeout(() => {
+      say('🎉 走出迷宫了，真厉害！', 'tip');
+      addRelationValue(3);
+      closeModal();
+    }, 300);
+  }
 }
 
 /* ============ 设置 / 其他辅助功能 ============ */
@@ -3582,7 +3905,7 @@ function applySaveObject(d){
     if(!c.pet.nextWalkAt) c.pet.nextWalkAt = 0;
     if(!c.stats || typeof c.stats !== 'object') c.stats = { mood:80, food:80, energy:80 };
     if(typeof c.stats.energy !== 'number') c.stats.energy = 80;
-    ['images','outfits','lorebook','track','anniversaries','customShopItems','recentTopics','pomoHistory','recentGames'].forEach(k=>{ if(!Array.isArray(c[k])) c[k] = []; });
+    ['images','outfits','lorebook','track','anniversaries','customShopItems','recentTopics','pomoHistory','recentGames','wrongWords'].forEach(k=>{ if(!Array.isArray(c[k])) c[k] = []; });
     if(!c.inventory || typeof c.inventory !== 'object') c.inventory = {};
     if(!c.diary || typeof c.diary !== 'object') c.diary = { yours:[], his:[] };
     if(!c.period || typeof c.period !== 'object') c.period = { lastStart:null, cycle:28, duration:5, manualOn:false };
