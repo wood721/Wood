@@ -422,7 +422,7 @@ function showInAppNotif(text){
     else icon.textContent = '💬';
     title.textContent = Current.name;
   }
-  msg.textContent = text;
+  msg.textContent = text || '';
   box.classList.add('show');
   if(notifTimer) clearTimeout(notifTimer);
   notifTimer = setTimeout(()=>{ box.classList.remove('show'); }, 4000);
@@ -1101,23 +1101,29 @@ function buildMessages(userInput){
 /* ============ 解析 ============ */
 const EMO_MAP={'开心':'happy','高兴':'happy','笑':'happy','害羞':'shy','脸红':'shy','难过':'sad','伤心':'sad','失落':'sad','生气':'angry','不满':'angry','哼':'angry','惊讶':'surprise','吃惊':'surprise','温柔':'tender','平静':'calm'};
 function parseEmotion(text){
-  const m=text.match(/\[([^\]]+)\]\s*$/);
-  if(!m)return{clean:text,emo:'calm',label:null};
+  if (text === null || text === undefined) return {clean:'', emo:'calm', label:null};
+  let str = String(text);
+  const m=str.match(/\[([^\]]+)\]\s*$/);
+  if(!m)return{clean:str,emo:'calm',label:null};
   const label=m[1].trim();
-  const clean=text.replace(/\[[^\]]+\]\s*$/,'').trim();
+  const clean=str.replace(/\[[^\]]+\]\s*$/,'').trim();
   let emo='calm';
   for(const k in EMO_MAP){if(label.includes(k)){emo=EMO_MAP[k];break;}}
   return{clean,emo,label};
 }
 function parseBgColor(text){
-  const m=text.match(/\[背景色[:：]\s*(#[0-9a-fA-F]{3,8})\s*\]/);
-  if(!m)return{clean:text,color:null};
-  return{clean:text.replace(m[0],'').trim(),color:m[1]};
+  if (text === null || text === undefined) return {clean:'', color:null};
+  let str = String(text);
+  const m=str.match(/\[背景色[:：]\s*(#[0-9a-fA-F]{3,8})\s*\]/);
+  if(!m)return{clean:str,color:null};
+  return{clean:str.replace(m[0],'').trim(),color:m[1]};
 }
 function parseKaomoji(text){
-  const m=text.match(/\[颜文字\]\s*([\s\S]+?)\s*$/);
-  if(!m)return{clean:text,kaomoji:null};
-  return{clean:text.replace(m[0],'').trim(),kaomoji:m[1].trim()};
+  if (text === null || text === undefined) return {clean:'', kaomoji:null};
+  let str = String(text);
+  const m=str.match(/\[颜文字\]\s*([\s\S]+?)\s*$/);
+  if(!m)return{clean:str,kaomoji:null};
+  return{clean:str.replace(m[0],'').trim(),kaomoji:m[1].trim()};
 }
 function findEmotionImage(label,emo){
   if(!Current) return null;
@@ -1198,10 +1204,11 @@ function repositionAllBubblesDebounced(){
   bubbleTimer = setTimeout(()=>{ repositionAllBubbles(); }, 80);
 }
 function say(text,who='them',opts={}){
+  if (text === null || text === undefined) return;
   const box=document.getElementById('bubbles'), stage=document.getElementById('stage');
   if(!box||!stage)return;
   
-  let cleanText = text.replace(/\[[^\]]+\]/g, '').trim();
+  let cleanText = String(text).replace(/\[[^\]]+\]/g, '').trim();
   if(!cleanText && !opts.kaomoji) return;
 
   const div=document.createElement('div');
@@ -1456,7 +1463,8 @@ function bindCharTouch(wrap){
   function onDown(e){
     if(e.target.closest('#charPlaceholder'))return;
     if(Current && (Current.isAway || Current.focusMode))return;
-    e.preventDefault();
+    // 🌟 核心修复：不要直接 e.preventDefault()，否则浏览器无法触发 pointermove
+    e.stopPropagation();
     charPressed = true;
     const rect = wrap.getBoundingClientRect();
     charDownY = (e.clientY - rect.top) / rect.height;
@@ -1480,7 +1488,7 @@ function bindCharTouch(wrap){
   }
   function onMove(e){
     if(!dragging)return;
-    e.preventDefault();
+    e.preventDefault(); // 🌟 拖拽过程中才阻止滚动
     const stage=document.getElementById('stage'), rect=stage.getBoundingClientRect();
     const dx=(e.clientX-startX)/rect.width, dy=(e.clientY-startY)/rect.height;
     if(Math.abs(dx)>0.01||Math.abs(dy)>0.01)moved=true;
@@ -1547,7 +1555,7 @@ async function triggerTouchAction(action){
       ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
       {role:'user',content:'【系统触发】'},
     ]);
-    if(reply){
+    if(reply && typeof reply === 'string'){
       let{clean,emo,label}=parseEmotion(reply);
       const bg=parseBgColor(clean); clean=bg.clean;
       const km=parseKaomoji(clean); clean=km.clean;
@@ -1704,7 +1712,7 @@ async function petAIReply(scene){
       ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
       {role:'user',content:'【系统触发】'},
     ]);
-    if(reply){
+    if(reply && typeof reply === 'string'){
       let{clean,emo,label}=parseEmotion(reply);
       const bg=parseBgColor(clean); clean=bg.clean;
       const km=parseKaomoji(clean); clean=km.clean;
@@ -1817,7 +1825,7 @@ function checkReturnHome(){
           ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
           {role:'user',content:'【系统触发】'},
         ]).then(reply=>{
-          if(reply){
+          if(reply && typeof reply === 'string'){
             let{clean,emo,label}=parseEmotion(reply);
             const bg=parseBgColor(clean); clean=bg.clean;
             const km=parseKaomoji(clean); clean=km.clean;
@@ -1866,7 +1874,7 @@ function nudgeStudy(){
     ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
     {role:'user',content:'【系统触发】'},
   ]).then(reply=>{
-    if(reply){
+    if(reply && typeof reply === 'string'){
       let{clean,emo,label}=parseEmotion(reply);
       const bg=parseBgColor(clean); clean=bg.clean;
       const km=parseKaomoji(clean); clean=km.clean;
@@ -1911,7 +1919,7 @@ function checkFestival(){
       ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
       {role:'user',content:'【系统触发】'},
     ]).then(reply=>{
-      if(reply){
+      if(reply && typeof reply === 'string'){
         let{clean,emo,label}=parseEmotion(reply);
         const bg=parseBgColor(clean); clean=bg.clean;
         const km=parseKaomoji(clean); clean=km.clean;
@@ -1953,7 +1961,7 @@ function checkSelfDiary(){
       {role:'system',content:sys},
       {role:'user',content:'【系统触发】'},
     ]).then(reply=>{
-      if(reply){
+      if(reply && typeof reply === 'string'){
         const clean = parseEmotion(reply).clean;
         Current.diary.his.push({date:y, text:clean, selfWritten:true});
         saveGameDebounced();
@@ -1981,7 +1989,7 @@ function tryBackgroundAINotification(){
     ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
     {role:'user',content:'【系统触发】'},
   ]).then(reply=>{
-    if(reply){
+    if(reply && typeof reply === 'string'){
       let{clean,emo,label}=parseEmotion(reply);
       clean = clean.trim();
       if(clean){
@@ -2141,12 +2149,13 @@ async function chat(userText){
   Current.chatLog.push({role:'user',text:userText,time:Date.now()});
   try {
     const reply=await callAI(buildMessages(userText));
-    // 🌟 核心修复：如果 AI 返回了空内容，不要崩，提示用户
-    if(!reply || typeof reply !== 'string' || reply.trim() === ''){
+    // 🌟 核心修复：安全地判断 reply 是否为空
+    if (reply === null || reply === undefined || String(reply).trim() === '') {
       say('（他好像走神了，没说出话来，你再说一次？）','tip');
       return;
     }
-    let{clean,emo,label}=parseEmotion(reply);
+    let replyStr = String(reply);
+    let{clean,emo,label}=parseEmotion(replyStr);
     const bg=parseBgColor(clean); clean=bg.clean;
     const km=parseKaomoji(clean); clean=km.clean;
     if(bg.color)applyBgColor(bg.color);
@@ -2868,7 +2877,7 @@ function openEnglishReading() {
   callAI([
     {role:'system', content:'你是一位高中英语老师。请写一篇完整的英语短文，只输出英文正文，不要任何中文解释、不要Markdown代码块。文章必须有头有尾，字数在150词左右。'},
     {role:'user', content:'请生成一篇 150 字左右的高中难度英语短文，主题可以是人与自然、科技发展或日常生活。文章必须完整，包含开头、中间和结尾。'}
-  ], {maxTokens: 1000, temperature: 0.8}).then(reply => {
+  ], {maxTokens: 1000, temperature: 0.8, timeout: 90000}).then(reply => {
     document.getElementById('readingText').textContent = (reply && typeof reply === 'string') ? reply : '生成失败，请重试。';
   }).catch(e => {
     document.getElementById('readingText').textContent = '生成失败：' + e.message;
@@ -3070,7 +3079,7 @@ async function initTurtleGame(){
     const reply = await callAI([
       {role:'system',content:'你是一个海龟汤游戏主持人。只输出JSON，不要别的文字。'},
       {role:'user',content:'请生成一个海龟汤谜题。要求：故事必须原创，不要用"酒吧点水"、"一个人走进酒吧"、"电梯里的女人"这类常见例子。要有点新意。输出 JSON：{"story":"故事开头（1-2句，诡异但不恐怖，适合情侣玩）","answer":"真相（1-2句）"}。' + hint}
-    ], {maxTokens:300, temperature:1.0});
+    ], {maxTokens:300, temperature:1.0, timeout: 90000});
     let story='', answer='';
     if(reply && typeof reply === 'string'){
       try{ const j = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); story=j.story||''; answer=j.answer||''; }catch(e){}
@@ -3094,7 +3103,7 @@ async function turtleAsk(){
     const reply = await callAI([
       {role:'system',content:`你是海龟汤主持人。谜题：${s.story}。真相：${s.answer}。玩家会问是/不是问题，你只能回答"是"、"不是"、"无关"三者之一，不要多说。`},
       {role:'user',content:q}
-    ], {maxTokens:20, temperature:0.1});
+    ], {maxTokens:20, temperature:0.1, timeout: 60000});
     s.log.push('他：'+((reply && typeof reply === 'string') ? reply.trim() : '无关'));
     document.getElementById('turtleLog').textContent = s.log.join('\n');
   }catch(e){ s.log.push('他：（网络出错）'); document.getElementById('turtleLog').textContent = s.log.join('\n'); }
@@ -3173,7 +3182,7 @@ async function initTwentyGame(){
     const reply = await callAI([
       {role:'system',content:'你是一个 20 问游戏主持人。只输出 JSON。'},
       {role:'user',content:'请想一个常见的物品。要求：不要用"苹果"、"手机"、"书"这类烂大街的，换点有新意的日常物品。输出 JSON：{"item":"物品名"}。' + hint}
-    ], {maxTokens:50, temperature:1.1});
+    ], {maxTokens:50, temperature:1.1, timeout: 60000});
     let item='苹果';
     if(reply && typeof reply === 'string'){
       try{ const j = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); item = j.item || '苹果'; }catch(e){}
@@ -3197,7 +3206,7 @@ async function twentyAsk(){
     const reply = await callAI([
       {role:'system',content:`你想的东西是：${s.item}。玩家会问是/不是问题，你只能回答"是"、"不是"、"无关"。不要多说。`},
       {role:'user',content:q}
-    ], {maxTokens:15, temperature:0.1});
+    ], {maxTokens:15, temperature:0.1, timeout: 60000});
     s.log.push('他答：'+((reply && typeof reply === 'string') ? reply.trim() : '无关'));
     document.getElementById('twentyLog').textContent = s.log.join('\n');
   }catch(e){ s.log.push('他答：（网络出错）'); document.getElementById('twentyLog').textContent = s.log.join('\n'); }
@@ -3243,7 +3252,7 @@ async function storySend(){
     const reply = await callAI([
       {role:'system',content:'你们在玩接龙编故事。根据前面的内容，接一句（1-2句），延续故事，别结束太快。只输出你要接的话。'},
       {role:'user',content:'当前故事：\n'+history+'\n\n请接一句。'}
-    ], {maxTokens:120, temperature:0.9});
+    ], {maxTokens:120, temperature:0.9, timeout: 60000});
     if(reply && typeof reply === 'string'){ s.turns.push('他：'+reply.trim()); document.getElementById('storyLog').textContent = s.turns.join('\n'); }
   }catch(e){ s.turns.push('他：（网络出错）'); document.getElementById('storyLog').textContent = s.turns.join('\n'); }
 }
@@ -4279,6 +4288,14 @@ async function boot(){
     GlobalState.currentCharId = GlobalState.characters[0].id;
   }
   Current = GlobalState.characters.find(c=>c.id===GlobalState.currentCharId);
+  
+  // 🌟 新增：重启后检查他是不是卡在外面了
+  if (Current.isAway && (!Current.awayUntil || Date.now() > Current.awayUntil)) {
+    Current.isAway = false;
+    Current.awayUntil = null;
+    updateTrackBar();
+  }
+
   applyMainColor(GlobalState.mainColor || '#ff8fab');
   pickRandomOutfit();
   if(Current && Current.pet && Current.pet.has && !Current.pet.nextWalkAt){
