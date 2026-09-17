@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -328,7 +329,7 @@ body{
 </div>
 
 <script>
-  /* ============ 农历节日对照表（2026-2036） ============ */
+/* ============ 农历节日对照表（2026-2036） ============ */
 const LUNAR_FESTIVALS = {
   2026: { chunjie:'2026-02-17', yuanxiao:'2026-03-03', qixi:'2026-08-19', zhongqiu:'2026-09-25' },
   2027: { chunjie:'2027-02-06', yuanxiao:'2027-02-20', qixi:'2027-08-08', zhongqiu:'2027-09-15' },
@@ -1088,6 +1089,29 @@ function buildSystemPrompt(userInput){
     '========== 不许重复 ==========',
     '1. 不许反复问同一件事。2. 不许一句话反复说。3. 每轮回复先在心里过一遍：这句话我是不是刚说过？',
     '',
+    '========== 语言硬规则（违反即 OOC）==========',
+    '1. 不要出现辱女词、歧视词、任何侮辱性词汇。',
+    '2. 不要出现逻辑漏洞。前后自相矛盾、时间线错乱、身份错乱都不允许。',
+    '3. 语言要像真实存在的人，不要像 AI。',
+    '4. 不要出现百分数、统计数据、专业术语（如"效率提升 80%""认知负荷"）。',
+    '5. 不要总是用"像被雷劈了""像被电击"这类比喻。',
+    '6. 不要说"你真是要命""你这个人真是……"这类油腻发言。',
+    '7. 人物不要毛手毛脚，不要总是掉东西。',
+    '8. 不要总是拿不稳东西，不要出现"XX 差点从手中落下"这类描写。',
+    '9. 不要频繁出现同一个物品（比如反复写杯子、手机、雨伞）。',
+    '',
+    '========== 禁止的写法 ==========',
+    '1. 禁止小众比喻、抽象修辞、堆砌形容词。',
+    '2. 不要氛围感。',
+    '3. 不要出现"我的""绷住""没绷住""低吼""把你揉进骨血里"这类词。',
+    '4. 不要冷门句子。',
+    '5. 只写动作，不做双重解释（例如不要写"不是生气的笑，是如释重负的笑"）。',
+    '6. 写实为主，不煽情、不造作、不 AI 腔。',
+    '7. 不要出现桂花糕、草莓类食品（草莓蛋糕、草莓牛奶）、糖醋类食品（糖醋排骨、糖醋里脊）。',
+    '8. 不要引用对方的话再解释，例如"你这句话的意思就是……"。',
+    '9. 不要给对方的任何话赋予意义，例如"你这句话比……有用""你这句话比……好""你这句话够我……"。',
+    '10. 不要出现"记下了""截图了""存档了""记在备忘录了"这类记录表述。',
+    '',
     '========== 默认风格（硬性）==========',
     '- 每次回复只能 1 句话，最多 2 句，绝对不能超过 2 句。',
     '- 即使用户发了很多条消息，也要理解全部内容后，合并成 1 句回复。',
@@ -1156,14 +1180,22 @@ function buildMessages(userInput){
 const EMO_MAP={'开心':'happy','高兴':'happy','笑':'happy','害羞':'shy','脸红':'shy','难过':'sad','伤心':'sad','失落':'sad','生气':'angry','不满':'angry','哼':'angry','惊讶':'surprise','吃惊':'surprise','温柔':'tender','平静':'calm'};
 function parseEmotion(text){
   if(!text) return {clean:text, emo:'calm', label:null};
-  const m = text.match(/\[([^\[\]]+)\]\s*$/);
-  if(!m) return {clean:text.trim(), emo:'calm', label:null};
-  const label = m[1].trim();
-  if(/^背景色|^颜文字|^行动/.test(label)) return {clean:text, emo:'calm', label:null};
-  const clean = text.replace(/\[[^\[\]]+\]\s*$/,'').trim();
-  let emo='calm';
-  for(const k in EMO_MAP){ if(label.includes(k)){ emo=EMO_MAP[k]; break; } }
-  return {clean, emo, label};
+  let t = String(text);
+  const allLabels = t.match(/\[([^\[\]]+)\]/g) || [];
+  let emo = 'calm';
+  let label = null;
+  for(const tag of allLabels){
+    const inner = tag.replace(/^\[|\]$/g,'').trim();
+    if(/^背景色|^颜文字|^行动/.test(inner)) continue;
+    for(const k in EMO_MAP){
+      if(inner.includes(k)){ emo = EMO_MAP[k]; label = inner; break; }
+    }
+  }
+  t = t.replace(/\[背景色[:：][^\]]*\]/g, '');
+  for(const k in EMO_MAP){
+    t = t.replace(new RegExp('\\[[^\\[\\]]*'+k+'[^\\[\\]]*\\]','g'), '');
+  }
+  return { clean: t.trim(), emo, label };
 }
 function parseBgColor(text){
   const m=text.match(/\[背景色[:：]\s*(#[0-9a-fA-F]{3,8})\s*\]/);
@@ -1792,7 +1824,8 @@ function bindStage(){
   });
   document.getElementById('charPlaceholder').addEventListener('click',e=>{ e.stopPropagation();openSettings(); });
 }
-  /* ============ 宠物面板 ============ */
+
+/* ============ 宠物面板 ============ */
 function openPetPanel(){
   if(!Current || !Current.pet.has) return;
   const p = Current.pet;
@@ -2315,7 +2348,7 @@ function openGift(){
   openModal();
 }
 
-/* ============ 聊天（防抖 + 合并 + 一句话） ============ */
+/* ============ 聊天 ============ */
 function needApiTip(){ say('先去「设置」里填 API，我才能说话。', 'tip'); }
 let chatDebounceTimer = null;
 let pendingUserMessages = [];
@@ -2531,7 +2564,7 @@ async function saveDiary(){
   } catch(e) {}
 }
 
-/* ============ 番茄钟 ============ */
+/* ============ 番茄钟（暂停解锁） ============ */
 let pomo={timer:null,remain:25*60,running:false,total:25*60,min:25};
 function savePomoGoal(){
   if(!Current) return;
@@ -2543,6 +2576,8 @@ function savePomoGoal(){
 function togglePomo(){
   if(pomo.running){
     clearInterval(pomo.timer);pomo.running=false;
+    if(Current){ Current.focusMode = false; Current.focusUntil = null; }
+    lockChat(false);
     document.getElementById('pomoBtn').textContent='继续';
     return;
   }
@@ -3136,10 +3171,15 @@ async function rpsAsk(type, target){
     openModal();
     try{
       const reply = await callAI([
-        {role:'system',content:buildSystemPrompt('')+`\n\n【场景】你和对方玩猜拳，对方输了，选了${type}。\n【要求】用你的身份，给对方出一道${type}的题目，1句话。直接说题目，不要加情绪标签，不要用括号。`},
+        {role:'system',content:buildSystemPrompt('')+`\n\n【场景】你和对方玩猜拳，对方输了，选了${type}。\n【要求】用你的身份，给对方出一道${type}的题目，只 1 句话，就是题目本身。\n- 不要加任何情绪标签\n- 不要用括号写动作\n- 不要加"欸""嗯""那个"之类的前缀或后缀\n- 不要反问对方\n- 只输出题目文字`},
         {role:'user',content:'【系统触发】'},
       ]);
-      if(reply) document.getElementById('rpsQ').textContent = parseEmotion(reply).clean;
+      if(reply){
+        let {clean, emo, label} = parseEmotion(reply);
+        clean = enforceOneSentence(clean);
+        document.getElementById('rpsQ').textContent = clean;
+        applyEmotion(emo, label);
+      }
     }catch(e){ document.getElementById('rpsQ').textContent='（网络出错）'; }
   } else {
     const cmdInput = document.getElementById('rpsCmdInput');
@@ -3957,7 +3997,8 @@ function importSave(e){
   };
   reader.readAsText(file);
 }
-  /* ============================================================
+
+/* ============================================================
    通用工具
    ============================================================ */
 function escapeHtml(s){
@@ -4335,10 +4376,19 @@ function studySave(type, title){
 function renderWordImport(){
   return `
     <div class="field"><label>词书名称</label>
-      <input id="wordBookName" placeholder="例：高考3500词">
+      <input id="wordBookName" placeholder="例：高考3500词 / 我的生词本">
     </div>
-    <div class="field"><label>粘贴单词（每行一个）</label>
-      <textarea id="wordImportText" style="min-height:180px;font-family:monospace;font-size:13px;"
+
+    <div style="background:var(--card);border-radius:14px;padding:12px;margin-bottom:14px;box-shadow:0 2px 8px rgba(229,107,140,.06);">
+      <div style="font-size:13px;color:var(--text-soft);margin-bottom:8px;">✍️ 手动加一个词</div>
+      <input id="wordManualW" placeholder="单词（如 apple）" style="margin-bottom:6px;">
+      <input id="wordManualM" placeholder="意思（如 苹果）" style="margin-bottom:6px;">
+      <input id="wordManualPh" placeholder="音标（可留空，如 ˈæpl）" style="margin-bottom:6px;">
+      <button class="btn" onclick="wordManualAdd()">添加到当前词书</button>
+    </div>
+
+    <div class="field"><label>批量粘贴（每行一个）</label>
+      <textarea id="wordImportText" style="min-height:150px;font-family:monospace;font-size:13px;"
 placeholder="01. rat老鼠
 04. unconditional 无条件的
 07. build建筑；建立"></textarea>
@@ -4346,11 +4396,45 @@ placeholder="01. rat老鼠
     <div class="field"><label>或上传 txt / csv</label>
       <input type="file" id="wordFile" accept=".txt,.csv" onchange="wordImportFile(event)">
     </div>
-    <button class="btn" onclick="wordImportText()">导入</button>
+    <button class="btn" onclick="wordImportText()">批量导入</button>
     <p style="font-size:11px;color:var(--text-soft);margin-top:10px;">
-      支持行首编号、空格、逗号、竖线、短横线、冒号。
+      批量导入支持行首编号、空格、逗号、竖线、短横线、冒号。
     </p>
   `;
+}
+function wordManualAdd(){
+  if(!Current) return;
+  if(!Current.word) Current.word = { books:[], currentBookId:null, dailyGoal:20, dir:'en2zh', learned:{}, history:[], wrong:[] };
+
+  const w = (document.getElementById('wordManualW').value || '').trim();
+  const m = (document.getElementById('wordManualM').value || '').trim();
+  const ph = (document.getElementById('wordManualPh').value || '').trim();
+
+  if(!w && !m){
+    say('至少要填单词或意思','tip');
+    return;
+  }
+
+  let book = Current.word.books.find(b=>b.id===Current.word.currentBookId);
+  if(!book){
+    book = { id:'b_'+Date.now(), name:'我的生词本', words:[], createdAt:Date.now() };
+    Current.word.books.push(book);
+    Current.word.currentBookId = book.id;
+  }
+
+  if(book.words.find(x=>x.w === w)){
+    say('这个词已经在词书里了','tip');
+    return;
+  }
+
+  book.words.push({ w, m, ph });
+  saveGame();
+
+  document.getElementById('wordManualW').value = '';
+  document.getElementById('wordManualM').value = '';
+  document.getElementById('wordManualPh').value = '';
+
+  say(`已添加「${w}」到「${book.name}」。`,'tip');
 }
 function preprocessWordText(text){
   const raw = text.split(/\r?\n/);
@@ -4946,6 +5030,7 @@ ${wrongList ? '错题：\n' + wrongList : '全对！'}`;
       const bg = parseBgColor(clean); clean = bg.clean;
       const km = parseKaomoji(clean); clean = km.clean;
       const ac = parseAction(clean); clean = ac.clean;
+      clean = enforceOneSentence(clean);
       if(bg.color) applyBgColor(bg.color);
       applyEmotion(emo, label);
       say(clean, 'them', {kaomoji: km.kaomoji});
@@ -5266,7 +5351,7 @@ function openPomoCalendar(){
   };
 }
 
-/* ============ 白噪音（4 个新名字） ============ */
+/* ============ 白噪音 ============ */
 const WHITE_NOISE_LIST = [
   { id:'fire',   name:'🔥 篝火', url:'audio/fire.mp3' },
   { id:'rain',   name:'🌧️ 小雨', url:'audio/rain.mp3' },
@@ -5389,3 +5474,4 @@ boot();
 </script>
 </body>
 </html>
+```
