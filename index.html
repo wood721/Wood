@@ -3759,7 +3759,6 @@ function quickSend(t){
   document.getElementById('chatInput').value=t;
   const input=document.getElementById('chatInput');
   if(!input) return;
-  const btn=document.getElementById('sendBtn');
   const evt=new KeyboardEvent('keydown',{key:'Enter'});
   input.dispatchEvent(evt);
 }
@@ -4554,19 +4553,19 @@ function renderWordStudy(){
   return `
     <div class="game-panel" style="text-align:center;">
       <div class="g-status">${escapeHtml(book.name)} · 今日 ${todayCount} / ${c.dailyGoal} · ${dirLabel}</div>
-      <div style="min-height:200px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;">
+      <div style="min-height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;">
         <div id="wordMain" style="font-size:30px;font-weight:600;color:var(--main-dark);word-break:break-word;text-align:center;"></div>
         <div id="wordPh" style="font-size:14px;color:var(--text-soft);margin-top:6px;min-height:20px;"></div>
-        <div id="wordMean" style="font-size:16px;color:var(--text);margin-top:14px;min-height:24px;text-align:center;"></div>
+        <div id="wordMean" style="font-size:14px;color:var(--text-soft);margin-top:10px;min-height:20px;text-align:center;"></div>
+      </div>
+      <div class="field" style="margin:0 0 10px 0;">
+        <input id="wordAnswerInput" placeholder="在这里输入答案…" style="font-size:16px;text-align:center;">
       </div>
       <div class="g-btn-row">
-        <button onclick="wordShowMean()">看答案</button>
-      </div>
-      <div class="g-btn-row" style="margin-top:8px;">
-        <button onclick="wordKnow()">认识</button>
-        <button onclick="wordDontKnow()">不认识</button>
+        <button onclick="wordSubmitAnswer()">提交</button>
         <button onclick="wordSkip()">跳过</button>
       </div>
+      <div id="wordJudge" style="margin-top:12px;min-height:24px;"></div>
       <div class="g-btn-row" style="margin-top:8px;">
         <button onclick="wordCycleDir()">方向：${dirLabel}</button>
         <button onclick="wordSetGoal()">设目标</button>
@@ -4607,40 +4606,49 @@ function loadNextWord(){
     if(ph) ph.textContent = '';
   }
   if(mean) mean.textContent = '';
+  const inp = document.getElementById('wordAnswerInput');
+  if(inp){ inp.value = ''; inp.focus(); }
+  const judge = document.getElementById('wordJudge');
+  if(judge) judge.innerHTML = '';
 }
-function wordShowMean(){
-  if(!__currentWord) return;
-  const mean = document.getElementById('wordMean');
-  const ph = document.getElementById('wordPh');
-  if(__currentDir === 'en2zh'){
-    if(mean) mean.textContent = __currentWord.m || '（没有释义）';
-  } else {
-    if(mean) mean.textContent = __currentWord.w;
-    if(ph) ph.textContent = __currentWord.ph ? '/'+__currentWord.ph+'/' : '';
-  }
-}
-function wordKnow(){
+function wordSubmitAnswer(){
   if(!Current || !__currentWord) return;
+  const inp = document.getElementById('wordAnswerInput');
+  const judge = document.getElementById('wordJudge');
+  if(!inp || !judge) return;
+  const ans = (inp.value || '').trim();
+  if(!ans){ say('先写答案吧','tip'); return; }
+
+  const correct = __currentDir === 'en2zh' ? __currentWord.m : __currentWord.w;
+  const userNorm = ans.toLowerCase().replace(/\s+/g,'').replace(/[，,。.；;、]/g,'');
+  const correctNorm = String(correct).toLowerCase().replace(/\s+/g,'').replace(/[，,。.；;、]/g,'');
+
+  let ok = userNorm === correctNorm;
+  if(!ok && correctNorm && (correctNorm.includes(userNorm) || userNorm.includes(correctNorm))){
+    ok = true;
+  }
+
   const c = Current.word;
   const today = todayStr();
   const key = __currentWord.w + '|' + __currentDir;
-  c.learned[key] = { date: today, count: (c.learned[key]?.count||0) + 1 };
-  c.history.push({ date: today, count: 1 });
-  if(c.history.length > 500) c.history = c.history.slice(-500);
-  Current.coin += 1;
-  updateStats();
-  saveGameDebounced();
-  say('已记住，+1 🪙','tip');
-  loadNextWord();
-}
-function wordDontKnow(){
-  if(!Current || !__currentWord) return;
-  const c = Current.word;
-  if(!c.wrong.find(x=>x.w===__currentWord.w && x.dir===__currentDir)){
-    c.wrong.push({ w:__currentWord.w, m:__currentWord.m, ph:__currentWord.ph||'', dir:__currentDir, date: todayStr() });
+
+  if(ok){
+    c.learned[key] = { date: today, count: (c.learned[key]?.count||0) + 1 };
+    c.history.push({ date: today, count: 1 });
+    if(c.history.length > 500) c.history = c.history.slice(-500);
+    Current.coin += 1;
+    updateStats();
+    judge.innerHTML = `<div class="test-result ok">✅ 正确：${escapeHtml(correct)}<br>+1 🪙</div>`;
+    saveGameDebounced();
+    setTimeout(()=>loadNextWord(), 1200);
+  } else {
+    if(!c.wrong.find(x=>x.w===__currentWord.w && x.dir===__currentDir)){
+      c.wrong.push({ w:__currentWord.w, m:__currentWord.m, ph:__currentWord.ph||'', dir:__currentDir, date: todayStr() });
+    }
+    judge.innerHTML = `<div class="test-result fail">❌ 你写的：${escapeHtml(ans)}<br>正确答案：${escapeHtml(correct)}</div>`;
+    saveGameDebounced();
+    setTimeout(()=>loadNextWord(), 2500);
   }
-  wordShowMean();
-  saveGameDebounced();
 }
 function wordSkip(){ loadNextWord(); }
 function wordSetGoal(){
