@@ -724,9 +724,7 @@ async function getUserLocation(){
   if(Geo){
     try{
       let perm = await Geo.checkPermissions();
-      if(perm.location !== 'granted'){
-        perm = await Geo.requestPermissions();
-      }
+      if(perm.location !== 'granted'){ perm = await Geo.requestPermissions(); }
       if(perm.location === 'granted'){
         const pos = await Geo.getCurrentPosition({ enableHighAccuracy:false, timeout:10000, maximumAge:600000 });
         return { lat: pos.coords.latitude, lon: pos.coords.longitude };
@@ -767,14 +765,11 @@ async function updateWeatherReal(force=false){
       return;
     }
     const w = await fetchWeatherByCoords(lat, lon);
-    GlobalState.weatherLat = lat;
-    GlobalState.weatherLon = lon;
+    GlobalState.weatherLat = lat; GlobalState.weatherLon = lon;
     GlobalState.weatherCity = cityName;
     GlobalState.weather = w.weather;
-    GlobalState.weatherUpdatedAt = now;
-    GlobalState.weatherDate = todayStr();
-    renderWeather();
-    saveGameDebounced();
+    GlobalState.weatherUpdatedAt = now; GlobalState.weatherDate = todayStr();
+    renderWeather(); saveGameDebounced();
   }catch(e){
     console.warn('天气获取失败', e);
     if(force) say('天气获取失败，请检查网络后重试。','tip');
@@ -957,6 +952,11 @@ function logTrack(place, action){
 }
 function computeTrack(){
   if(!Current) return {place:'客厅', action:'发呆'};
+  if(Current.__customTrack && Date.now() < Current.__customTrack.until){
+    return { place: Current.__customTrack.place, action: Current.__customTrack.action };
+  } else {
+    Current.__customTrack = null;
+  }
   const h=new Date().getHours();
   if(Current.isAway) return {place:'外面', action:'打工'};
   if(Current.sick) return {place:'卧室', action:'休息'};
@@ -1088,8 +1088,11 @@ function buildSystemPrompt(userInput){
     '========== 不许重复 ==========',
     '1. 不许反复问同一件事。2. 不许一句话反复说。3. 每轮回复先在心里过一遍：这句话我是不是刚说过？',
     '',
-    '========== 默认风格 ==========',
-    `- 默认回复 1~3 句。`,
+    '========== 默认风格（硬性）==========',
+    '- 每次回复只能 1 句话，最多 2 句，绝对不能超过 2 句。',
+    '- 即使用户发了很多条消息，也要理解全部内容后，合并成 1 句回复。',
+    '- 不要逐条回应。不要罗列。不要分点。',
+    '- 如果用户说了很多，你就用一句总结性的话回应。',
     `- 默认语气：${love>=75?'温柔亲昵':love>=50?'亲近关心':love>=25?'轻松开玩笑':'平淡有点距离'}。`,
     `- 默认不用颜文字，偶尔可以。默认用口语。`,
     c.language ? `- 必须用${c.language}回复。不管你之前用什么语言，从这一句开始全部用${c.language}。` : '',
@@ -1130,6 +1133,8 @@ function buildSystemPrompt(userInput){
     `3. 情绪标签只能有一个，放在末尾。`,
     `4. 可附加 [背景色:#RRGGBB] 标签。`,
     `5. 颜文字单独放最后一行，格式：[颜文字]你的颜文字`,
+    '6. 每次回复只能 1 句话。绝对不能写成长段落。',
+    '7. 如果对方让你做具体动作（打工、做饭、睡觉、出门、看书、洗澡、发呆、唱歌、跳舞、做饭给你），可以在末尾加 [行动:xxx] 标签，会真的执行。',
     '',
     '========== 防念稿规则（最重要）==========',
     '1. 绝对不要复述系统提示里给你的任何内容。',
@@ -1154,7 +1159,7 @@ function parseEmotion(text){
   const m = text.match(/\[([^\[\]]+)\]\s*$/);
   if(!m) return {clean:text.trim(), emo:'calm', label:null};
   const label = m[1].trim();
-  if(/^背景色|^颜文字/.test(label)) return {clean:text, emo:'calm', label:null};
+  if(/^背景色|^颜文字|^行动/.test(label)) return {clean:text, emo:'calm', label:null};
   const clean = text.replace(/\[[^\[\]]+\]\s*$/,'').trim();
   let emo='calm';
   for(const k in EMO_MAP){ if(label.includes(k)){ emo=EMO_MAP[k]; break; } }
@@ -1169,6 +1174,21 @@ function parseKaomoji(text){
   const m=text.match(/\[颜文字\]\s*([\s\S]+?)\s*$/);
   if(!m)return{clean:text,kaomoji:null};
   return{clean:text.replace(m[0],'').trim(),kaomoji:m[1].trim()};
+}
+function parseAction(text){
+  const m = text.match(/\[行动[:：]\s*([^\]]+)\s*\]/);
+  if(!m) return {clean:text, action:null};
+  return {
+    clean: text.replace(m[0],'').trim(),
+    action: m[1].trim()
+  };
+}
+function enforceOneSentence(text){
+  if(!text) return text;
+  let t = text.replace(/\n+/g,' ').trim();
+  const parts = t.split(/(?<=[。！？!?\.])\s*/).filter(Boolean);
+  if(parts.length <= 1) return t;
+  return parts[0];
 }
 function findEmotionImage(label,emo){
   if(!Current) return null;
@@ -1567,6 +1587,93 @@ function energyTooLowBlock(){
   }
   return false;
 }
+async function executeAction(action){
+  if(!Current || !action) return;
+  const a = action.trim();
+  if(a === '打工'){ doWorkNow(); }
+  else if(a === '做饭'){ doCookNow(); }
+  else if(a === '睡觉'){ openSleep(); }
+  else if(a === '看书'){
+    Current.__customTrack = { place:'客厅', action:'看书', until: Date.now()+30*60000 };
+    Current.stats.mood = Math.min(100, Current.stats.mood + 5);
+    updateStats(); updateTrackBar(); saveGame();
+  }
+  else if(a === '出门'){ doGoOutNow(); }
+  else if(a === '洗澡'){
+    Current.stats.energy = Math.min(100, Current.stats.energy + 10);
+    updateStats(); saveGame();
+  }
+  else if(a === '发呆'){
+    Current.__customTrack = { place:'客厅', action:'发呆', until: Date.now()+15*60000 };
+    updateTrackBar();
+  }
+  else if(a === '唱歌'){
+    Current.stats.mood = Math.min(100, Current.stats.mood + 5);
+    updateStats(); saveGame();
+  }
+  else if(a === '跳舞'){
+    Current.stats.mood = Math.min(100, Current.stats.mood + 8);
+    Current.stats.energy = Math.max(0, Current.stats.energy - 5);
+    updateStats(); saveGame();
+  }
+  else if(a === '做饭给你'){
+    Current.stats.food = Math.min(100, Current.stats.food + 20);
+    updateStats(); saveGame();
+  }
+}
+function doWorkNow(){
+  if(!Current || Current.isAway) return;
+  Current.isAway = true;
+  Current.stats.energy = Math.max(0, Current.stats.energy - 25);
+  Current.stats.food = Math.max(0, Current.stats.food - 15);
+  const awayMinutes = 5 + Math.floor(Math.random()*6);
+  Current.awayUntil = Date.now() + awayMinutes*60000;
+  logTrack('外面','打工');
+  updateTrackBar();
+  saveGame();
+  setTimeout(()=>{
+    if(!Current) return;
+    Current.isAway=false; Current.awayUntil=null;
+    updateTrackBar();
+    const earn = Math.floor((10 + Math.random()*21) * (0.7 + Current.stats.mood/200));
+    Current.coin += earn;
+    addRelationValue(2);
+    const msg = `“回来了，赚了 ${earn} 金币。”`;
+    say(msg,'them');
+    showInAppNotif(msg.replace(/[“”]/g,''));
+    updateStats(); saveGame();
+    walkTo(0.5);
+  }, awayMinutes*60000);
+}
+function doCookNow(){
+  if(!Current) return;
+  if(!Current.inventory['food']){
+    say('（家里没有食材，做不了饭。）','action');
+    return;
+  }
+  Current.inventory['food']--;
+  Current.stats.food = Math.min(100, Current.stats.food + 20);
+  Current.__customTrack = { place:'厨房', action:'做饭', until: Date.now()+20*60000 };
+  updateStats(); updateTrackBar(); saveGame();
+}
+function doGoOutNow(){
+  if(!Current || Current.isAway) return;
+  Current.isAway = true;
+  const awayMinutes = 3 + Math.floor(Math.random()*3);
+  Current.awayUntil = Date.now() + awayMinutes*60000;
+  logTrack('外面','散步');
+  updateTrackBar();
+  saveGame();
+  setTimeout(()=>{
+    if(!Current) return;
+    Current.isAway=false; Current.awayUntil=null;
+    updateTrackBar();
+    Current.stats.mood = Math.min(100, Current.stats.mood + 5);
+    say('“回来了，外面挺舒服的。”','them');
+    updateStats(); saveGame();
+    walkTo(0.5);
+  }, awayMinutes*60000);
+}
 async function triggerTouchAction(action){
   if(!Current) return;
   if(Current.isAway){ say('他不在家。','tip'); return; }
@@ -1588,7 +1695,7 @@ async function triggerTouchAction(action){
   addRelationValue(1);
   updateStats(); saveGameDebounced();
   try {
-    const sys = buildSystemPrompt('') + '\n\n【场景】' + a.scene + '\n【要求】这是已经发生的事，不是对方对你说的话。请直接以你的身份回应，1~2句。不要复述【场景】，不要提到"设定""规则""人设"，不要用括号写动作。';
+    const sys = buildSystemPrompt('') + '\n\n【场景】' + a.scene + '\n【要求】这是已经发生的事，不是对方对你说的话。请直接以你的身份回应，1句话。不要复述【场景】，不要提到"设定""规则""人设"，不要用括号写动作。';
     const reply = await callAI([
       {role:'system',content: sys},
       ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
@@ -1598,15 +1705,17 @@ async function triggerTouchAction(action){
       let{clean,emo,label}=parseEmotion(reply);
       const bg=parseBgColor(clean); clean=bg.clean;
       const km=parseKaomoji(clean); clean=km.clean;
+      const ac=parseAction(clean); clean=ac.clean;
+      clean = enforceOneSentence(clean);
       if(bg.color)applyBgColor(bg.color);
       say(clean,'them',{kaomoji:km.kaomoji});
       applyEmotion(emo,label);
+      if(ac.action) setTimeout(()=>executeAction(ac.action), 800);
       Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
       saveGameDebounced();
     }
   } catch(e) {}
 }
-
 function bindStage(){
   const stage=document.getElementById('stage');
   const wrap=document.getElementById('charWrap');
@@ -1744,7 +1853,7 @@ async function petTalk(){
 async function petAIReply(scene){
   if(!API.ready || !Current) return;
   try {
-    const sys = buildSystemPrompt('') + '\n\n【场景】' + scene + '\n【要求】这是已经发生的事，不是对方对你说的话。请直接以你的身份回应，1~2句。不要复述【场景】，不要提到"设定""规则""人设"，不要用括号写动作。';
+    const sys = buildSystemPrompt('') + '\n\n【场景】' + scene + '\n【要求】这是已经发生的事，不是对方对你说的话。请直接以你的身份回应，1句话。不要复述【场景】，不要提到"设定""规则""人设"，不要用括号写动作。';
     const reply = await callAI([
       {role:'system',content: sys},
       ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
@@ -1754,9 +1863,12 @@ async function petAIReply(scene){
       let{clean,emo,label}=parseEmotion(reply);
       const bg=parseBgColor(clean); clean=bg.clean;
       const km=parseKaomoji(clean); clean=km.clean;
+      const ac=parseAction(clean); clean=ac.clean;
+      clean = enforceOneSentence(clean);
       if(bg.color)applyBgColor(bg.color);
       say(clean,'them',{kaomoji:km.kaomoji});
       applyEmotion(emo,label);
+      if(ac.action) setTimeout(()=>executeAction(ac.action), 800);
       Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
       saveGameDebounced();
     }
@@ -1831,7 +1943,7 @@ function tryWork(){
   if(API.ready){
     const noteSys = buildSystemPrompt('') +
       '\n\n【场景】你要出门打工了，出门前给对方留一张小纸条。' +
-      '\n【要求】只写纸条内容，1~2句，简短自然。不要加情绪标签，不要用括号写动作，不要提到"设定""规则"。';
+      '\n【要求】只写纸条内容，1句话，简短自然。不要加情绪标签，不要用括号写动作，不要提到"设定""规则"。';
     callAI([
       {role:'system',content:noteSys},
       ...Current.chatLog.slice(-6).map(m=>({role:m.role,content:m.text})),
@@ -1878,7 +1990,7 @@ function tryWork(){
       Current.awayNote = null;
       setTimeout(()=>{
         if(API.ready){
-          const sys = buildSystemPrompt('') + '\n\n【场景】你刚回家，看到对方留在桌上的一张纸条，内容是：' + note + '\n【要求】请直接以你的身份回应这张纸条，1~2句。不要复述【场景】，不要提到"设定""规则"，不要用括号写动作。';
+          const sys = buildSystemPrompt('') + '\n\n【场景】你刚回家，看到对方留在桌上的一张纸条，内容是：' + note + '\n【要求】请直接以你的身份回应这张纸条，1句话。不要复述【场景】，不要提到"设定""规则"，不要用括号写动作。';
           callAI([
             {role:'system',content:sys},
             ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
@@ -1888,9 +2000,12 @@ function tryWork(){
               let{clean,emo,label}=parseEmotion(reply);
               const bg=parseBgColor(clean); clean=bg.clean;
               const km=parseKaomoji(clean); clean=km.clean;
+              const ac=parseAction(clean); clean=ac.clean;
+              clean = enforceOneSentence(clean);
               if(bg.color)applyBgColor(bg.color);
               say(clean,'them',{kaomoji:km.kaomoji});
               applyEmotion(emo,label);
+              if(ac.action) setTimeout(()=>executeAction(ac.action), 800);
               Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
               showInAppNotif(clean);
               saveGameDebounced();
@@ -1926,7 +2041,7 @@ function nudgeStudy(){
   const promptMap = h < 12 ? '现在是早上，提醒对方今天的学习目标还没完成。'
     : h < 18 ? '现在是下午，提醒对方今天的学习目标还有一部分没完成。'
     : '现在是晚上，提醒对方今天的学习目标快接近尾声了。';
-  const sys = buildSystemPrompt('') + '\n\n【场景】' + promptMap + '对方今天的目标是 ' + goal + ' 分钟，已经完成 ' + done + ' 分钟，还差 ' + remainTxt + '。\n【要求】根据你的性格，自然地催一下对方去学习/专注，1~2句。不要提到"设定""规则"，不要用括号写动作。';
+  const sys = buildSystemPrompt('') + '\n\n【场景】' + promptMap + '对方今天的目标是 ' + goal + ' 分钟，已经完成 ' + done + ' 分钟，还差 ' + remainTxt + '。\n【要求】根据你的性格，自然地催一下对方去学习/专注，1句话。不要提到"设定""规则"，不要用括号写动作。';
   callAI([
     {role:'system',content:sys},
     ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
@@ -1936,9 +2051,12 @@ function nudgeStudy(){
       let{clean,emo,label}=parseEmotion(reply);
       const bg=parseBgColor(clean); clean=bg.clean;
       const km=parseKaomoji(clean); clean=km.clean;
+      const ac=parseAction(clean); clean=ac.clean;
+      clean = enforceOneSentence(clean);
       if(bg.color)applyBgColor(bg.color);
       say(clean,'them',{kaomoji:km.kaomoji});
       applyEmotion(emo,label);
+      if(ac.action) setTimeout(()=>executeAction(ac.action), 800);
       Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
       showInAppNotif(clean);
       Current.lastPomoNudge = Date.now();
@@ -1964,14 +2082,14 @@ function checkFestival(){
   Current.lastFestivalDate = today;
   let scene = '';
   if(festival && isBirthday){
-    scene = `今天是「${festival.name}」，同时也是你的生日（${festival.emoji}）。请以你的身份，主动说一句生日快乐和节日祝福，1~2句。`;
+    scene = `今天是「${festival.name}」，同时也是你的生日（${festival.emoji}）。请以你的身份，主动说一句生日快乐和节日祝福，1句话。`;
   } else if(festival){
-    scene = `今天是「${festival.name}」${festival.emoji}。请以你的身份，主动说一句节日祝福，1~2句。`;
+    scene = `今天是「${festival.name}」${festival.emoji}。请以你的身份，主动说一句节日祝福，1句话。`;
   } else {
-    scene = `今天是你的生日🎂。请以你的身份，主动说一句生日相关的、开心的话，1~2句。`;
+    scene = `今天是你的生日🎂。请以你的身份，主动说一句生日相关的、开心的话，1句话。`;
   }
   setTimeout(()=>{
-    const sys = buildSystemPrompt('') + '\n\n【场景】' + scene + '\n【要求】这是已经发生的事，请直接以你的身份说出来，1~2句。不要复述【场景】，不要提到"设定""规则"，不要用括号写动作。';
+    const sys = buildSystemPrompt('') + '\n\n【场景】' + scene + '\n【要求】这是已经发生的事，请直接以你的身份说出来，1句话。不要复述【场景】，不要提到"设定""规则"，不要用括号写动作。';
     callAI([
       {role:'system',content:sys},
       ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
@@ -1981,6 +2099,7 @@ function checkFestival(){
         let{clean,emo,label}=parseEmotion(reply);
         const bg=parseBgColor(clean); clean=bg.clean;
         const km=parseKaomoji(clean); clean=km.clean;
+        clean = enforceOneSentence(clean);
         if(bg.color)applyBgColor(bg.color);
         say(clean,'them',{kaomoji:km.kaomoji});
         applyEmotion(emo,label);
@@ -2041,7 +2160,7 @@ function tryBackgroundAINotification(){
   else if(h < 18) promptMap = '现在是下午，主动给对方说一句话（比如在做什么）。';
   else if(h < 22) promptMap = '现在是晚上，主动给对方说一句话（比如今天过得怎么样）。';
   else return;
-  const sys = buildSystemPrompt('') + '\n\n【场景】' + promptMap + '\n【要求】直接以你的身份说 1~2 句话。不要复述【场景】，不要提到"设定""规则"，不要用括号写动作。';
+  const sys = buildSystemPrompt('') + '\n\n【场景】' + promptMap + '\n【要求】直接以你的身份说 1句话。不要复述【场景】，不要提到"设定""规则"，不要用括号写动作。';
   callAI([
     {role:'system',content:sys},
     ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
@@ -2049,7 +2168,7 @@ function tryBackgroundAINotification(){
   ]).then(reply=>{
     if(reply){
       let{clean,emo,label}=parseEmotion(reply);
-      clean = clean.trim();
+      clean = enforceOneSentence(clean.trim());
       if(clean){
         Current.lastBackgroundNotifAt = Date.now();
         pushNativeNotif(Current.name, clean);
@@ -2196,24 +2315,52 @@ function openGift(){
   openModal();
 }
 
-/* ============ 聊天 ============ */
+/* ============ 聊天（防抖 + 合并 + 一句话） ============ */
 function needApiTip(){ say('先去「设置」里填 API，我才能说话。', 'tip'); }
-async function chat(userText){
-  if(!Current) return;
-  if(Current.isAway){ say('他现在在外面，等他回来吧。','tip'); return; }
-  if(Current.focusMode){ say('专注中，先专心。','tip'); return; }
-  if(!API.ready){ needApiTip(); return; }
-  say(userText,'you');
-  Current.chatLog.push({role:'user',text:userText,time:Date.now()});
+let chatDebounceTimer = null;
+let pendingUserMessages = [];
+function bindChat(){
+  const input=document.getElementById('chatInput');
+  const btn=document.getElementById('sendBtn');
+  const send=()=>{
+    const t=input.value.trim(); if(!t)return;
+    if(!API.ready){ needApiTip(); return; }
+    input.value='';
+    say(t,'you');
+    Current.chatLog.push({role:'user',text:t,time:Date.now()});
+    pendingUserMessages.push(t);
+    if(chatDebounceTimer) clearTimeout(chatDebounceTimer);
+    chatDebounceTimer = setTimeout(()=>{ flushChat(); }, 3000);
+  };
+  btn.onclick=send;
+  input.addEventListener('keydown',e=>{ if(e.key==='Enter')send(); });
+}
+async function flushChat(){
+  if(!Current || !pendingUserMessages.length) return;
+  if(Current.isAway){ say('他现在在外面，等他回来吧。','tip'); pendingUserMessages=[]; return; }
+  if(Current.focusMode){ say('专注中，先专心。','tip'); pendingUserMessages=[]; return; }
+  if(!API.ready){ needApiTip(); pendingUserMessages=[]; return; }
+  const msgs = pendingUserMessages.slice();
+  pendingUserMessages = [];
+  let combined;
+  if(msgs.length === 1){
+    combined = msgs[0];
+  } else {
+    combined = `（对方连续说了 ${msgs.length} 条消息，请理解全部后，合并成 1 句话回应，不要逐条回）\n` +
+      msgs.map((m,i)=>`${i+1}. ${m}`).join('\n');
+  }
   try {
-    const reply=await callAI(buildMessages(userText));
+    const reply = await callAI(buildMessages(combined));
     if(!reply){ say('（他没回应，可能模型返回了空内容。）','err'); return; }
     let{clean,emo,label}=parseEmotion(reply);
     const bg=parseBgColor(clean); clean=bg.clean;
     const km=parseKaomoji(clean); clean=km.clean;
+    const ac=parseAction(clean); clean=ac.clean;
+    clean = enforceOneSentence(clean);
     if(bg.color)applyBgColor(bg.color);
     say(clean,'them',{kaomoji:km.kaomoji});
     applyEmotion(emo,label);
+    if(ac.action) setTimeout(()=>executeAction(ac.action), 800);
     Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
     addRelationValue(0.8);
     saveGameDebounced();
@@ -2237,7 +2384,7 @@ async function proactiveTalk(type='idle'){
     emo:'你今天有点闷，随口说一句。',
   }[type]||'主动说一句话。';
   try {
-    const sys = buildSystemPrompt('') + '\n\n【场景】' + prompt + '\n【要求】直接以你的身份说 1~2 句话。不要复述【场景】，不要提到"设定""规则"，不要用括号写动作。';
+    const sys = buildSystemPrompt('') + '\n\n【场景】' + prompt + '\n【要求】直接以你的身份说 1句话。不要复述【场景】，不要提到"设定""规则"，不要用括号写动作。';
     const reply=await callAI([
       {role:'system',content:sys},
       ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
@@ -2247,9 +2394,12 @@ async function proactiveTalk(type='idle'){
       let{clean,emo,label}=parseEmotion(reply);
       const bg=parseBgColor(clean); clean=bg.clean;
       const km=parseKaomoji(clean); clean=km.clean;
+      const ac=parseAction(clean); clean=ac.clean;
+      clean = enforceOneSentence(clean);
       if(bg.color)applyBgColor(bg.color);
       say(clean,'them',{kaomoji:km.kaomoji});
       applyEmotion(emo,label);
+      if(ac.action) setTimeout(()=>executeAction(ac.action), 800);
       Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
       rememberProactive(clean);
       showInAppNotif(clean);
@@ -2313,7 +2463,7 @@ async function doTouch(type){
   updateStats();saveGame();
   Current.lastInteract=Date.now();
   try {
-    const sys = buildSystemPrompt('') + '\n\n【场景】' + a.scene + '\n【要求】这是已经发生的事，不是对方对你说的话。请直接以你的身份回应，1~2句。不要复述【场景】，不要提到"设定""规则""人设"，不要用括号写动作。';
+    const sys = buildSystemPrompt('') + '\n\n【场景】' + a.scene + '\n【要求】这是已经发生的事，不是对方对你说的话。请直接以你的身份回应，1句话。不要复述【场景】，不要提到"设定""规则""人设"，不要用括号写动作。';
     const reply=await callAI([
       {role:'system',content:sys},
       ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
@@ -2323,9 +2473,12 @@ async function doTouch(type){
       let{clean,emo,label}=parseEmotion(reply);
       const bg=parseBgColor(clean); clean=bg.clean;
       const km=parseKaomoji(clean); clean=km.clean;
+      const ac=parseAction(clean); clean=ac.clean;
+      clean = enforceOneSentence(clean);
       if(bg.color)applyBgColor(bg.color);
       say(clean,'them',{kaomoji:km.kaomoji});
       applyEmotion(emo,label);
+      if(ac.action) setTimeout(()=>executeAction(ac.action), 800);
       Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
       saveGameDebounced();
     }
@@ -2426,7 +2579,7 @@ function togglePomo(){
         let scene = '对方刚完成一次专注，用了 ' + pomo.min + ' 分钟。';
         if(goal > 0 && done >= goal) scene += ' 今天的目标已经完成了！';
         else if(goal > 0) scene += ' 今天还差 ' + (goal-done) + ' 分钟才达标。';
-        const sys = buildSystemPrompt('') + '\n\n【场景】' + scene + '\n【要求】根据你的性格，说一句关心或夸奖的话，1~2句。不要提到"设定""规则"，不要用括号写动作。';
+        const sys = buildSystemPrompt('') + '\n\n【场景】' + scene + '\n【要求】根据你的性格，说一句关心或夸奖的话，1句话。不要提到"设定""规则"，不要用括号写动作。';
         callAI([
           {role:'system',content:sys},
           ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
@@ -2436,9 +2589,12 @@ function togglePomo(){
             let{clean,emo,label}=parseEmotion(reply);
             const bg=parseBgColor(clean); clean=bg.clean;
             const km=parseKaomoji(clean); clean=km.clean;
+            const ac=parseAction(clean); clean=ac.clean;
+            clean = enforceOneSentence(clean);
             if(bg.color)applyBgColor(bg.color);
             say(clean,'them',{kaomoji:km.kaomoji});
             applyEmotion(emo,label);
+            if(ac.action) setTimeout(()=>executeAction(ac.action), 800);
             Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
             showInAppNotif(clean);
             saveGameDebounced();
@@ -2493,7 +2649,7 @@ async function startSleep(){
   if(API.ready){
     try {
       const reply=await callAI([
-        {role:'system',content:buildSystemPrompt('')+'\n\n【场景】对方要睡了。\n【要求】轻声说一句晚安，1句，温柔一点。不要用括号写动作。'},
+        {role:'system',content:buildSystemPrompt('')+'\n\n【场景】对方要睡了。\n【要求】轻声说一句晚安，1句话，温柔一点。不要用括号写动作。'},
         {role:'user',content:'【系统触发】'},
       ]);
       if(reply)text.textContent=parseEmotion(reply).clean;
@@ -2541,7 +2697,7 @@ function endSleep(){
   updateStats();saveGameDebounced();
   if(API.ready && Current){
     setTimeout(()=>{
-      const sys = buildSystemPrompt('') + '\n\n【场景】对方刚醒来。\n【要求】根据你的性格，轻声问一句「睡得好吗」之类，1~2句。不要提到"设定""规则"，不要用括号写动作。';
+      const sys = buildSystemPrompt('') + '\n\n【场景】对方刚醒来。\n【要求】根据你的性格，轻声问一句「睡得好吗」之类，1句话。不要提到"设定""规则"，不要用括号写动作。';
       callAI([
         {role:'system',content:sys},
         ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
@@ -2551,9 +2707,12 @@ function endSleep(){
           let{clean,emo,label}=parseEmotion(reply);
           const bg=parseBgColor(clean); clean=bg.clean;
           const km=parseKaomoji(clean); clean=km.clean;
+          const ac=parseAction(clean); clean=ac.clean;
+          clean = enforceOneSentence(clean);
           if(bg.color)applyBgColor(bg.color);
           say(clean,'them',{kaomoji:km.kaomoji});
           applyEmotion(emo,label);
+          if(ac.action) setTimeout(()=>executeAction(ac.action), 800);
           Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
           showInAppNotif(clean);
           saveGameDebounced();
@@ -2657,7 +2816,8 @@ function openLog(){
   `;
   openModal();
 }
-  /* ============ 小游戏 ============ */
+
+/* ============ 小游戏 ============ */
 function openGameMenu(){
   const modal=document.getElementById('modalContent');
   modal.innerHTML=`
@@ -2941,7 +3101,7 @@ function rpsChallenge(winner){
       <h2>你赢了！ <span class="close" onclick="closeGame()">×</span></h2>
       <p style="font-size:13px;color:var(--text-soft);margin-bottom:12px;">你让他做什么？</p>
       <div class="field"><label>指定内容（留空则让他自己想）</label>
-        <input id="rpsCmdInput" placeholder="例：唱首歌 / 说一句真心话">
+        <input id="rpsCmdInput" placeholder="例：唱首歌 / 去打工">
       </div>
       <button class="btn" onclick="rpsAsk('真心话','ai')">让他真心话</button>
       <button class="btn ghost" onclick="rpsAsk('大冒险','ai')">让他大冒险</button>
@@ -2976,7 +3136,7 @@ async function rpsAsk(type, target){
     openModal();
     try{
       const reply = await callAI([
-        {role:'system',content:buildSystemPrompt('')+`\n\n【场景】你和对方玩猜拳，对方输了，选了${type}。\n【要求】用你的身份，给对方出一道${type}的题目，1句。直接说题目，不要加情绪标签，不要用括号。`},
+        {role:'system',content:buildSystemPrompt('')+`\n\n【场景】你和对方玩猜拳，对方输了，选了${type}。\n【要求】用你的身份，给对方出一道${type}的题目，1句话。直接说题目，不要加情绪标签，不要用括号。`},
         {role:'user',content:'【系统触发】'},
       ]);
       if(reply) document.getElementById('rpsQ').textContent = parseEmotion(reply).clean;
@@ -2993,11 +3153,19 @@ async function rpsAsk(type, target){
     try{
       const tip = type==='真心话' ? '回答一个真诚的、关于你自己的心里话' : '描述一个有趣的小冒险动作';
       const cmdLine = userCmd ? `对方让你做：${userCmd}。请照做。` : `对方让你做${type}。`;
+      const actionTip = (type==='大冒险' && userCmd) ? '\n如果对方让你做的是具体动作（打工、做饭、睡觉、出门、看书、洗澡、发呆、唱歌、跳舞、做饭给你），你可以在末尾加行动标签 [行动:xxx]，这样会真的执行。' : '';
       const reply = await callAI([
-        {role:'system',content:buildSystemPrompt('')+`\n\n【场景】你和对方玩猜拳，你输了。${cmdLine}\n【要求】用你的身份，${tip}，1~2句。不要用括号。`},
+        {role:'system',content:buildSystemPrompt('')+`\n\n【场景】你和对方玩猜拳，你输了。${cmdLine}${actionTip}\n【要求】用你的身份，${tip}，1句话。不要用括号。`},
         {role:'user',content:'【系统触发】'},
       ]);
-      if(reply) document.getElementById('rpsA').textContent = parseEmotion(reply).clean;
+      if(reply){
+        let {clean,emo,label} = parseEmotion(reply);
+        const ac = parseAction(clean); clean = ac.clean;
+        clean = enforceOneSentence(clean);
+        document.getElementById('rpsA').textContent = clean;
+        applyEmotion(emo, label);
+        if(ac.action) setTimeout(()=>executeAction(ac.action), 800);
+      }
     }catch(e){ document.getElementById('rpsA').textContent='（网络出错）'; }
   }
 }
@@ -3008,7 +3176,7 @@ async function rpsSubmitAnswer(){
   const replyBox = document.getElementById('rpsReply');
   replyBox.innerHTML = '<div class="test-result">他在听…</div>';
   try{
-    const sys = buildSystemPrompt('') + `\n\n【场景】你们在玩真心话/大冒险。他问你的问题是：「${q}」，你回答：「${ans}」。\n\n【要求】根据你的性格，对你的回答做 1~2 句回应。可以点评、调侃、继续追问。\n- 不要复述问题\n- 不要提到"规则""设定"\n- 不要用括号写动作`;
+    const sys = buildSystemPrompt('') + `\n\n【场景】你们在玩真心话/大冒险。他问你的问题是：「${q}」，你回答：「${ans}」。\n\n【要求】根据你的性格，对你的回答做 1 句话回应。可以点评、调侃、继续追问。\n- 不要复述问题\n- 不要提到"规则""设定"\n- 不要用括号写动作`;
     const reply = await callAI([
       {role:'system',content:sys},
       ...Current.chatLog.slice(-6).map(m=>({role:m.role,content:m.text})),
@@ -3018,8 +3186,11 @@ async function rpsSubmitAnswer(){
       let {clean,emo,label} = parseEmotion(reply);
       const bg = parseBgColor(clean); clean = bg.clean;
       const km = parseKaomoji(clean); clean = km.clean;
+      const ac = parseAction(clean); clean = ac.clean;
+      clean = enforceOneSentence(clean);
       if(bg.color) applyBgColor(bg.color);
       applyEmotion(emo, label);
+      if(ac.action) setTimeout(()=>executeAction(ac.action), 800);
       replyBox.innerHTML = `<div class="notice-body" style="font-size:13px;">${escapeHtml(clean)}</div>`;
       say(clean, 'them', {kaomoji: km.kaomoji});
       showInAppNotif(clean);
@@ -3539,19 +3710,6 @@ function bindToolbar(){
     };
   });
 }
-
-/* ============ 输入 ============ */
-function bindChat(){
-  const input=document.getElementById('chatInput');
-  const btn=document.getElementById('sendBtn');
-  const send=()=>{
-    const t=input.value.trim(); if(!t)return;
-    if(!API.ready){ needApiTip(); return; }
-    input.value=''; chat(t);
-  };
-  btn.onclick=send;
-  input.addEventListener('keydown',e=>{ if(e.key==='Enter')send(); });
-}
 const QUICK_TOPICS=['今天过得怎么样？','我有点累','想你了','在做什么？','陪我聊聊天','今天发生了一件小事'];
 function renderQuick(){
   document.getElementById('quick').innerHTML=QUICK_TOPICS.map(t=>`<button onclick="quickSend('${t}')">${t}</button>`).join('');
@@ -3559,7 +3717,11 @@ function renderQuick(){
 function quickSend(t){
   if(!API.ready){ needApiTip(); return; }
   document.getElementById('chatInput').value=t;
-  chat(t); document.getElementById('chatInput').value='';
+  const input=document.getElementById('chatInput');
+  if(!input) return;
+  const btn=document.getElementById('sendBtn');
+  const evt=new KeyboardEvent('keydown',{key:'Enter'});
+  input.dispatchEvent(evt);
 }
 
 /* ============ 存档 ============ */
@@ -3795,9 +3957,8 @@ function importSave(e){
   };
   reader.readAsText(file);
 }
-
-/* ============================================================
-   学习总入口 + 4 个 Tab
+  /* ============================================================
+   通用工具
    ============================================================ */
 function escapeHtml(s){
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -3820,6 +3981,9 @@ function renderMath(text){
   return div.innerHTML;
 }
 
+/* ============================================================
+   学习总入口 + 4 个 Tab
+   ============================================================ */
 function openStudy(){
   if(!Current) return;
   if(!Current.study) Current.study = { materials:[], wrong:[] };
@@ -4764,7 +4928,7 @@ ${wrongList ? '错题：\n' + wrongList : '全对！'}`;
 
 【场景】${scene}
 
-【要求】根据你的性格，说 2~3 句。可以点评、鼓励、吐槽、讲解错题。
+【要求】根据你的性格，说 1~2 句话。可以点评、鼓励、吐槽、讲解错题。
 - 不要复述题目原文
 - 不要提到"规则""设定""人设"
 - 不要用括号写动作
@@ -4781,10 +4945,12 @@ ${wrongList ? '错题：\n' + wrongList : '全对！'}`;
       let {clean,emo,label} = parseEmotion(reply);
       const bg = parseBgColor(clean); clean = bg.clean;
       const km = parseKaomoji(clean); clean = km.clean;
+      const ac = parseAction(clean); clean = ac.clean;
       if(bg.color) applyBgColor(bg.color);
       applyEmotion(emo, label);
       say(clean, 'them', {kaomoji: km.kaomoji});
       showInAppNotif(clean);
+      if(ac.action) setTimeout(()=>executeAction(ac.action), 800);
       Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
       saveGameDebounced();
     }
@@ -4919,7 +5085,7 @@ function moneyAdd(){
       const sys = buildSystemPrompt('') + `
 
 【场景】对方刚记了一笔支出：${category} ¥${amount}${note?'（'+note+'）':''}。
-【要求】根据你的性格，说一句反应，1~2句。可以调侃、关心、提醒。
+【要求】根据你的性格，说 1 句话。可以调侃、关心、提醒。
 - 不要提到"规则""设定"
 - 不要用括号写动作`;
       const reply = await callAI([
@@ -4929,8 +5095,11 @@ function moneyAdd(){
       ], {maxTokens:120, temperature:0.9});
       if(reply){
         let {clean,emo,label} = parseEmotion(reply);
+        const ac = parseAction(clean); clean = ac.clean;
+        clean = enforceOneSentence(clean);
         say(clean, 'them');
         applyEmotion(emo, label);
+        if(ac.action) setTimeout(()=>executeAction(ac.action), 800);
         Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
         saveGameDebounced();
       }
@@ -5097,12 +5266,12 @@ function openPomoCalendar(){
   };
 }
 
-/* ============ 白噪音 ============ */
+/* ============ 白噪音（4 个新名字） ============ */
 const WHITE_NOISE_LIST = [
-  { id:'rain',   name:'🌧️ 雨声',   url:'audio/rain.mp3' },
-  { id:'cafe',   name:'☕ 咖啡馆', url:'audio/cafe.mp3' },
-  { id:'forest', name:'🌲 森林',   url:'audio/forest.mp3' },
-  { id:'fire',   name:'🔥 篝火',   url:'audio/fire.mp3' },
+  { id:'fire',   name:'🔥 篝火', url:'audio/fire.mp3' },
+  { id:'rain',   name:'🌧️ 小雨', url:'audio/rain.mp3' },
+  { id:'wave',   name:'🌊 海浪', url:'audio/wave.mp3' },
+  { id:'stream', name:'💧 流水', url:'audio/stream.mp3' },
 ];
 let noiseAudio = null;
 let currentNoiseId = null;
@@ -5220,4 +5389,3 @@ boot();
 </script>
 </body>
 </html>
-  
