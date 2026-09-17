@@ -326,6 +326,8 @@ body{
   <div class="story-btn" id="sleepStoryBtn" onclick="tellSleepStory()">📖 讲个晚安故事</div>
   <div class="exit" id="sleepExit">轻触结束陪睡</div>
 </div>
+
+<script>
   /* ============ 农历节日对照表（2026-2036） ============ */
 const LUNAR_FESTIVALS = {
   2026: { chunjie:'2026-02-17', yuanxiao:'2026-03-03', qixi:'2026-08-19', zhongqiu:'2026-09-25' },
@@ -1681,7 +1683,6 @@ function bindStage(){
   });
   document.getElementById('charPlaceholder').addEventListener('click',e=>{ e.stopPropagation();openSettings(); });
 }
-<script>
   /* ============ 宠物面板 ============ */
 function openPetPanel(){
   if(!Current || !Current.pet.has) return;
@@ -5219,3 +5220,4 @@ boot();
 </script>
 </body>
 </html>
+  
