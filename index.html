@@ -310,6 +310,10 @@ body{
     <div class="tool" data-panel="period"><span class="ico">🩸</span>生理期</div>
     <div class="tool" data-panel="anniv"><span class="ico">💍</span>纪念日</div>
     <div class="tool" data-panel="log"><span class="ico">📜</span>记录</div>
+    <div class="tool" data-panel="study"><span class="ico">📚</span>学习</div>
+    <div class="tool" data-panel="word"><span class="ico">📖</span>单词</div>
+    <div class="tool" data-panel="quiz"><span class="ico">📝</span>刷题</div>
+    <div class="tool" data-panel="money"><span class="ico">💰</span>记账</div>
     <div class="tool" data-panel="settings"><span class="ico">⚙️</span>设置</div>
   </div>
 </div>
@@ -324,7 +328,7 @@ body{
 </div>
 
 <script>
-/* ============ 农历节日对照表（2026-2036） ============ */
+  /* ============ 农历节日对照表（2026-2036） ============ */
 const LUNAR_FESTIVALS = {
   2026: { chunjie:'2026-02-17', yuanxiao:'2026-03-03', qixi:'2026-08-19', zhongqiu:'2026-09-25' },
   2027: { chunjie:'2027-02-06', yuanxiao:'2027-02-20', qixi:'2027-08-08', zhongqiu:'2027-09-15' },
@@ -470,8 +474,9 @@ function newCharacterData(id){
     lastInteract:null, lastChatDate:null, fightUntil:null,
     lastSurpriseDate:null, lastMeal:null, emoUntil:null,
     isSleeping:false, isAway:false, awayUntil:null, awayNote:null,
+    charAwayNote:null,
     customShopItems:[],
-    pet:{ has:false, type:'cat', name:'小家伙', image:null, x:0.78, y:0.82, food:80, clean:80, mood:80, lastTick:Date.now(), flip:false, nextWalkAt:0 },
+    pet:{ has:false, type:'猫', name:'小家伙', image:null, x:0.78, y:0.82, food:80, clean:80, mood:80, lastTick:Date.now(), flip:false, nextWalkAt:0 },
     lastProactiveAt:0, lastProactiveText:'', recentTopics:[],
     pomoHistory:[], focusMode:false, focusUntil:null,
     pomoGoalMin: 120,
@@ -480,6 +485,10 @@ function newCharacterData(id){
     lastSelfDiaryDate: null,
     lastFestivalDate: null,
     lastBackgroundNotifAt: 0,
+    study: { materials:[], wrong:[] },
+    word: { books:[], currentBookId:null, dailyGoal:20, dir:'en2zh', learned:{}, history:[], wrong:[] },
+    quiz: { history:[], wrong:[], cache:[] },
+    money: { budget:3000, records:[] },
   };
 }
 let Current = null;
@@ -498,7 +507,7 @@ function initSettingsDraft(){
     relationType:c.relationType||'friend', relationValue:(typeof c.relationValue==='number')?c.relationValue:10,
     image:c.image||null, images:deepCloneSafe(c.images||[]), outfits:deepCloneSafe(c.outfits||[]),
     currentOutfitIndex:(typeof c.currentOutfitIndex==='number')?c.currentOutfitIndex:-1,
-    pet:deepCloneSafe(c.pet || { has:false, type:'cat', name:'小家伙', image:null, x:0.78, y:0.82, food:80, clean:80, mood:80, lastTick:Date.now() }),
+    pet:deepCloneSafe(c.pet || { has:false, type:'猫', name:'小家伙', image:null, x:0.78, y:0.82, food:80, clean:80, mood:80, lastTick:Date.now() }),
     lorebook:deepCloneSafe(c.lorebook||[]),
     background_img:GlobalState.background||null, userImage:GlobalState.userImage||null,
     userShow:!!GlobalState.userShow,
@@ -522,7 +531,7 @@ function collectSettingsDraft(){
   if(g('setStyle')) settingsDraft.style = g('setStyle').value.trim();
   if(g('setLanguage')) settingsDraft.language = g('setLanguage').value;
   if(g('setIntro')) settingsDraft.intro = g('setIntro').value.trim();
-  if(g('setBirthday')) settingsDraft.birthday = g('setBirthday').value;
+  if(g('setBirthday')) settingsDraft.birthday = normalizeBirthday(g('setBirthday').value);
   if(g('setRelation')) settingsDraft.relationType = g('setRelation').value;
   if(g('setRelationValue')) settingsDraft.relationValue = Math.max(0,Math.min(100,parseInt(g('setRelationValue').value)||0));
   if(g('setWeatherCity')) settingsDraft.weatherManualCity = g('setWeatherCity').value.trim();
@@ -535,6 +544,19 @@ function collectSettingsDraft(){
   if(g('userShowChk')) settingsDraft.userShow = g('userShowChk').checked;
   if(g('petNameInput')) settingsDraft.pet.name = g('petNameInput').value.trim() || '小家伙';
   if(g('pomoGoalInput')) settingsDraft.pomoGoalMin = Math.max(0, parseInt(g('pomoGoalInput').value)||0);
+}
+
+/* ============ 生日格式化 ============ */
+function normalizeBirthday(input){
+  const s = (input||'').trim();
+  if(!s) return '';
+  let m = s.match(/^(\d{4})\s*[-/年.]\s*(\d{1,2})\s*[-/月.]\s*(\d{1,2})/);
+  if(m) return `${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+  m = s.match(/^(\d{1,2})\s*[-/.]\s*(\d{1,2})$/);
+  if(m) return `${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}`;
+  m = s.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*日?/);
+  if(m) return `${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}`;
+  return s;
 }
 
 /* ============ 图片压缩 ============ */
@@ -697,39 +719,65 @@ async function fetchWeatherByCoords(lat, lon){
   if(!data.current) throw new Error('天气数据无效');
   return { weather: wmoToWeather(data.current.weather_code) };
 }
-function getUserLocation(){
+async function getUserLocation(){
+  const Geo = getCapPlugin('Geolocation');
+  if(Geo){
+    try{
+      let perm = await Geo.checkPermissions();
+      if(perm.location !== 'granted'){
+        perm = await Geo.requestPermissions();
+      }
+      if(perm.location === 'granted'){
+        const pos = await Geo.getCurrentPosition({ enableHighAccuracy:false, timeout:10000, maximumAge:600000 });
+        return { lat: pos.coords.latitude, lon: pos.coords.longitude };
+      }
+    }catch(e){ console.warn('原生定位失败', e); }
+  }
   return new Promise((resolve, reject)=>{
     if(!navigator.geolocation) return reject(new Error('不支持定位'));
-    navigator.geolocation.getCurrentPosition((pos)=>resolve({lat: pos.coords.latitude, lon: pos.coords.longitude}), (err)=>reject(err), {timeout: 8000, maximumAge: 600000});
+    navigator.geolocation.getCurrentPosition(
+      (pos)=>resolve({lat: pos.coords.latitude, lon: pos.coords.longitude}),
+      (err)=>reject(err),
+      {timeout: 10000, maximumAge: 600000, enableHighAccuracy: false}
+    );
   });
 }
 async function updateWeatherReal(force=false){
   const now = Date.now();
-  if(!force && GlobalState.weatherUpdatedAt && (now - GlobalState.weatherUpdatedAt < 3600000)) return;
+  if(!force && GlobalState.weatherUpdatedAt && (now - GlobalState.weatherUpdatedAt < 1800000)) return;
   try{
-    let lat = GlobalState.weatherLat, lon = GlobalState.weatherLon, cityName = GlobalState.weatherCity;
-    if(lat === null || lon === null){
-      try{ const loc = await getUserLocation(); lat = loc.lat; lon = loc.lon; cityName=''; }catch(e){}
+    let lat = null, lon = null, cityName = '';
+    if(GlobalState.weatherManualCity){
+      try{
+        const geo = await geocodeCity(GlobalState.weatherManualCity);
+        lat = geo.lat; lon = geo.lon; cityName = geo.name;
+      }catch(e){ console.warn('城市查询失败', e); }
     }
-    if((lat === null || lon === null) && GlobalState.weatherManualCity){
-      try{ const geo = await geocodeCity(GlobalState.weatherManualCity); lat=geo.lat; lon=geo.lon; cityName=geo.name; }catch(e){}
+    if(lat === null || lon === null){
+      try{
+        const loc = await getUserLocation();
+        lat = loc.lat; lon = loc.lon; cityName = '当前城市';
+      }catch(e){ console.warn('定位失败', e); }
     }
     if(lat === null || lon === null){
-      GlobalState.weather = WEATHERS[Math.floor(Math.random()*WEATHERS.length)];
-      GlobalState.weatherCity = GlobalState.weatherManualCity || '未知';
+      GlobalState.weatherCity = GlobalState.weatherManualCity || '未设置城市';
       GlobalState.weatherUpdatedAt = now;
-      renderWeather(); saveGameDebounced(); return;
+      renderWeather();
+      if(force) say('天气获取失败，去「设置 → 天气城市」手动填一个城市。','tip');
+      return;
     }
     const w = await fetchWeatherByCoords(lat, lon);
-    GlobalState.weatherLat = lat; GlobalState.weatherLon = lon;
-    GlobalState.weatherCity = cityName || '当前城市';
+    GlobalState.weatherLat = lat;
+    GlobalState.weatherLon = lon;
+    GlobalState.weatherCity = cityName;
     GlobalState.weather = w.weather;
-    GlobalState.weatherUpdatedAt = now; GlobalState.weatherDate = todayStr();
-    renderWeather(); saveGameDebounced();
-  }catch(e){
-    GlobalState.weather = WEATHERS[Math.floor(Math.random()*WEATHERS.length)];
+    GlobalState.weatherUpdatedAt = now;
     GlobalState.weatherDate = todayStr();
-    renderWeather(); saveGameDebounced();
+    renderWeather();
+    saveGameDebounced();
+  }catch(e){
+    console.warn('天气获取失败', e);
+    if(force) say('天气获取失败，请检查网络后重试。','tip');
   }
 }
 function applyBgColor(hex){ if(hex) GlobalState.bgColor=hex; }
@@ -769,6 +817,26 @@ function getCurrentOutfitImg(){
 function getBaseCharImage(){
   if(!Current) return null;
   return getCurrentOutfitImg() || Current.image || null;
+}
+
+/* ============ 宠物 emoji ============ */
+function petEmoji(type){
+  const t = (type || '').toLowerCase();
+  if(/猫|cat/.test(t)) return '🐱';
+  if(/狗|犬|dog/.test(t)) return '🐶';
+  if(/兔|rabbit|bunny/.test(t)) return '🐰';
+  if(/鸟|雀|鸽|bird/.test(t)) return '🐦';
+  if(/仓鼠|hamster/.test(t)) return '🐹';
+  if(/龙|dragon/.test(t)) return '🐲';
+  if(/蛇|snake/.test(t)) return '🐍';
+  if(/狐|fox/.test(t)) return '🦊';
+  if(/熊|bear/.test(t)) return '🐻';
+  if(/鱼|fish/.test(t)) return '🐟';
+  if(/龟|turtle/.test(t)) return '🐢';
+  if(/蛙|frog/.test(t)) return '🐸';
+  if(/马|horse/.test(t)) return '🐴';
+  if(/羊|sheep|goat/.test(t)) return '🐑';
+  return '🐾';
 }
 
 /* ============ 关系 ============ */
@@ -935,9 +1003,13 @@ function openTrack(){
   Current.track.forEach(t=>{ if(!grouped[t.date])grouped[t.date]=[]; grouped[t.date].push(t); });
   const dates=Object.keys(grouped).sort().reverse();
   const today=todayStr();
+  const noteHtml = Current.charAwayNote
+    ? `<div style="background:var(--card);border-radius:12px;padding:10px;margin-bottom:12px;font-size:13px;box-shadow:0 2px 8px rgba(229,107,140,.06);">
+         📝 他留的纸条：${escapeHtml(Current.charAwayNote)}
+       </div>` : '';
   const rows = dates.length===0 ? '<p style="color:var(--text-soft);font-size:13px;">还没有记录。</p>'
     : dates.map(d=>`<div class="track-day"><h3>${d===today?'今天':d}</h3>`+grouped[d].map(t=>`<div class="row"><span class="time">${t.time}</span>在${t.place} · ${t.action}</div>`).join('')+`</div>`).join('');
-  modal.innerHTML=`<h2>行踪 <span class="close" onclick="closeModal()">×</span></h2>${rows}`;
+  modal.innerHTML=`<h2>行踪 <span class="close" onclick="closeModal()">×</span></h2>${noteHtml}${rows}`;
   openModal();
 }
 function openAwayNote(){
@@ -1168,18 +1240,6 @@ function repositionAllBubbles(){
     const top = Math.max(4, userTopY - 8 - fromBottom * BUBBLE_LINE_HEIGHT - h);
     el.style.left = left + 'px'; el.style.top = top + 'px';
   });
-  // 🌟 新增：tip / err 气泡也要定位，否则永远卡在屏幕外
-  const sysBubbles = Array.from(box.children).filter(c =>
-    c.classList.contains('tip') || c.classList.contains('err')
-  );
-  sysBubbles.forEach((el, i)=>{
-    const w = el.offsetWidth || 220, h = el.offsetHeight || 40;
-    const left = Math.max(4, (stageRect.width - w) / 2);
-    const fromBottom = (sysBubbles.length - 1 - i);
-    const top = Math.max(4, stageRect.height - 20 - fromBottom * BUBBLE_LINE_HEIGHT - h);
-    el.style.left = left + 'px';
-    el.style.top  = top + 'px';
-  });
 }
 let bubbleTimer = null;
 function repositionAllBubblesDebounced(){
@@ -1272,7 +1332,7 @@ function renderPet(){
   el.style.display='flex';
   el.innerHTML='';
   if(Current.pet.image){ const i=document.createElement('img'); i.src=Current.pet.image; el.appendChild(i); }
-  else { const icons={cat:'🐱',dog:'🐶',rabbit:'🐰',bird:'🐦'}; el.textContent=icons[Current.pet.type]||'🐾'; }
+  else { el.textContent=petEmoji(Current.pet.type); }
   if(isNightTime()){ const z=document.createElement('div'); z.className='zzz'; z.textContent='zZ'; el.appendChild(z); }
   el.classList.toggle('flipH', !!Current.pet.flip);
   positionPet();
@@ -1626,7 +1686,7 @@ function bindStage(){
 function openPetPanel(){
   if(!Current || !Current.pet.has) return;
   const p = Current.pet;
-  const icon = {cat:'🐱',dog:'🐶',rabbit:'🐰',bird:'🐦'}[p.type]||'🐾';
+  const icon = petEmoji(p.type);
   const modal=document.getElementById('modalContent');
   modal.innerHTML=`
     <h2>${icon} ${p.name} <span class="close" onclick="closeModal()">×</span></h2>
@@ -1765,11 +1825,42 @@ function tryWork(){
   logTrack('外面','打工');
   updateTrackBar();
   say('“我出门一趟。”','them');
+
+  // 角色留纸条
+  Current.charAwayNote = null;
+  if(API.ready){
+    const noteSys = buildSystemPrompt('') +
+      '\n\n【场景】你要出门打工了，出门前给对方留一张小纸条。' +
+      '\n【要求】只写纸条内容，1~2句，简短自然。不要加情绪标签，不要用括号写动作，不要提到"设定""规则"。';
+    callAI([
+      {role:'system',content:noteSys},
+      ...Current.chatLog.slice(-6).map(m=>({role:m.role,content:m.text})),
+      {role:'user',content:'【系统触发】'},
+    ]).then(reply=>{
+      if(reply){
+        const clean = parseEmotion(reply).clean.trim();
+        if(clean){
+          Current.charAwayNote = clean;
+          saveGameDebounced();
+          setTimeout(()=>{
+            say(`（桌上多了一张纸条，是他的字迹：「${clean}」）`, 'action');
+            showInAppNotif('他留了一张纸条：' + clean);
+          }, 600);
+        }
+      }
+    }).catch(()=>{});
+  }
+
   saveGame();
   setTimeout(()=>{
     if(!Current) return;
     Current.isAway=false; Current.awayUntil=null;
     updateTrackBar();
+    const hisNote = Current.charAwayNote;
+    Current.charAwayNote = null;
+    if(hisNote){
+      setTimeout(()=>{ say(`（他把桌上的纸条收起来了。）`, 'action'); }, 1200);
+    }
     const earn = Math.floor((10 + Math.random()*21) * (0.7 + Current.stats.mood/200));
     Current.coin += earn;
     const gotGift = Math.random() < 0.5;
@@ -1868,7 +1959,7 @@ function checkFestival(){
   const today = todayStr();
   if(Current.lastFestivalDate === today) return;
   const festival = getTodayFestival();
-  const isBirthday = Current.birthday && Current.birthday === today;
+  const isBirthday = Current.birthday && (Current.birthday === today || Current.birthday === today.slice(5));
   if(!festival && !isBirthday) return;
   Current.lastFestivalDate = today;
   let scene = '';
@@ -2312,11 +2403,16 @@ function openTimer(){
       <input type="number" id="pomoGoalInput" value="${goal}" min="0" max="600">
     </div>
     <p style="font-size:12px;color:var(--text-soft);margin-bottom:12px;">今天已完成 ${todayCount} 次 · 累计 ${todayMin} / ${goal} 分钟</p>
+    <div class="field"><label>白噪音</label>
+      <div id="noiseBox" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+      <input type="range" min="0" max="100" value="50" oninput="setNoiseVolume(this.value/100)" style="width:100%;margin-top:8px;">
+    </div>
     <button class="btn" id="pomoBtn" onclick="togglePomo()">开始专注</button>
     <button class="btn ghost" onclick="savePomoGoal()">保存目标</button>
+    <button class="btn ghost" onclick="openPomoCalendar()">📅 学习打卡</button>
     ${hist.length?'<hr style="margin:16px 0;border:none;border-top:1px solid #00000011;"><label style="font-size:13px;color:var(--text-soft);">最近专注</label>'+hist.map(h=>`<div class="log-item"><div class="who">${h.date}</div><div class="txt">${h.min} 分钟</div></div>`).join(''):''}
   `;
-  openModal();updatePomoDisplay();
+  openModal();updatePomoDisplay();renderNoiseUI();
 }
 function savePomoGoal(){
   if(!Current) return;
@@ -2345,12 +2441,16 @@ function togglePomo(){
       clearInterval(pomo.timer);pomo.running=false;
       document.getElementById('pomoBtn').textContent='开始专注';
       addRelationValue(3);
+      stopNoise();
       if(Current){
         Current.stats.mood=Math.min(100,Current.stats.mood+5);
         Current.focusMode = false; Current.focusUntil = null;
         if(!Current.pomoHistory) Current.pomoHistory = [];
         Current.pomoHistory.push({ date: todayStr(), min: pomo.min, time: Date.now() });
         if(Current.pomoHistory.length > 50) Current.pomoHistory = Current.pomoHistory.slice(-50);
+        const reward = Math.max(5, Math.round(pomo.min * 0.6));
+        Current.coin += reward;
+        setTimeout(()=>{ say(`（专注奖励：+${reward} 🪙）`,'tip'); }, 400);
       }
       lockChat(false);
       updateStats();saveGame();
@@ -2380,6 +2480,10 @@ function togglePomo(){
         }).catch(()=>{});
         if(goal > 0 && done >= goal){
           setTimeout(()=>{
+            const bonus = 20;
+            Current.coin += bonus;
+            updateStats();
+            say(`（今日目标达成！额外奖励 +${bonus} 🪙）`,'tip');
             const m2 = document.getElementById('modalContent');
             m2.innerHTML=`<h2>🎉 今日目标完成 <span class="close" onclick="closeModal()">×</span></h2>
               <p style="font-size:14px;color:var(--text);line-height:1.7;">今天你已经专注了 <b>${done}</b> 分钟，达成了 <b>${goal}</b> 分钟的目标！<br>${Current.name} 为你感到骄傲。</p>
@@ -2587,8 +2691,7 @@ function openLog(){
   `;
   openModal();
 }
-
-/* ============ 小游戏 ============ */
+  /* ============ 小游戏 ============ */
 function openGameMenu(){
   const modal=document.getElementById('modalContent');
   modal.innerHTML=`
@@ -2597,17 +2700,23 @@ function openGameMenu(){
     <div class="game-item" onclick="startGame('bomb')"><div><div class="g-name">💣 数字炸弹</div><div class="g-desc">1-100 里有个雷，轮流猜</div></div><div class="g-arrow">›</div></div>
     <div class="game-item" onclick="startGame('twenty')"><div><div class="g-name">❓ 20 问</div><div class="g-desc">他想了样东西，你问 20 个问题猜</div></div><div class="g-arrow">›</div></div>
     <div class="game-item" onclick="startGame('story')"><div><div class="g-name">📖 接龙编故事</div><div class="g-desc">你一句他一句，一起编故事</div></div><div class="g-arrow">›</div></div>
+    <div class="game-item" onclick="startGame('rps')"><div><div class="g-name">✊ 猜拳·真心话大冒险</div><div class="g-desc">猜拳定输赢，输的人接受惩罚</div></div><div class="g-arrow">›</div></div>
+    <div class="game-item" onclick="startGame('sudoku')"><div><div class="g-name">🔢 数独</div><div class="g-desc">经典 9×9，慢慢填</div></div><div class="g-arrow">›</div></div>
+    <div class="game-item" onclick="startGame('maze')"><div><div class="g-name">🧩 走迷宫</div><div class="g-desc">从左上走到右下的 🏁</div></div><div class="g-arrow">›</div></div>
   `;
   openModal();
 }
 function startGame(type){
-  if(!API.ready){ needApiTip(); return; }
+  if(!API.ready && ['turtle','twenty','story','rps'].includes(type)){ needApiTip(); return; }
   if(!Current) return;
   Current.game = { active:true, type:type, subState:{} };
   if(type==='turtle') initTurtleGame();
   else if(type==='bomb') initBombGame();
   else if(type==='twenty') initTwentyGame();
   else if(type==='story') initStoryGame();
+  else if(type==='rps') initRpsGame();
+  else if(type==='sudoku') initSudokuGame();
+  else if(type==='maze') initMazeGame();
 }
 function getRecentGamesHint(){
   if(!Current || !Current.recentGames || !Current.recentGames.length) return '';
@@ -2813,6 +2922,269 @@ function storyEnd(){
   if(!Current||!Current.game||!Current.game.subState)return;
   alert('你们一起编的故事：\n\n' + Current.game.subState.turns.join('\n'));
 }
+
+/* ---- 猜拳·真心话大冒险 ---- */
+function initRpsGame(){
+  Current.game.subState = { score:{user:0,ai:0}, log:[] };
+  renderRpsUI();
+}
+function renderRpsUI(){
+  const modal=document.getElementById('modalContent');
+  const s = Current.game.subState;
+  modal.innerHTML=`
+    <h2>✊ 猜拳·真心话大冒险 <span class="close" onclick="closeGame()">×</span></h2>
+    <div class="game-panel">
+      <div class="g-status">比分 你 ${s.score.user} : ${s.score.ai} 他</div>
+      <div class="g-content" id="rpsResult">出拳吧！</div>
+      <div class="g-btn-row" style="margin-top:14px;">
+        <button onclick="rpsPlay('石头')">✊ 石头</button>
+        <button onclick="rpsPlay('剪刀')">✌️ 剪刀</button>
+        <button onclick="rpsPlay('布')">✋ 布</button>
+      </div>
+      <div class="g-log" id="rpsLog">${(s.log||[]).join('\n')}</div>
+      <div class="g-btn-row"><button onclick="closeGame()">结束</button></div>
+    </div>`;
+  openModal();
+}
+async function rpsPlay(choice){
+  const s = Current.game.subState;
+  const opts=['石头','剪刀','布'];
+  const ai = opts[Math.floor(Math.random()*3)];
+  const emoji={石头:'✊',剪刀:'✌️',布:'✋'};
+  let result;
+  if(choice === ai) result = 'draw';
+  else if((choice==='石头'&&ai==='剪刀')||(choice==='剪刀'&&ai==='布')||(choice==='布'&&ai==='石头')) result='win';
+  else result='lose';
+
+  let text = `你出 ${emoji[choice]}${choice}，他出 ${emoji[ai]}${ai} —— `;
+  if(result==='draw') text += '平局！再来一次。';
+  else if(result==='win'){ s.score.user++; text += '你赢了！'; }
+  else { s.score.ai++; text += '他赢了。'; }
+
+  document.getElementById('rpsResult').textContent = text;
+  document.getElementById('rpsLog').textContent = (s.log||[]).join('\n');
+
+  if(result !== 'draw'){
+    setTimeout(()=>rpsChallenge(result==='win' ? 'user' : 'ai'), 800);
+  }
+}
+function rpsChallenge(winner){
+  const modal=document.getElementById('modalContent');
+  if(winner === 'user'){
+    modal.innerHTML=`
+      <h2>你赢了！ <span class="close" onclick="closeGame()">×</span></h2>
+      <p style="font-size:13px;color:var(--text-soft);margin-bottom:12px;">你让他做什么？</p>
+      <button class="btn" onclick="rpsAsk('真心话','ai')">让他真心话</button>
+      <button class="btn ghost" onclick="rpsAsk('大冒险','ai')">让他大冒险</button>
+      <button class="btn ghost" onclick="renderRpsUI()">再来一局</button>`;
+  } else {
+    modal.innerHTML=`
+      <h2>他赢了 <span class="close" onclick="closeGame()">×</span></h2>
+      <p style="font-size:13px;color:var(--text-soft);margin-bottom:12px;">他让你选一个</p>
+      <button class="btn" onclick="rpsAsk('真心话','user')">我选真心话</button>
+      <button class="btn ghost" onclick="rpsAsk('大冒险','user')">我选大冒险</button>
+      <button class="btn ghost" onclick="renderRpsUI()">再来一局</button>`;
+  }
+  openModal();
+}
+async function rpsAsk(type, target){
+  const modal=document.getElementById('modalContent');
+  const s = Current.game.subState;
+  s.log = s.log || [];
+  s.log.push(`${type}（${target==='ai'?'他':'你'}）`);
+
+  if(target === 'user'){
+    modal.innerHTML=`<h2>${type} <span class="close" onclick="closeGame()">×</span></h2>
+      <div class="game-panel"><div class="g-content" id="rpsQ">他正在想…</div>
+      <div class="g-btn-row"><button onclick="renderRpsUI()">再来一局</button><button onclick="closeGame()">结束</button></div></div>`;
+    openModal();
+    try{
+      const reply = await callAI([
+        {role:'system',content:buildSystemPrompt('')+`\n\n【场景】你和对方玩猜拳，对方输了，选了${type}。\n【要求】用你的身份，给对方出一道${type}的题目，1句。直接说题目，不要加情绪标签，不要用括号。`},
+        {role:'user',content:'【系统触发】'},
+      ]);
+      if(reply) document.getElementById('rpsQ').textContent = parseEmotion(reply).clean;
+    }catch(e){ document.getElementById('rpsQ').textContent='（网络出错）'; }
+  } else {
+    modal.innerHTML=`<h2>${type} <span class="close" onclick="closeGame()">×</span></h2>
+      <div class="game-panel"><div class="g-content" id="rpsA">他正在回答…</div>
+      <div class="g-btn-row"><button onclick="renderRpsUI()">再来一局</button><button onclick="closeGame()">结束</button></div></div>`;
+    openModal();
+    try{
+      const tip = type==='真心话' ? '回答一个真诚的、关于你自己的心里话' : '描述一个有趣的小冒险动作';
+      const reply = await callAI([
+        {role:'system',content:buildSystemPrompt('')+`\n\n【场景】你和对方玩猜拳，你输了，对方让你做${type}。\n【要求】用你的身份，${tip}，1~2句。不要用括号。`},
+        {role:'user',content:'【系统触发】'},
+      ]);
+      if(reply) document.getElementById('rpsA').textContent = parseEmotion(reply).clean;
+    }catch(e){ document.getElementById('rpsA').textContent='（网络出错）'; }
+  }
+}
+
+/* ---- 数独 ---- */
+function genSudoku(){
+  const board = Array.from({length:9},()=>Array(9).fill(0));
+  function valid(b,r,c,n){
+    for(let i=0;i<9;i++){ if(b[r][i]===n||b[i][c]===n) return false; }
+    const br=Math.floor(r/3)*3, bc=Math.floor(c/3)*3;
+    for(let i=0;i<3;i++)for(let j=0;j<3;j++) if(b[br+i][bc+j]===n) return false;
+    return true;
+  }
+  function fill(b){
+    for(let r=0;r<9;r++)for(let c=0;c<9;c++){
+      if(b[r][c]===0){
+        const nums=[1,2,3,4,5,6,7,8,9].sort(()=>Math.random()-0.5);
+        for(const n of nums){
+          if(valid(b,r,c,n)){ b[r][c]=n; if(fill(b)) return true; b[r][c]=0; }
+        }
+        return false;
+      }
+    }
+    return true;
+  }
+  fill(board);
+  const puzzle = board.map(r=>r.slice());
+  let holes = 45, guard = 0;
+  while(holes>0 && guard++<1000){
+    const r=Math.floor(Math.random()*9), c=Math.floor(Math.random()*9);
+    if(puzzle[r][c]!==0){ puzzle[r][c]=0; holes--; }
+  }
+  return { puzzle, solution: board };
+}
+function initSudokuGame(){
+  const { puzzle, solution } = genSudoku();
+  Current.game.subState = {
+    puzzle: puzzle.map(r=>r.slice()),
+    solution,
+    userBoard: puzzle.map(r=>r.slice()),
+    selected: null,
+  };
+  renderSudokuUI();
+}
+function renderSudokuUI(){
+  const s = Current.game.subState;
+  const modal=document.getElementById('modalContent');
+  const cells = s.userBoard.map((row,r)=>row.map((v,c)=>{
+    const isFixed = s.puzzle[r][c]!==0;
+    const isSel = s.selected && s.selected[0]===r && s.selected[1]===c;
+    const isWrong = v!==0 && v!==s.solution[r][c];
+    return `<div onclick="sudokuSelect(${r},${c})" style="
+      display:flex;align-items:center;justify-content:center;
+      aspect-ratio:1;font-size:16px;font-weight:${isFixed?'700':'400'};
+      color:${isWrong?'#d44':isFixed?'var(--text)':'var(--main-dark)'};
+      background:${isSel?'var(--accent)':(isFixed?'transparent':'#fff8fb')};
+      border:1px solid #00000011;border-radius:6px;cursor:pointer;user-select:none;
+    ">${v||''}</div>`;
+  }).join('')).join('');
+  const done = s.userBoard.every((row,r)=>row.every((v,c)=>v===s.solution[r][c]));
+  modal.innerHTML=`
+    <h2>🔢 数独 <span class="close" onclick="closeGame()">×</span></h2>
+    <div class="game-panel">
+      <div class="g-status">${done?'🎉 完成！':'点格子选中，再点数字填入'}</div>
+      <div style="display:grid;grid-template-columns:repeat(9,1fr);gap:2px;max-width:340px;margin:0 auto;">${cells}</div>
+      <div class="g-btn-row" style="margin-top:12px;display:grid;grid-template-columns:repeat(9,1fr);gap:4px;">
+        ${[1,2,3,4,5,6,7,8,9].map(n=>`<button onclick="sudokuFill(${n})" style="padding:8px 0;">${n}</button>`).join('')}
+      </div>
+      <div class="g-btn-row" style="margin-top:8px;">
+        <button onclick="sudokuFill(0)">清空</button>
+        <button onclick="sudokuNew()">换一题</button>
+        <button onclick="closeGame()">结束</button>
+      </div>
+    </div>`;
+  openModal();
+}
+function sudokuSelect(r,c){
+  const s = Current.game.subState;
+  if(s.puzzle[r][c]!==0) return;
+  s.selected = [r,c];
+  renderSudokuUI();
+}
+function sudokuFill(n){
+  const s = Current.game.subState;
+  if(!s.selected) return;
+  const [r,c] = s.selected;
+  s.userBoard[r][c] = n;
+  if(n!==0 && n===s.solution[r][c]) addRelationValue(0.3);
+  renderSudokuUI();
+  const done = s.userBoard.every((row,ri)=>row.every((v,ci)=>v===s.solution[ri][ci]));
+  if(done){ addRelationValue(3); saveGame(); say('你把数独解出来了！','tip'); }
+}
+function sudokuNew(){ initSudokuGame(); }
+
+/* ---- 走迷宫 ---- */
+function initMazeGame(){
+  const size = 8;
+  const W = size*2+1;
+  const grid = Array.from({length:W},()=>Array(W).fill(0));
+  const stack = [[0,0]];
+  grid[1][1] = 1;
+  const dirs = [[0,1],[1,0],[0,-1],[-1,0]];
+  while(stack.length){
+    const [x,y] = stack[stack.length-1];
+    const neighbors = [];
+    for(const [dx,dy] of dirs){
+      const nx=x+dx, ny=y+dy;
+      if(nx>=0&&nx<size&&ny>=0&&ny<size&&grid[ny*2+1][nx*2+1]===0){
+        neighbors.push([nx,ny,dx,dy]);
+      }
+    }
+    if(neighbors.length){
+      const [nx,ny,dx,dy] = neighbors[Math.floor(Math.random()*neighbors.length)];
+      grid[y*2+1+dy][x*2+1+dx] = 1;
+      grid[ny*2+1][nx*2+1] = 1;
+      stack.push([nx,ny]);
+    } else stack.pop();
+  }
+  Current.game.subState = { grid, W, px:1, py:1, goalX:W-2, goalY:W-2 };
+  renderMazeUI();
+}
+function renderMazeUI(){
+  const s = Current.game.subState;
+  const modal=document.getElementById('modalContent');
+  const { grid, W, px, py } = s;
+  const cells = [];
+  for(let y=0;y<W;y++){
+    for(let x=0;x<W;x++){
+      let content = '';
+      let bg = grid[y][x] ? '#fff' : '#5a4a52';
+      if(x===px && y===py){ content='🧑'; bg='#ffe0ea'; }
+      else if(x===s.goalX && y===s.goalY){ content='🏁'; bg='#d8f0dc'; }
+      cells.push(`<div style="display:flex;align-items:center;justify-content:center;aspect-ratio:1;background:${bg};font-size:12px;border-radius:2px;">${content}</div>`);
+    }
+  }
+  const done = px===s.goalX && py===s.goalY;
+  modal.innerHTML=`
+    <h2>🧩 走迷宫 <span class="close" onclick="closeGame()">×</span></h2>
+    <div class="game-panel">
+      <div class="g-status">${done?'🎉 到达终点！':'用按钮走到 🏁'}</div>
+      <div style="display:grid;grid-template-columns:repeat(${W},1fr);gap:1px;max-width:340px;margin:0 auto;">${cells.join('')}</div>
+      <div class="g-btn-row" style="margin-top:12px;">
+        <button onclick="mazeMove(-1,0)">←</button>
+        <button onclick="mazeMove(0,-1)">↑</button>
+        <button onclick="mazeMove(0,1)">↓</button>
+        <button onclick="mazeMove(1,0)">→</button>
+      </div>
+      <div class="g-btn-row" style="margin-top:8px;">
+        <button onclick="mazeNew()">换一个迷宫</button>
+        <button onclick="closeGame()">结束</button>
+      </div>
+    </div>`;
+  openModal();
+}
+function mazeMove(dx,dy){
+  const s = Current.game.subState;
+  const nx = s.px+dx, ny = s.py+dy;
+  if(nx<0||nx>=s.W||ny<0||ny>=s.W) return;
+  if(!s.grid[ny][nx]) return;
+  s.px=nx; s.py=ny;
+  renderMazeUI();
+  if(nx===s.goalX && ny===s.goalY){
+    addRelationValue(3); saveGame();
+    say('你走出迷宫啦！','tip');
+  }
+}
+function mazeNew(){ initMazeGame(); }
+
 function closeGame(){
   if(Current) Current.game = { active:false, type:null, subState:null };
   closeModal();
@@ -2895,7 +3267,9 @@ function openSettings(){
     <div class="field"><label>背景故事</label><textarea id="setBackground" oninput="settingsDraft.background=this.value">${d.background||''}</textarea></div>
     <div class="field"><label>世界观</label><textarea id="setWorldview" oninput="settingsDraft.worldview=this.value">${d.worldview||''}</textarea></div>
     <div class="field"><label>说话风格</label><input id="setStyle" value="${d.style||''}" oninput="settingsDraft.style=this.value"></div>
-    <div class="field"><label>生日（角色生日）</label><input id="setBirthday" type="date" value="${d.birthday||''}" oninput="settingsDraft.birthday=this.value"></div>
+    <div class="field"><label>生日（可直接输入，如：03-15 / 3月15日）</label>
+      <input id="setBirthday" value="${d.birthday||''}" placeholder="例如：03-15" oninput="settingsDraft.birthday=this.value">
+    </div>
     <div class="field"><label>语言</label>
       <select id="setLanguage" onchange="settingsDraft.language=this.value">
         ${['中文','English','日本語','한국어'].map(l=>`<option value="${l}" ${d.language===l?'selected':''}>${l}</option>`).join('')}
@@ -3085,7 +3459,9 @@ function openPetSetup(){
       <button class="btn" onclick="collectSettingsDraft();settingsDraft.pet.name=(document.getElementById('petNameInput').value.trim()||'小家伙');if(Current)Current.pet.name=settingsDraft.pet.name;saveGame();openSettings();">保存名字</button>
       <button class="btn ghost" onclick="collectSettingsDraft();removePet()">送走宠物</button>
     `:`
-      <div class="field"><label>种类</label><select id="petType"><option value="cat">猫</option><option value="dog">狗</option><option value="rabbit">兔</option><option value="bird">鸟</option></select></div>
+      <div class="field"><label>种类（自己填，如：猫、狗、仓鼠、龙……）</label>
+        <input id="petType" value="猫" placeholder="输入宠物种类">
+      </div>
       <div class="field"><label>名字</label><input id="petName" value="小家伙"></div>
       <button class="btn" onclick="createPet()">领养</button>
     `}
@@ -3094,15 +3470,15 @@ function openPetSetup(){
 }
 function createPet(){
   if(!settingsDraft) initSettingsDraft();
-  const type=document.getElementById('petType').value;
-  const name=document.getElementById('petName').value.trim()||'小家伙';
+  const type = (document.getElementById('petType').value || '').trim() || '猫';
+  const name = document.getElementById('petName').value.trim() || '小家伙';
   settingsDraft.pet = { has:true, type, name, image:null, x:0.78, y:0.82, food:80, clean:80, mood:80, lastTick:Date.now(), flip:false, nextWalkAt:0 };
   if(Current) Current.pet = deepCloneSafe(settingsDraft.pet);
   renderPet(); openSettings();
 }
 function removePet(){
   if(!settingsDraft) return;
-  settingsDraft.pet = { has:false, type:'cat', name:'小家伙', image:null, x:0.78, y:0.82, food:80, clean:80, mood:80, lastTick:Date.now(), flip:false, nextWalkAt:0 };
+  settingsDraft.pet = { has:false, type:'猫', name:'小家伙', image:null, x:0.78, y:0.82, food:80, clean:80, mood:80, lastTick:Date.now(), flip:false, nextWalkAt:0 };
   if(Current) Current.pet = deepCloneSafe(settingsDraft.pet);
   renderPet(); openSettings();
 }
@@ -3151,6 +3527,10 @@ function bindToolbar(){
       else if(p==='period')openPeriod();
       else if(p==='anniv')openAnniv();
       else if(p==='log')openLog();
+      else if(p==='study')openStudy();
+      else if(p==='word')openWord();
+      else if(p==='quiz')openQuiz();
+      else if(p==='money')openMoney();
     };
   });
 }
@@ -3176,8 +3556,7 @@ function quickSend(t){
   document.getElementById('chatInput').value=t;
   chat(t); document.getElementById('chatInput').value='';
 }
-
-/* ============ 存档 ============ */
+  /* ============ 存档 ============ */
 function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
 function buildSaveObject(){
   return {
@@ -3217,7 +3596,7 @@ function applySaveObject(d){
   GlobalState.characters = GlobalState.characters.map(raw=>{
     const c = newCharacterData(raw.id || ('c_'+Math.random().toString(36).slice(2,8)));
     for(const k in raw){ if(k in c) c[k] = raw[k]; }
-    if(!c.pet || typeof c.pet !== 'object') c.pet = { has:false, type:'cat', name:'小家伙', image:null, x:0.78, y:0.82, food:80, clean:80, mood:80, lastTick:Date.now(), flip:false, nextWalkAt:0 };
+    if(!c.pet || typeof c.pet !== 'object') c.pet = { has:false, type:'猫', name:'小家伙', image:null, x:0.78, y:0.82, food:80, clean:80, mood:80, lastTick:Date.now(), flip:false, nextWalkAt:0 };
     if(typeof c.pet.food !== 'number') c.pet.food = 80;
     if(typeof c.pet.clean !== 'number') c.pet.clean = 80;
     if(typeof c.pet.mood !== 'number') c.pet.mood = 80;
@@ -3237,6 +3616,19 @@ function applySaveObject(d){
     if(!c.lastSelfDiaryDate) c.lastSelfDiaryDate = null;
     if(!c.lastFestivalDate) c.lastFestivalDate = null;
     if(typeof c.lastBackgroundNotifAt !== 'number') c.lastBackgroundNotifAt = 0;
+    if(!c.study || typeof c.study !== 'object') c.study = { materials:[], wrong:[] };
+    ['materials','wrong'].forEach(k=>{ if(!Array.isArray(c.study[k])) c.study[k] = []; });
+    if(!c.word || typeof c.word !== 'object') c.word = { books:[], currentBookId:null, dailyGoal:20, dir:'en2zh', learned:{}, history:[], wrong:[] };
+    ['books','history','wrong'].forEach(k=>{ if(!Array.isArray(c.word[k])) c.word[k] = []; });
+    if(!c.word.learned || typeof c.word.learned !== 'object') c.word.learned = {};
+    if(typeof c.word.dailyGoal !== 'number') c.word.dailyGoal = 20;
+    if(!c.word.dir) c.word.dir = 'en2zh';
+    if(!c.word.currentBookId) c.word.currentBookId = null;
+    if(!c.quiz || typeof c.quiz !== 'object') c.quiz = { history:[], wrong:[], cache:[] };
+    ['history','wrong','cache'].forEach(k=>{ if(!Array.isArray(c.quiz[k])) c.quiz[k] = []; });
+    if(!c.money || typeof c.money !== 'object') c.money = { budget:3000, records:[] };
+    if(typeof c.money.budget !== 'number') c.money.budget = 3000;
+    if(!Array.isArray(c.money.records)) c.money.records = [];
     return c;
   });
   if(!GlobalState.characters.length){
@@ -3398,7 +3790,1204 @@ function importSave(e){
   reader.readAsText(file);
 }
 
-/* ============ 初始化 ============ */
+/* ============================================================
+   以下是新增模块：学习素材 / 背单词 / 刷题 / 记账 / 打卡 / 白噪音
+   ============================================================ */
+
+/* ---------- 通用 ---------- */
+function escapeHtml(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ============ 学习打卡日历 ============ */
+function getPomoByDate(){
+  const map = {};
+  if(!Current || !Current.pomoHistory) return map;
+  Current.pomoHistory.forEach(h=>{
+    map[h.date] = (map[h.date]||0) + (h.min||0);
+  });
+  return map;
+}
+function openPomoCalendar(){
+  if(!Current) return;
+  const modal = document.getElementById('modalContent');
+  const map = getPomoByDate();
+  const goal = Current.pomoGoalMin || 120;
+  const now = new Date();
+  let viewYear = now.getFullYear();
+  let viewMonth = now.getMonth();
+  const today = todayStr();
+
+  function render(){
+    const first = new Date(viewYear, viewMonth, 1);
+    const startWeek = first.getDay();
+    const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
+    const cells = [];
+    ['日','一','二','三','四','五','六'].forEach(d=>{
+      cells.push(`<div style="text-align:center;font-size:11px;color:var(--text-soft);padding:4px 0;">${d}</div>`);
+    });
+    for(let i=0;i<startWeek;i++) cells.push('<div></div>');
+    for(let d=1; d<=daysInMonth; d++){
+      const ds = `${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const min = map[ds]||0;
+      let bg = 'transparent', color = 'var(--text)';
+      if(min > 0){
+        const ratio = Math.min(1, min/goal);
+        bg = `rgba(255,143,171,${0.25 + ratio*0.65})`;
+        if(ratio >= 1) color = '#fff';
+      }
+      if(ds === today) color = 'var(--main-dark)';
+      cells.push(`
+        <div style="text-align:center;padding:6px 0;border-radius:8px;background:${bg};
+          font-size:12px;color:${color};font-weight:${ds===today?'700':'400'};"
+          ${min?`onclick="say('${ds} 专注了 ${min} 分钟','tip')"`:''}>
+          ${d}${min?`<div style="font-size:9px;opacity:.8;">${min}分</div>`:''}
+        </div>`);
+    }
+    return cells.join('');
+  }
+
+  modal.innerHTML = `
+    <h2>📅 学习打卡 <span class="close" onclick="closeModal()">×</span></h2>
+    <div class="game-panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <button class="btn ghost" style="width:auto;padding:6px 14px;" onclick="pomoCalPrev()">‹ 上月</button>
+        <div style="font-size:15px;font-weight:600;" id="calTitle">${viewYear} 年 ${viewMonth+1} 月</div>
+        <button class="btn ghost" style="width:auto;padding:6px 14px;" onclick="pomoCalNext()">下月 ›</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;" id="calGrid">${render()}</div>
+      <p style="font-size:11px;color:var(--text-soft);margin-top:12px;text-align:center;">
+        颜色越深，当天专注时间越长。目标 ${goal} 分钟。
+      </p>
+    </div>`;
+  openModal();
+
+  window.pomoCalPrev = ()=>{
+    viewMonth--; if(viewMonth<0){ viewMonth=11; viewYear--; }
+    document.getElementById('calTitle').textContent = `${viewYear} 年 ${viewMonth+1} 月`;
+    document.getElementById('calGrid').innerHTML = render();
+  };
+  window.pomoCalNext = ()=>{
+    viewMonth++; if(viewMonth>11){ viewMonth=0; viewYear++; }
+    document.getElementById('calTitle').textContent = `${viewYear} 年 ${viewMonth+1} 月`;
+    document.getElementById('calGrid').innerHTML = render();
+  };
+}
+
+/* ============ 白噪音 ============ */
+const WHITE_NOISE_LIST = [
+  { id:'rain',   name:'🌧️ 雨声',   url:'audio/rain.mp3' },
+  { id:'cafe',   name:'☕ 咖啡馆', url:'audio/cafe.mp3' },
+  { id:'forest', name:'🌲 森林',   url:'audio/forest.mp3' },
+  { id:'fire',   name:'🔥 篝火',   url:'audio/fire.mp3' },
+];
+let noiseAudio = null;
+let currentNoiseId = null;
+
+function playNoise(id){
+  const item = WHITE_NOISE_LIST.find(x=>x.id===id);
+  if(!item) return;
+  if(noiseAudio){ noiseAudio.pause(); noiseAudio = null; }
+  noiseAudio = new Audio(item.url);
+  noiseAudio.loop = true;
+  noiseAudio.volume = 0.5;
+  noiseAudio.play().catch(e=>{
+    say('音频播放失败：' + e.message,'err');
+  });
+  currentNoiseId = id;
+  renderNoiseUI();
+}
+function stopNoise(){
+  if(noiseAudio){ noiseAudio.pause(); noiseAudio = null; }
+  currentNoiseId = null;
+  renderNoiseUI();
+}
+function setNoiseVolume(v){
+  if(noiseAudio) noiseAudio.volume = Math.max(0, Math.min(1, v));
+}
+function renderNoiseUI(){
+  const box = document.getElementById('noiseBox');
+  if(!box) return;
+  box.innerHTML = WHITE_NOISE_LIST.map(n=>`
+    <button class="btn ${currentNoiseId===n.id?'':'ghost'}" style="width:auto;padding:8px 14px;font-size:13px;"
+      onclick="${currentNoiseId===n.id?'stopNoise()':`playNoise('${n.id}')`}">
+      ${n.name}${currentNoiseId===n.id?' ⏸':''}
+    </button>`).join('');
+}
+
+/* ============ 学习素材 ============ */
+function openStudy(){
+  if(!Current) return;
+  if(!Current.study) Current.study = { materials:[], wrong:[] };
+  const modal = document.getElementById('modalContent');
+  modal.innerHTML = `
+    <h2>📚 学习素材 <span class="close" onclick="closeModal()">×</span></h2>
+    <div style="display:flex;gap:6px;margin-bottom:14px;">
+      <button class="btn" style="flex:1;" onclick="studyTab('gen')">✨ AI 生成</button>
+      <button class="btn ghost" style="flex:1;" onclick="studyTab('paste')">📄 粘贴文章</button>
+      <button class="btn ghost" style="flex:1;" onclick="studyTab('list')">📁 素材库</button>
+    </div>
+    <div id="studyBody"></div>
+  `;
+  openModal();
+  studyTab('gen');
+}
+function studyTab(tab){
+  const box = document.getElementById('studyBody');
+  if(!box) return;
+  if(tab === 'gen') box.innerHTML = renderStudyGen();
+  else if(tab === 'paste') box.innerHTML = renderStudyPaste();
+  else if(tab === 'list') box.innerHTML = renderStudyList();
+}
+function renderStudyGen(){
+  return `
+    <div class="field"><label>类型</label>
+      <select id="genType">
+        <option value="essay">读后续写短文</option>
+        <option value="phrases">好词好句</option>
+        <option value="reading">阅读理解</option>
+        <option value="grammar">语法填空</option>
+        <option value="cloze">完形填空</option>
+      </select>
+    </div>
+    <div class="field"><label>学科</label>
+      <select id="genSubject">
+        <option value="english">英语</option>
+        <option value="chinese">语文</option>
+        <option value="history">历史</option>
+        <option value="politics">政治</option>
+        <option value="geography">地理</option>
+        <option value="biology">生物</option>
+      </select>
+    </div>
+    <div class="field"><label>难度 / 年级</label>
+      <select id="genLevel">
+        <option value="高三" selected>高三</option>
+        <option value="高考冲刺">高考冲刺</option>
+        <option value="四级">四级</option>
+        <option value="六级">六级</option>
+        <option value="考研">考研</option>
+      </select>
+    </div>
+    <div class="field"><label>主题（可留空）</label>
+      <input id="genTopic" placeholder="例：雨中帮助陌生人">
+    </div>
+    <button class="btn" onclick="studyGenerate()">生成</button>
+    <div id="studyResult" style="margin-top:14px;"></div>
+  `;
+}
+function renderStudyPaste(){
+  return `
+    <div class="field"><label>粘贴文章</label>
+      <textarea id="pasteArticle" style="min-height:180px;" placeholder="把文章粘贴到这里…"></textarea>
+    </div>
+    <div class="field"><label>分析项</label>
+      <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+        <label><input type="checkbox" id="anaPhrase" checked> 挑好词好句</label>
+        <label><input type="checkbox" id="anaReading" checked> 出阅读理解题</label>
+        <label><input type="checkbox" id="anaGrammar"> 分析语法点</label>
+        <label><input type="checkbox" id="anaContinue"> 生成读后续写题</label>
+        <label><input type="checkbox" id="anaSummary"> 写摘要</label>
+      </div>
+    </div>
+    <button class="btn" onclick="studyAnalyze()">分析</button>
+    <div id="studyResult" style="margin-top:14px;"></div>
+  `;
+}
+function renderStudyList(){
+  const list = (Current.study && Current.study.materials) || [];
+  if(!list.length) return '<p style="color:var(--text-soft);font-size:13px;">还没有素材。</p>';
+  return list.slice().reverse().map((m,i)=>`
+    <div class="shop-item" style="align-items:flex-start;">
+      <div class="info" style="flex:1;">
+        <div style="font-size:13px;font-weight:600;">${escapeHtml(m.title||'素材')}</div>
+        <div style="font-size:11px;color:var(--text-soft);">${m.date} · ${m.type}</div>
+      </div>
+      <button onclick="studyView(${list.length-1-i})">查看</button>
+    </div>
+  `).join('');
+}
+function studyView(idx){
+  const m = Current.study.materials[idx];
+  if(!m) return;
+  const modal = document.getElementById('modalContent');
+  modal.innerHTML = `
+    <h2>${escapeHtml(m.title||'素材')} <span class="close" onclick="closeModal()">×</span></h2>
+    <div class="notice-body" style="font-size:13px;max-height:60vh;overflow-y:auto;">${escapeHtml(m.content)}</div>
+    <button class="btn" onclick="studyDelete(${idx})">删除</button>
+    <button class="btn ghost" onclick="openStudy()">返回</button>
+  `;
+  openModal();
+}
+function studyDelete(idx){
+  if(!Current.study) return;
+  Current.study.materials.splice(idx,1);
+  saveGame(); openStudy();
+}
+async function studyGenerate(){
+  if(!API.ready){ needApiTip(); return; }
+  const type = document.getElementById('genType').value;
+  const subject = document.getElementById('genSubject').value;
+  const level = document.getElementById('genLevel').value;
+  const topic = document.getElementById('genTopic').value.trim();
+  const box = document.getElementById('studyResult');
+  box.innerHTML = '<div class="test-result">生成中…</div>';
+
+  const typeMap = {
+    essay:'一篇读后续写短文（200 词左右），结尾留白',
+    phrases:'10 个好词好句，每条附中文翻译和例句',
+    reading:'一篇短文 + 3 道阅读理解选择题，附答案和解析',
+    grammar:'一篇语法填空题（10 空），附答案和解析',
+    cloze:'一篇完形填空题（10 空），附答案和解析',
+  };
+  const subjMap = { english:'英语', chinese:'语文', history:'历史', politics:'政治', geography:'地理', biology:'生物' };
+
+  const prompt = `请生成${subjMap[subject]}学科的${typeMap[type]}。
+难度：${level}。
+${topic?'主题：'+topic+'。':''}
+要求：
+- 内容原创
+- 输出 Markdown 格式
+- 英语内容附中文
+- 只输出素材本身`;
+
+  try{
+    const reply = await callAI([
+      {role:'system',content:'你是一位经验丰富的学科老师。'},
+      {role:'user',content:prompt},
+    ], {maxTokens:1500, temperature:0.9});
+    if(!reply){ box.innerHTML = '<div class="test-result fail">生成失败：空回复</div>'; return; }
+    box.innerHTML = `
+      <div class="notice-body" style="font-size:13px;max-height:50vh;overflow-y:auto;">${escapeHtml(reply)}</div>
+      <button class="btn" onclick="studySave('${type}','${escapeHtml(topic||type).replace(/'/g,"\\'")}')">保存到素材库</button>
+    `;
+    window.__lastStudyContent = reply;
+  }catch(e){
+    box.innerHTML = `<div class="test-result fail">生成失败：${escapeHtml(e.message)}</div>`;
+  }
+}
+async function studyAnalyze(){
+  if(!API.ready){ needApiTip(); return; }
+  const article = document.getElementById('pasteArticle').value.trim();
+  if(!article){ say('请先粘贴文章','tip'); return; }
+  const tasks = [];
+  if(document.getElementById('anaPhrase').checked) tasks.push('挑出 8~10 个好词好句，附中文和用法');
+  if(document.getElementById('anaReading').checked) tasks.push('出 3 道阅读理解选择题，附答案和解析');
+  if(document.getElementById('anaGrammar').checked) tasks.push('分析 3~5 个语法点');
+  if(document.getElementById('anaContinue').checked) tasks.push('生成一个读后续写题目');
+  if(document.getElementById('anaSummary').checked) tasks.push('写一段 100 字摘要');
+  if(!tasks.length){ say('至少选一项','tip'); return; }
+
+  const box = document.getElementById('studyResult');
+  box.innerHTML = '<div class="test-result">分析中…</div>';
+
+  const prompt = `请分析下面文章，完成：\n${tasks.map((t,i)=>`${i+1}. ${t}`).join('\n')}\n\n要求：Markdown 格式，英语附中文。\n\n【文章】\n${article}`;
+
+  try{
+    const reply = await callAI([
+      {role:'system',content:'你是一位经验丰富的学科老师。'},
+      {role:'user',content:prompt},
+    ], {maxTokens:1800, temperature:0.8});
+    if(!reply){ box.innerHTML = '<div class="test-result fail">分析失败</div>'; return; }
+    box.innerHTML = `
+      <div class="notice-body" style="font-size:13px;max-height:50vh;overflow-y:auto;">${escapeHtml(reply)}</div>
+      <button class="btn" onclick="studySave('analysis','文章分析')">保存到素材库</button>
+    `;
+    window.__lastStudyContent = reply;
+  }catch(e){
+    box.innerHTML = `<div class="test-result fail">分析失败：${escapeHtml(e.message)}</div>`;
+  }
+}
+function studySave(type, title){
+  if(!Current) return;
+  if(!Current.study) Current.study = { materials:[], wrong:[] };
+  Current.study.materials.push({
+    date: todayStr(), type, title: title || '素材',
+    content: window.__lastStudyContent || '',
+  });
+  if(Current.study.materials.length > 100) Current.study.materials = Current.study.materials.slice(-100);
+  saveGame();
+  say('已保存到素材库。','tip');
+  studyTab('list');
+}
+
+/* ============ 背单词 ============ */
+function openWord(){
+  if(!Current) return;
+  if(!Current.word) Current.word = { books:[], currentBookId:null, dailyGoal:20, dir:'en2zh', learned:{}, history:[], wrong:[] };
+  const modal = document.getElementById('modalContent');
+  modal.innerHTML = `
+    <h2>📖 背单词 <span class="close" onclick="closeModal()">×</span></h2>
+    <div style="display:flex;gap:6px;margin-bottom:14px;">
+      <button class="btn" style="flex:1;" onclick="wordTab('study')">开始背</button>
+      <button class="btn ghost" style="flex:1;" onclick="wordTab('books')">词书</button>
+      <button class="btn ghost" style="flex:1;" onclick="wordTab('import')">导入</button>
+      <button class="btn ghost" style="flex:1;" onclick="wordTab('wrong')">错词</button>
+    </div>
+    <div id="wordBody"></div>
+  `;
+  openModal();
+  wordTab('study');
+}
+function wordTab(tab){
+  const box = document.getElementById('wordBody');
+  if(!box) return;
+  if(tab === 'study') box.innerHTML = renderWordStudy();
+  else if(tab === 'books') box.innerHTML = renderWordBooks();
+  else if(tab === 'import') box.innerHTML = renderWordImport();
+  else if(tab === 'wrong') box.innerHTML = renderWordWrong();
+  if(tab === 'study') setTimeout(loadNextWord, 0);
+}
+function renderWordImport(){
+  return `
+    <div class="field"><label>词书名称</label>
+      <input id="wordBookName" placeholder="例：高考3500词">
+    </div>
+    <div class="field"><label>粘贴单词（每行一个）</label>
+      <textarea id="wordImportText" style="min-height:180px;font-family:monospace;font-size:13px;"
+placeholder="01. rat老鼠
+04. unconditional 无条件的
+07. build建筑；建立"></textarea>
+    </div>
+    <div class="field"><label>或上传 txt / csv</label>
+      <input type="file" id="wordFile" accept=".txt,.csv" onchange="wordImportFile(event)">
+    </div>
+    <button class="btn" onclick="wordImportText()">导入</button>
+    <p style="font-size:11px;color:var(--text-soft);margin-top:10px;">
+      支持行首编号、空格、逗号、竖线、短横线、冒号。
+    </p>
+  `;
+}
+function preprocessWordText(text){
+  const raw = text.split(/\r?\n/);
+  const merged = [];
+  for(let i=0; i<raw.length; i++){
+    let line = raw[i].trim();
+    if(!line) continue;
+    if(!/[\u4e00-\u9fa5]/.test(line) && i+1 < raw.length){
+      const next = raw[i+1].trim();
+      if(next && /[\u4e00-\u9fa5]/.test(next)){
+        line = line + ' ' + next;
+        i++;
+      }
+    }
+    merged.push(line);
+  }
+  return merged.join('\n');
+}
+function parseWordLines(text){
+  text = preprocessWordText(text);
+  const lines = text.split(/\r?\n/);
+  const words = [];
+  for(let raw of lines){
+    let line = raw.trim();
+    if(!line) continue;
+    line = line.replace(/^\d+\s*[.．、]\s*/, '').trim();
+    line = line.replace(/[，,。；;]+$/, '').trim();
+
+    let ph = '';
+    const phMatch = line.match(/(\/[^\/]+\/|\[[^\]]+\])/);
+    if(phMatch){
+      ph = phMatch[1].replace(/^[\/\[]|[\/\]]$/g, '').trim();
+      line = line.replace(phMatch[1], ' ').trim();
+    }
+
+    const m = line.match(/^([A-Za-z][A-Za-z0-9\s\-'’().\/=]*?)\s*([\u4e00-\u9fa5][\s\S]*)$/);
+    if(!m) continue;
+    let w = m[1].trim().replace(/\s+/g,' ');
+    let mean = m[2].trim().replace(/\s+/g,' ');
+    if(!w) continue;
+    words.push({ w, m: mean, ph });
+  }
+  return words;
+}
+function wordImportText(){
+  const name = (document.getElementById('wordBookName').value || '').trim() || ('词书 ' + new Date().toLocaleDateString());
+  const text = document.getElementById('wordImportText').value;
+  if(!text.trim()){ say('请粘贴单词','tip'); return; }
+  const words = parseWordLines(text);
+  if(!words.length){ say('没有解析到有效单词','tip'); return; }
+  addWordBook(name, words);
+}
+function wordImportFile(e){
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    document.getElementById('wordImportText').value = ev.target.result;
+    say('文件已读入，点「导入」保存。','tip');
+  };
+  reader.readAsText(file);
+}
+function addWordBook(name, words){
+  if(!Current) return;
+  if(!Current.word) Current.word = { books:[], currentBookId:null, dailyGoal:20, dir:'en2zh', learned:{}, history:[], wrong:[] };
+  const book = { id:'b_'+Date.now(), name, words, createdAt:Date.now() };
+  Current.word.books.push(book);
+  Current.word.currentBookId = book.id;
+  saveGame();
+  say(`已导入「${name}」，共 ${words.length} 个单词。`,'tip');
+  wordTab('books');
+}
+function wordDeleteBook(id){
+  if(!Current) return;
+  if(!confirm('确定删除这个词书吗？')) return;
+  Current.word.books = Current.word.books.filter(b=>b.id!==id);
+  if(Current.word.currentBookId === id){
+    Current.word.currentBookId = Current.word.books[0]?.id || null;
+  }
+  saveGame(); wordTab('books');
+}
+function wordSelectBook(id){
+  if(!Current) return;
+  Current.word.currentBookId = id;
+  saveGame(); wordTab('study');
+}
+function renderWordBooks(){
+  const books = Current.word.books || [];
+  if(!books.length) return '<p style="color:var(--text-soft);font-size:13px;">还没有词书。</p>';
+  return `
+    <button class="btn ghost" style="margin-bottom:10px;" onclick="wordAutoPhonetic()">🔤 自动补音标（联网）</button>
+    ${books.map(b=>`
+    <div class="shop-item">
+      <div class="info">${escapeHtml(b.name)}<small>${b.words.length} 个单词${Current.word.currentBookId===b.id?' · 当前':''}</small></div>
+      ${Current.word.currentBookId===b.id?'':'<button onclick="wordSelectBook(\''+b.id+'\')">选用</button>'}
+      <button style="background:#e08a8a;margin-left:6px;" onclick="wordDeleteBook('${b.id}')">删除</button>
+    </div>
+  `).join('')}`;
+}
+function renderWordStudy(){
+  const c = Current.word;
+  const book = c.books.find(b=>b.id===c.currentBookId);
+  const today = todayStr();
+  const todayCount = Object.values(c.learned).filter(v=>v.date===today).length;
+  if(!book) return '<p style="color:var(--text-soft);font-size:13px;">还没有选词书。</p>';
+  const dirLabel = { en2zh:'英→中', zh2en:'中→英', random:'随机' }[c.dir||'en2zh'];
+  return `
+    <div class="game-panel" style="text-align:center;">
+      <div class="g-status">${escapeHtml(book.name)} · 今日 ${todayCount} / ${c.dailyGoal} · ${dirLabel}</div>
+      <div style="min-height:200px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;">
+        <div id="wordMain" style="font-size:30px;font-weight:600;color:var(--main-dark);word-break:break-word;text-align:center;"></div>
+        <div id="wordPh" style="font-size:14px;color:var(--text-soft);margin-top:6px;min-height:20px;"></div>
+        <div id="wordMean" style="font-size:16px;color:var(--text);margin-top:14px;min-height:24px;text-align:center;"></div>
+      </div>
+      <div class="g-btn-row">
+        <button onclick="wordShowMean()">看答案</button>
+      </div>
+      <div class="g-btn-row" style="margin-top:8px;">
+        <button onclick="wordKnow()">认识</button>
+        <button onclick="wordDontKnow()">不认识</button>
+        <button onclick="wordSkip()">跳过</button>
+      </div>
+      <div class="g-btn-row" style="margin-top:8px;">
+        <button onclick="wordCycleDir()">方向：${dirLabel}</button>
+        <button onclick="wordSetGoal()">设目标</button>
+        <button onclick="closeModal()">退出</button>
+      </div>
+    </div>
+  `;
+}
+let __currentWord = null;
+let __currentDir = 'en2zh';
+function loadNextWord(){
+  if(!Current || !Current.word) return;
+  const c = Current.word;
+  const book = c.books.find(b=>b.id===c.currentBookId);
+  if(!book || !book.words.length){
+    const main = document.getElementById('wordMain');
+    if(main) main.textContent = '（没有单词）';
+    return;
+  }
+  const unlearned = book.words.filter(x=>!c.learned[x.w+'|en2zh'] && !c.learned[x.w+'|zh2en']);
+  const pool = unlearned.length ? unlearned : book.words;
+  __currentWord = pool[Math.floor(Math.random()*pool.length)];
+
+  let dir = c.dir || 'en2zh';
+  if(dir === 'random') dir = Math.random() < 0.5 ? 'en2zh' : 'zh2en';
+  if(!__currentWord.m) dir = 'en2zh';
+  if(!__currentWord.w) dir = 'zh2en';
+  __currentDir = dir;
+
+  const main = document.getElementById('wordMain');
+  const ph = document.getElementById('wordPh');
+  const mean = document.getElementById('wordMean');
+  if(dir === 'en2zh'){
+    if(main) main.textContent = __currentWord.w;
+    if(ph) ph.textContent = __currentWord.ph ? '/'+__currentWord.ph+'/' : '';
+  } else {
+    if(main) main.textContent = __currentWord.m || '（无中文）';
+    if(ph) ph.textContent = '';
+  }
+  if(mean) mean.textContent = '';
+}
+function wordShowMean(){
+  if(!__currentWord) return;
+  const mean = document.getElementById('wordMean');
+  const ph = document.getElementById('wordPh');
+  if(__currentDir === 'en2zh'){
+    if(mean) mean.textContent = __currentWord.m || '（没有释义）';
+  } else {
+    if(mean) mean.textContent = __currentWord.w;
+    if(ph) ph.textContent = __currentWord.ph ? '/'+__currentWord.ph+'/' : '';
+  }
+}
+function wordKnow(){
+  if(!Current || !__currentWord) return;
+  const c = Current.word;
+  const today = todayStr();
+  const key = __currentWord.w + '|' + __currentDir;
+  c.learned[key] = { date: today, count: (c.learned[key]?.count||0) + 1 };
+  c.history.push({ date: today, count: 1 });
+  if(c.history.length > 500) c.history = c.history.slice(-500);
+  Current.coin += 1;
+  updateStats();
+  saveGameDebounced();
+  say('已记住，+1 🪙','tip');
+  loadNextWord();
+}
+function wordDontKnow(){
+  if(!Current || !__currentWord) return;
+  const c = Current.word;
+  if(!c.wrong.find(x=>x.w===__currentWord.w && x.dir===__currentDir)){
+    c.wrong.push({ w:__currentWord.w, m:__currentWord.m, ph:__currentWord.ph||'', dir:__currentDir, date: todayStr() });
+  }
+  wordShowMean();
+  saveGameDebounced();
+}
+function wordSkip(){ loadNextWord(); }
+function wordSetGoal(){
+  const v = prompt('每天背多少个？', Current.word.dailyGoal);
+  if(v === null) return;
+  const n = parseInt(v);
+  if(!n || n<1) return;
+  Current.word.dailyGoal = n;
+  saveGame(); wordTab('study');
+}
+function wordCycleDir(){
+  if(!Current) return;
+  const order = ['en2zh','zh2en','random'];
+  const cur = Current.word.dir || 'en2zh';
+  const idx = order.indexOf(cur);
+  Current.word.dir = order[(idx+1) % order.length];
+  saveGame(); wordTab('study');
+}
+function renderWordWrong(){
+  const list = Current.word.wrong || [];
+  if(!list.length) return '<p style="color:var(--text-soft);font-size:13px;">还没有错词。</p>';
+  const dirLabel = { en2zh:'英→中', zh2en:'中→英' };
+  return list.slice().reverse().map((x,i)=>`
+    <div class="shop-item">
+      <div class="info">
+        ${escapeHtml(x.w)} ${x.ph?'<small>/'+escapeHtml(x.ph)+'/</small>':''}
+        <small>${escapeHtml(x.m||'')} · ${dirLabel[x.dir]||''}</small>
+      </div>
+      <button style="background:#e08a8a;" onclick="wordRemoveWrong(${list.length-1-i})">移除</button>
+    </div>
+  `).join('');
+}
+function wordRemoveWrong(i){
+  Current.word.wrong.splice(i,1);
+  saveGame(); wordTab('wrong');
+}
+async function wordAutoPhonetic(limit=0){
+  if(!Current || !Current.word) return;
+  const book = Current.word.books.find(b=>b.id===Current.word.currentBookId);
+  if(!book) return;
+  const targets = book.words.filter(x=>x.w && !x.ph && /^[A-Za-z\s\-']+$/.test(x.w));
+  if(!targets.length){ say('没有需要补音标的词。','tip'); return; }
+  const list = limit > 0 ? targets.slice(0, limit) : targets;
+  say(`开始补音标，共 ${list.length} 个词…`,'tip');
+  let ok = 0;
+  for(const t of list){
+    try{
+      const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(t.w)}`);
+      if(!res.ok) continue;
+      const data = await res.json();
+      const entry = data[0];
+      const ph = entry?.phonetic || entry?.phonetics?.find(p=>p.text)?.text || '';
+      if(ph){ t.ph = ph.replace(/^\/|\/$/g,''); ok++; }
+    }catch(e){}
+    await new Promise(r=>setTimeout(r, 120));
+  }
+  saveGame();
+  say(`补完音标：${ok} / ${list.length}`,'tip');
+  wordTab('books');
+}
+
+/* ============ 刷题 ============ */
+function openQuiz(){
+  if(!Current) return;
+  if(!Current.quiz) Current.quiz = { history:[], wrong:[], cache:[] };
+  const modal = document.getElementById('modalContent');
+  modal.innerHTML = `
+    <h2>📝 刷题 <span class="close" onclick="closeModal()">×</span></h2>
+    <div style="display:flex;gap:6px;margin-bottom:14px;">
+      <button class="btn" style="flex:1;" onclick="quizTab('new')">出题</button>
+      <button class="btn ghost" style="flex:1;" onclick="quizTab('wrong')">错题本</button>
+      <button class="btn ghost" style="flex:1;" onclick="quizTab('stat')">统计</button>
+    </div>
+    <div id="quizBody"></div>
+  `;
+  openModal();
+  quizTab('new');
+}
+function quizTab(tab){
+  const box = document.getElementById('quizBody');
+  if(!box) return;
+  if(tab === 'new') box.innerHTML = renderQuizSetup();
+  else if(tab === 'wrong') box.innerHTML = renderQuizWrong();
+  else if(tab === 'stat') box.innerHTML = renderQuizStat();
+}
+function renderQuizSetup(){
+  const q = Current.quiz;
+  const today = todayStr();
+  const todayList = q.history.filter(h=>h.date===today);
+  const todayTotal = todayList.reduce((a,b)=>a+b.total,0);
+  const todayCorrect = todayList.reduce((a,b)=>a+b.correct,0);
+  const rate = todayTotal ? Math.round(todayCorrect/todayTotal*100) : 0;
+  return `
+    <div class="field"><label>学科</label>
+      <select id="quizSubject">
+        <option value="english">英语</option>
+        <option value="chinese">语文</option>
+        <option value="history">历史</option>
+        <option value="politics">政治</option>
+        <option value="geography">地理</option>
+        <option value="biology">生物</option>
+      </select>
+    </div>
+    <div class="field"><label>难度</label>
+      <select id="quizLevel">
+        <option value="高三" selected>高三</option>
+        <option value="高考冲刺">高考冲刺</option>
+        <option value="四级">四级</option>
+        <option value="六级">六级</option>
+        <option value="考研">考研</option>
+        <option value="雅思">雅思</option>
+        <option value="托福">托福</option>
+      </select>
+    </div>
+    <div class="field"><label>题型</label>
+      <select id="quizType">
+        <option value="single">单选</option>
+        <option value="multi">多选</option>
+        <option value="judge">判断</option>
+        <option value="fill">填空</option>
+      </select>
+    </div>
+    <div class="field"><label>数量</label>
+      <select id="quizCount">
+        <option value="3">3</option>
+        <option value="5" selected>5</option>
+        <option value="10">10</option>
+      </select>
+    </div>
+    <div class="field"><label>知识点（可留空）</label>
+      <input id="quizTopic" placeholder="例：时态、非谓语、虚拟语气">
+    </div>
+    <button class="btn" onclick="quizGenerate()">开始出题</button>
+    <p style="font-size:12px;color:var(--text-soft);margin-top:12px;text-align:center;">
+      📊 今日已刷 ${todayTotal} 题 · 正确率 ${rate}%
+    </p>
+    <div id="quizLoading"></div>
+  `;
+}
+async function quizGenerate(){
+  if(!API.ready){ needApiTip(); return; }
+  const subject = document.getElementById('quizSubject').value;
+  const level = document.getElementById('quizLevel').value;
+  const type = document.getElementById('quizType').value;
+  const count = parseInt(document.getElementById('quizCount').value);
+  const topic = document.getElementById('quizTopic').value.trim();
+
+  const box = document.getElementById('quizLoading');
+  box.innerHTML = '<div class="test-result">⏳ 正在出题…</div>';
+
+  const subjMap = { english:'英语', chinese:'语文', history:'历史', politics:'政治', geography:'地理', biology:'生物' };
+  const typeMap = { single:'单选题', multi:'多选题', judge:'判断题', fill:'填空题' };
+  const levelDesc = {
+    '高三':'高三水平，难度接近高考',
+    '高考冲刺':'高考压轴难度，要有区分度',
+    '四级':'大学英语四级',
+    '六级':'大学英语六级',
+    '考研':'考研英语一/二',
+    '雅思':'IELTS 6.5+',
+    '托福':'TOEFL 90+',
+  };
+
+  let format = '';
+  if(type === 'single'){
+    format = `{"q":"题干","options":["A. ...","B. ...","C. ...","D. ..."],"answer":"A","explain":"解析"}`;
+  } else if(type === 'multi'){
+    format = `{"q":"题干","options":["A. ...","B. ...","C. ...","D. ..."],"answer":["A","C"],"explain":"解析"}`;
+  } else if(type === 'judge'){
+    format = `{"q":"题干","answer":true,"explain":"解析"}`;
+  } else if(type === 'fill'){
+    format = `{"q":"题干（用 ___ 表示空）","answer":"答案","explain":"解析"}`;
+  }
+
+  const prompt = `请出 ${count} 道${subjMap[subject]}${typeMap[type]}，难度：${levelDesc[level]}。
+${topic ? '知识点：' + topic + '。' : ''}
+
+要求：
+- 答案唯一且正确
+- ${type==='single'||type==='multi' ? '4 个选项不能重复' : ''}
+- 题干不能有歧义
+- 如果没把握，换一道你确定的
+- 英语内容附中文解析
+
+输出严格 JSON，不要其他文字：
+{
+  "questions": [
+    ${format}
+  ]
+}`;
+
+  try{
+    const reply = await callAI([
+      {role:'system',content:'你是出题老师，只输出 JSON。'},
+      {role:'user',content:prompt},
+    ], {maxTokens:2000, temperature:0.8});
+
+    const m = reply.match(/\{[\s\S]*\}/);
+    if(!m) throw new Error('AI 返回格式不对');
+    const data = JSON.parse(m[0]);
+    if(!data.questions || !data.questions.length) throw new Error('没有题目');
+
+    Current.quiz.current = {
+      subject, level, type, topic,
+      questions: data.questions,
+      index: 0,
+      userAnswers: data.questions.map(()=>null),
+      results: [],
+    };
+    renderQuizQuestion();
+  }catch(e){
+    box.innerHTML = `<div class="test-result fail">出题失败：${escapeHtml(e.message)}</div>`;
+  }
+}
+function renderQuizQuestion(){
+  const s = Current.quiz.current;
+  const modal = document.getElementById('modalContent');
+  const q = s.questions[s.index];
+  const total = s.questions.length;
+  const idx = s.index;
+
+  let body = '';
+  const type = s.type;
+
+  if(type === 'single'){
+    body = q.options.map((opt,i)=>{
+      const letter = String.fromCharCode(65+i);
+      const selected = s.userAnswers[idx] === letter;
+      return `<div class="shop-item" style="cursor:pointer;${selected?'outline:2px solid var(--main);':''}" onclick="quizSelect('${letter}')">
+        <div class="info">${escapeHtml(opt)}</div>
+      </div>`;
+    }).join('');
+  } else if(type === 'multi'){
+    body = q.options.map((opt,i)=>{
+      const letter = String.fromCharCode(65+i);
+      const arr = s.userAnswers[idx] || [];
+      const selected = arr.includes(letter);
+      return `<div class="shop-item" style="cursor:pointer;${selected?'outline:2px solid var(--main);':''}" onclick="quizToggle('${letter}')">
+        <div class="info">${selected?'☑':'☐'} ${escapeHtml(opt)}</div>
+      </div>`;
+    }).join('');
+  } else if(type === 'judge'){
+    const ans = s.userAnswers[idx];
+    body = `
+      <div class="g-btn-row">
+        <button class="btn ${ans===true?'':'ghost'}" onclick="quizSelect(true)">✓ 对</button>
+        <button class="btn ${ans===false?'':'ghost'}" onclick="quizSelect(false)">✗ 错</button>
+      </div>`;
+  } else if(type === 'fill'){
+    body = `<div class="field"><input id="quizFillInput" value="${s.userAnswers[idx]||''}" placeholder="输入答案" oninput="Current.quiz.current.userAnswers[${idx}]=this.value"></div>`;
+  }
+
+  modal.innerHTML = `
+    <h2>刷题 · 第 ${idx+1}/${total} <span class="close" onclick="closeModal()">×</span></h2>
+    <div class="game-panel">
+      <div class="g-status">${s.subject} · ${s.level} · ${s.type}</div>
+      <div class="g-content" style="font-size:15px;line-height:1.7;margin:12px 0;">${escapeHtml(q.q)}</div>
+      ${body}
+      <div class="g-btn-row" style="margin-top:14px;">
+        ${idx > 0 ? `<button onclick="quizPrev()">← 上一题</button>` : ''}
+        ${idx < total-1 ? `<button onclick="quizNext()">下一题 →</button>` : ''}
+        <button onclick="quizSubmit()">提交本轮</button>
+      </div>
+    </div>
+    <div id="quizReactionBox"></div>
+  `;
+  openModal();
+}
+function quizSelect(val){
+  const s = Current.quiz.current;
+  s.userAnswers[s.index] = val;
+  renderQuizQuestion();
+}
+function quizToggle(letter){
+  const s = Current.quiz.current;
+  let arr = s.userAnswers[s.index] || [];
+  if(arr.includes(letter)) arr = arr.filter(x=>x!==letter);
+  else arr.push(letter);
+  arr.sort();
+  s.userAnswers[s.index] = arr;
+  renderQuizQuestion();
+}
+function quizPrev(){ Current.quiz.current.index--; renderQuizQuestion(); }
+function quizNext(){ Current.quiz.current.index++; renderQuizQuestion(); }
+function judgeAnswer(q, userAnswer, type){
+  if(type === 'single') return userAnswer === q.answer;
+  if(type === 'multi'){
+    const a = (userAnswer||[]).slice().sort().join(',');
+    const b = (q.answer||[]).slice().sort().join(',');
+    return a === b;
+  }
+  if(type === 'judge') return userAnswer === q.answer;
+  if(type === 'fill'){
+    if(!userAnswer) return false;
+    const ua = String(userAnswer).trim().toLowerCase().replace(/\s+/g,' ');
+    const ca = String(q.answer).trim().toLowerCase().replace(/\s+/g,' ');
+    return ua === ca;
+  }
+  return false;
+}
+async function quizSubmit(){
+  const s = Current.quiz.current;
+  const results = s.questions.map((q,i)=>({
+    q,
+    userAnswer: s.userAnswers[i],
+    correct: judgeAnswer(q, s.userAnswers[i], s.type),
+  }));
+
+  const correctCount = results.filter(r=>r.correct).length;
+  const total = results.length;
+
+  Current.coin += correctCount * 2;
+
+  results.filter(r=>!r.correct).forEach(r=>{
+    Current.quiz.wrong.push({
+      q: r.q, type: s.type, subject: s.subject,
+      userAnswer: r.userAnswer, date: todayStr(),
+    });
+  });
+  if(Current.quiz.wrong.length > 200) Current.quiz.wrong = Current.quiz.wrong.slice(-200);
+
+  Current.quiz.history.push({
+    date: todayStr(), subject: s.subject, level: s.level, type: s.type,
+    total, correct: correctCount,
+  });
+  if(Current.quiz.history.length > 300) Current.quiz.history = Current.quiz.history.slice(-300);
+
+  updateStats();
+  saveGame();
+
+  const modal = document.getElementById('modalContent');
+  modal.innerHTML = `
+    <h2>本轮完成 <span class="close" onclick="closeModal()">×</span></h2>
+    <div class="game-panel" style="text-align:center;">
+      <div style="font-size:40px;margin:10px 0;">${correctCount === total ? '🎉' : correctCount >= total*0.6 ? '👍' : '💪'}</div>
+      <div class="g-content" style="font-size:15px;">
+        答对 ${correctCount} / ${total}<br>
+        正确率 ${Math.round(correctCount/total*100)}%<br>
+        +${correctCount*2} 🪙
+      </div>
+      <div style="margin-top:16px;text-align:left;">
+        ${results.map((r,i)=>`
+          <div class="log-item" style="border-left:3px solid ${r.correct?'#5fbf88':'#e08a8a'};padding-left:8px;margin-bottom:8px;">
+            <div class="who">第 ${i+1} 题 · ${r.correct?'✓ 正确':'✗ 错误'}</div>
+            <div class="txt" style="font-size:12px;color:var(--text-soft);">${escapeHtml(r.q.q.slice(0,50))}${r.q.q.length>50?'…':''}</div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="g-btn-row" style="margin-top:16px;">
+        <button onclick="openQuiz()">再来一组</button>
+        <button onclick="closeModal()">退出</button>
+      </div>
+      <div id="quizReactionBox"></div>
+    </div>
+  `;
+  openModal();
+
+  say('（他看了看你的答案……）','action');
+  await quizRoundReaction(results, correctCount, total);
+}
+async function quizRoundReaction(results, correctCount, total){
+  if(!API.ready || !Current) return;
+  const wrongList = results.filter(r=>!r.correct).map((r,i)=>{
+    const q = r.q;
+    const ua = Array.isArray(r.userAnswer) ? r.userAnswer.join('') : r.userAnswer;
+    const ca = Array.isArray(q.answer) ? q.answer.join('') : q.answer;
+    return `题目：${q.q}\n你的答案：${ua}\n正确答案：${ca}\n解析：${q.explain||''}`;
+  }).join('\n---\n');
+
+  const scene = `对方刚做完一组题，共 ${total} 道，答对 ${correctCount} 道。
+${wrongList ? '错题：\n' + wrongList : '全对！'}`;
+
+  const sys = buildSystemPrompt('') + `
+
+【场景】${scene}
+
+【要求】根据你的性格，说 2~3 句。可以点评、鼓励、吐槽、讲解错题。
+- 不要复述题目原文
+- 不要提到"规则""设定""人设"
+- 不要用括号写动作
+- 直接以你的身份说话`;
+
+  try{
+    const reply = await callAI([
+      {role:'system',content:sys},
+      ...Current.chatLog.slice(-6).map(m=>({role:m.role,content:m.text})),
+      {role:'user',content:'【系统触发】'},
+    ], {maxTokens:200, temperature:0.9});
+
+    if(reply){
+      let {clean,emo,label} = parseEmotion(reply);
+      const bg = parseBgColor(clean); clean = bg.clean;
+      const km = parseKaomoji(clean); clean = km.clean;
+      if(bg.color) applyBgColor(bg.color);
+      applyEmotion(emo, label);
+      say(clean, 'them', {kaomoji: km.kaomoji});
+      showInAppNotif(clean);
+      Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
+      saveGameDebounced();
+    }
+  }catch(e){}
+}
+function renderQuizWrong(){
+  const list = Current.quiz.wrong || [];
+  if(!list.length) return '<p style="color:var(--text-soft);font-size:13px;">还没有错题。</p>';
+  return list.slice().reverse().map((w,i)=>{
+    const idx = list.length-1-i;
+    const ua = Array.isArray(w.userAnswer) ? w.userAnswer.join('') : w.userAnswer;
+    const ca = Array.isArray(w.q.answer) ? w.q.answer.join('') : w.q.answer;
+    return `
+      <div class="shop-item" style="align-items:flex-start;flex-direction:column;">
+        <div class="info" style="flex:1;">
+          <div style="font-size:13px;font-weight:600;">${escapeHtml(w.q.q)}</div>
+          <small>你的答案：${escapeHtml(String(ua))} · 正确：${escapeHtml(String(ca))}</small>
+          ${w.q.explain ? `<small style="color:var(--text-soft);">${escapeHtml(w.q.explain)}</small>` : ''}
+        </div>
+        <button style="background:#e08a8a;margin-top:6px;" onclick="quizRemoveWrong(${idx})">移除</button>
+      </div>`;
+  }).join('');
+}
+function quizRemoveWrong(i){
+  Current.quiz.wrong.splice(i,1);
+  saveGame(); quizTab('wrong');
+}
+function renderQuizStat(){
+  const h = Current.quiz.history || [];
+  if(!h.length) return '<p style="color:var(--text-soft);font-size:13px;">还没有记录。</p>';
+  const today = todayStr();
+  const todayList = h.filter(x=>x.date===today);
+  const totalAll = h.reduce((a,b)=>a+b.total,0);
+  const correctAll = h.reduce((a,b)=>a+b.correct,0);
+  const totalToday = todayList.reduce((a,b)=>a+b.total,0);
+  const correctToday = todayList.reduce((a,b)=>a+b.correct,0);
+  return `
+    <div class="game-panel" style="margin-bottom:14px;">
+      <div class="g-status">今日</div>
+      <div class="g-content">刷了 ${totalToday} 题 · 对 ${correctToday} 题 · 正确率 ${totalToday?Math.round(correctToday/totalToday*100):0}%</div>
+    </div>
+    <div class="game-panel" style="margin-bottom:14px;">
+      <div class="g-status">累计</div>
+      <div class="g-content">刷了 ${totalAll} 题 · 对 ${correctAll} 题 · 正确率 ${totalAll?Math.round(correctAll/totalAll*100):0}%</div>
+    </div>
+    <label style="font-size:13px;color:var(--text-soft);">最近记录</label>
+    ${h.slice(-10).reverse().map(x=>`
+      <div class="log-item">
+        <div class="who">${x.date} · ${x.subject} · ${x.level}</div>
+        <div class="txt">${x.correct} / ${x.total}</div>
+      </div>
+    `).join('')}
+  `;
+}
+
+/* ============ 记账 ============ */
+function openMoney(){
+  if(!Current) return;
+  if(!Current.money) Current.money = { budget:3000, records:[] };
+  const modal = document.getElementById('modalContent');
+  modal.innerHTML = `
+    <h2>💰 记账 <span class="close" onclick="closeModal()">×</span></h2>
+    <div style="display:flex;gap:6px;margin-bottom:14px;">
+      <button class="btn" style="flex:1;" onclick="moneyTab('add')">记一笔</button>
+      <button class="btn ghost" style="flex:1;" onclick="moneyTab('list')">明细</button>
+      <button class="btn ghost" style="flex:1;" onclick="moneyTab('stat')">统计</button>
+    </div>
+    <div id="moneyBody"></div>
+  `;
+  openModal();
+  moneyTab('add');
+}
+function moneyTab(tab){
+  const box = document.getElementById('moneyBody');
+  if(!box) return;
+  if(tab === 'add') box.innerHTML = renderMoneyAdd();
+  else if(tab === 'list') box.innerHTML = renderMoneyList();
+  else if(tab === 'stat') box.innerHTML = renderMoneyStat();
+}
+function renderMoneyAdd(){
+  return `
+    <div class="field"><label>金额</label>
+      <input id="moneyAmount" type="number" placeholder="0.00" step="0.01">
+    </div>
+    <div class="field"><label>类型</label>
+      <select id="moneyType">
+        <option value="expense">支出</option>
+        <option value="income">收入</option>
+      </select>
+    </div>
+    <div class="field"><label>分类</label>
+      <select id="moneyCategory">
+        <option value="餐饮">餐饮</option>
+        <option value="交通">交通</option>
+        <option value="购物">购物</option>
+        <option value="学习">学习</option>
+        <option value="娱乐">娱乐</option>
+        <option value="居住">居住</option>
+        <option value="医疗">医疗</option>
+        <option value="其他">其他</option>
+      </select>
+    </div>
+    <div class="field"><label>备注（可留空）</label>
+      <input id="moneyNote" placeholder="例：午饭">
+    </div>
+    <div class="field"><label>日期</label>
+      <input id="moneyDate" type="date" value="${todayStr()}">
+    </div>
+    <button class="btn" onclick="moneyAdd()">保存</button>
+  `;
+}
+function moneyAdd(){
+  const amount = parseFloat(document.getElementById('moneyAmount').value);
+  if(!amount || amount <= 0){ say('请输入有效金额','tip'); return; }
+  const type = document.getElementById('moneyType').value;
+  const category = document.getElementById('moneyCategory').value;
+  const note = document.getElementById('moneyNote').value.trim();
+  const date = document.getElementById('moneyDate').value || todayStr();
+
+  Current.money.records.push({
+    id: 'm_' + Date.now(),
+    amount, type, category, note, date,
+  });
+  saveGame();
+  say('已记录。','tip');
+  moneyTab('add');
+  document.getElementById('moneyAmount').value = '';
+
+  if(amount >= 500){
+    setTimeout(async ()=>{
+      if(!API.ready || !Current) return;
+      const sys = buildSystemPrompt('') + `
+
+【场景】对方刚记了一笔支出：${category} ¥${amount}${note?'（'+note+'）':''}。
+【要求】根据你的性格，说一句反应，1~2句。可以调侃、关心、提醒。
+- 不要提到"规则""设定"
+- 不要用括号写动作`;
+      const reply = await callAI([
+        {role:'system',content:sys},
+        ...Current.chatLog.slice(-6).map(m=>({role:m.role,content:m.text})),
+        {role:'user',content:'【系统触发】'},
+      ], {maxTokens:120, temperature:0.9});
+      if(reply){
+        let {clean,emo,label} = parseEmotion(reply);
+        say(clean, 'them');
+        applyEmotion(emo, label);
+        Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
+        saveGameDebounced();
+      }
+    }, 800);
+  }
+}
+function renderMoneyList(){
+  const list = Current.money.records || [];
+  if(!list.length) return '<p style="color:var(--text-soft);font-size:13px;">还没有记录。</p>';
+  const byDate = {};
+  list.forEach(r=>{
+    if(!byDate[r.date]) byDate[r.date] = [];
+    byDate[r.date].push(r);
+  });
+  const dates = Object.keys(byDate).sort().reverse();
+  return dates.map(d=>{
+    const items = byDate[d];
+    const dayExpense = items.filter(x=>x.type==='expense').reduce((a,b)=>a+b.amount,0);
+    const dayIncome = items.filter(x=>x.type==='income').reduce((a,b)=>a+b.amount,0);
+    return `
+      <div class="track-day">
+        <h3>${d} · 支出 ¥${dayExpense.toFixed(2)}${dayIncome?` · 收入 ¥${dayIncome.toFixed(2)}`:''}</h3>
+        ${items.map(r=>`
+          <div class="row" style="display:flex;justify-content:space-between;">
+            <span><span class="time">${r.category}</span>${escapeHtml(r.note||'')}</span>
+            <span style="color:${r.type==='expense'?'#e08a8a':'#5fbf88'};">
+              ${r.type==='expense'?'-':'+'}¥${r.amount.toFixed(2)}
+            </span>
+          </div>
+        `).join('')}
+      </div>`;
+  }).join('');
+}
+function renderMoneyStat(){
+  const m = Current.money;
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const monthStr = `${year}-${String(month).padStart(2,'0')}`;
+  const monthRecords = m.records.filter(r=>r.date.startsWith(monthStr));
+
+  const expense = monthRecords.filter(r=>r.type==='expense').reduce((a,b)=>a+b.amount,0);
+  const income = monthRecords.filter(r=>r.type==='income').reduce((a,b)=>a+b.amount,0);
+  const budget = m.budget || 3000;
+  const remain = budget - expense;
+  const ratio = budget > 0 ? Math.min(1, expense/budget) : 0;
+
+  const byCat = {};
+  monthRecords.filter(r=>r.type==='expense').forEach(r=>{
+    byCat[r.category] = (byCat[r.category]||0) + r.amount;
+  });
+  const catList = Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+
+  return `
+    <div class="game-panel" style="margin-bottom:14px;">
+      <div class="g-status">${year} 年 ${month} 月</div>
+      <div style="font-size:13px;line-height:2;">
+        预算：¥${budget.toFixed(2)}<br>
+        支出：<span style="color:#e08a8a;">¥${expense.toFixed(2)}</span><br>
+        收入：<span style="color:#5fbf88;">¥${income.toFixed(2)}</span><br>
+        结余：<span style="color:${remain<0?'#e08a8a':'#5fbf88'};">¥${remain.toFixed(2)}</span>
+      </div>
+      <div style="height:10px;background:var(--accent);border-radius:5px;overflow:hidden;margin-top:10px;">
+        <div style="height:100%;width:${ratio*100}%;background:${ratio>=1?'#e08a8a':'var(--main)'};transition:width .4s;"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-soft);margin-top:6px;text-align:center;">
+        已用 ${Math.round(ratio*100)}%
+      </div>
+    </div>
+    <div class="field"><label>每月预算</label>
+      <input id="moneyBudgetInput" type="number" value="${budget}" step="100">
+      <button class="btn" style="margin-top:8px;" onclick="moneySaveBudget()">保存预算</button>
+    </div>
+    <label style="font-size:13px;color:var(--text-soft);">分类支出</label>
+    ${catList.length ? catList.map(([cat,amt])=>`
+      <div class="shop-item">
+        <div class="info">${cat}<small>¥${amt.toFixed(2)}</small></div>
+        <div style="font-size:12px;color:var(--text-soft);">${Math.round(amt/expense*100)}%</div>
+      </div>
+    `).join('') : '<p style="color:var(--text-soft);font-size:13px;">本月还没有支出。</p>'}
+  `;
+}
+function moneySaveBudget(){
+  const v = parseFloat(document.getElementById('moneyBudgetInput').value);
+  if(!v || v <= 0){ say('请输入有效预算','tip'); return; }
+  Current.money.budget = v;
+  saveGame();
+  say('预算已更新。','tip');
+  moneyTab('stat');
+}
+
+/* ============================================================
+   初始化
+   ============================================================ */
 setInterval(saveGame, 30000);
 window.addEventListener('beforeunload', ()=>{ try{ saveGame(); }catch(e){} });
 window.addEventListener('resize',()=>{ positionCharacter(); positionUser(); positionPet(); repositionAllBubblesDebounced(); });
