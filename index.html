@@ -108,9 +108,8 @@ body{
   background:var(--card);color:var(--text);font-size:14px;box-shadow:var(--shadow)}
 .inputbar input:disabled{opacity:.5}
 .inputbar button{border:none;width:44px;height:44px;border-radius:50%;background:var(--main);
-  color:#fff;font-size:18px;cursor:pointer;box-shadow:var(--shadow);transition:transform .15s;flex-shrink:0;}
+  color:#fff;font-size:18px;cursor:pointer;box-shadow:var(--shadow);transition:transform .15s}
 .inputbar button:active{transform:scale(.9)}
-.inputbar button.new-topic-btn{background:var(--accent);color:var(--text);font-size:20px;}
 .quick{display:flex;gap:6px;margin-top:8px;overflow-x:auto;padding-bottom:4px}
 .quick button{flex-shrink:0;border:none;padding:7px 14px;border-radius:999px;
   background:var(--card);color:var(--text);font-size:12px;cursor:pointer;box-shadow:var(--shadow)}
@@ -296,7 +295,6 @@ body{
 
   <div class="inputbar">
     <input id="chatInput" placeholder="和他说点什么…" />
-    <button id="newTopicBtn" class="new-topic-btn" title="开启新话题">🔄</button>
     <button id="sendBtn">↑</button>
   </div>
 
@@ -304,11 +302,10 @@ body{
     <div class="tool" data-panel="gift"><span class="ico">🎁</span>送礼物</div>
     <div class="tool" data-panel="touch"><span class="ico">✋</span>互动</div>
     <div class="tool" data-panel="outfit"><span class="ico">👗</span>换装</div>
-    <div class="tool" data-panel="study"><span class="ico">📚</span>学习</div>
     <div class="tool" data-panel="game"><span class="ico">🎮</span>小游戏</div>
     <div class="tool" data-panel="shop"><span class="ico">🛒</span>商城</div>
-    <div class="tool" data-panel="money"><span class="ico">💰</span>记账</div>
     <div class="tool" data-panel="diary"><span class="ico">📔</span>日记</div>
+    <div class="tool" data-panel="timer"><span class="ico">⏱️</span>番茄钟</div>
     <div class="tool" data-panel="sleep"><span class="ico">🌙</span>陪睡</div>
     <div class="tool" data-panel="period"><span class="ico">🩸</span>生理期</div>
     <div class="tool" data-panel="anniv"><span class="ico">💍</span>纪念日</div>
@@ -325,6 +322,7 @@ body{
   <div class="story-btn" id="sleepStoryBtn" onclick="tellSleepStory()">📖 讲个晚安故事</div>
   <div class="exit" id="sleepExit">轻触结束陪睡</div>
 </div>
+
 <script>
 /* ============ 农历节日对照表（2026-2036） ============ */
 const LUNAR_FESTIVALS = {
@@ -422,7 +420,7 @@ function showInAppNotif(text){
     else icon.textContent = '💬';
     title.textContent = Current.name;
   }
-  msg.textContent = text || '';
+  msg.textContent = text;
   box.classList.add('show');
   if(notifTimer) clearTimeout(notifTimer);
   notifTimer = setTimeout(()=>{ box.classList.remove('show'); }, 4000);
@@ -482,11 +480,6 @@ function newCharacterData(id){
     lastSelfDiaryDate: null,
     lastFestivalDate: null,
     lastBackgroundNotifAt: 0,
-    money: { budget: 3000, logs: [] },
-    lastMoneyNudgeDate: null,
-    wordBook: { currentBook: null, learnedCount: 0 },
-    wrongWords: [],
-    subjectAnswer: null,
   };
 }
 let Current = null;
@@ -515,7 +508,6 @@ function initSettingsDraft(){
     apiUrl:API.baseUrl||'', apiKey:API.key||'', apiModel:API.model||'',
     useFallback:!!GlobalState.useFallback, fallbackModels:(GlobalState.fallbackModels||[]).slice(),
     pomoGoalMin: (typeof c.pomoGoalMin === 'number') ? c.pomoGoalMin : 120,
-    moneyBudget: (c.money && typeof c.money.budget === 'number') ? c.money.budget : 3000,
   };
 }
 function collectSettingsDraft(){
@@ -543,7 +535,6 @@ function collectSettingsDraft(){
   if(g('userShowChk')) settingsDraft.userShow = g('userShowChk').checked;
   if(g('petNameInput')) settingsDraft.pet.name = g('petNameInput').value.trim() || '小家伙';
   if(g('pomoGoalInput')) settingsDraft.pomoGoalMin = Math.max(0, parseInt(g('pomoGoalInput').value)||0);
-  if(g('setMoneyBudget')) settingsDraft.moneyBudget = Math.max(0, parseInt(g('setMoneyBudget').value)||0);
 }
 
 /* ============ 图片压缩 ============ */
@@ -813,52 +804,6 @@ function saveRelationSetting(){
   saveGame(); updateRelationUI(); closeModal();
 }
 
-/* ============ 角色切换（🌟 新增） ============ */
-function openCharSwitch(){
-  if(!Current) return;
-  const modal=document.getElementById('modalContent');
-  modal.innerHTML=`
-    <h2>角色列表 <span class="close" onclick="closeModal()">×</span></h2>
-    ${GlobalState.characters.map(c=>`
-      <div class="char-list-item ${c.id===GlobalState.currentCharId?'active':''}" onclick="switchChar('${c.id}')">
-        ${c.image?`<img src="${c.image}">`:'<div class="avatar-placeholder">👤</div>'}
-        <div class="info"><div class="n">${c.name||'他'}</div><div class="d">${getRelationName(c.relationType)}</div></div>
-        ${GlobalState.characters.length>1?`<button class="del-btn" onclick="event.stopPropagation();deleteChar('${c.id}')">删除</button>`:''}
-      </div>
-    `).join('')}
-    <button class="btn" onclick="createNewChar()">+ 新建角色</button>
-  `;
-  openModal();
-}
-function switchChar(id){
-  const c = GlobalState.characters.find(x=>x.id===id);
-  if(!c) return;
-  GlobalState.currentCharId = id;
-  Current = c;
-  saveGame(); closeModal();
-  applyMainColor(GlobalState.mainColor);
-  updateStats(); updateRelationUI();
-  renderBackground(); renderCharacter(); renderUser(); renderPet();
-  updateTrackBar();
-}
-function createNewChar(){
-  const c = newCharacterData('c_'+Date.now()+'_'+Math.random().toString(36).slice(2,6));
-  GlobalState.characters.push(c);
-  GlobalState.currentCharId = c.id;
-  Current = c;
-  saveGame(); closeModal(); openSettings();
-}
-function deleteChar(id){
-  if(GlobalState.characters.length <= 1){ say('至少要保留一个角色。','tip'); return; }
-  if(!confirm('确定删除这个角色吗？')) return;
-  GlobalState.characters = GlobalState.characters.filter(c=>c.id!==id);
-  if(GlobalState.currentCharId === id){
-    GlobalState.currentCharId = GlobalState.characters[0].id;
-    Current = GlobalState.characters[0];
-  }
-  saveGame(); openCharSwitch(); updateStats(); updateRelationUI(); renderCharacter();
-}
-
 /* ============ 生理期 / 作息 ============ */
 function isPeriodNow(){
   if(!Current) return false;
@@ -897,15 +842,10 @@ function renderWeatherFx(){
   }
 }
 function isNightTime(){ const h=new Date().getHours(); return (h>=23 || h<6); }
-// 🌟 修复：刷新页面后也把 DOM 状态同步到角色状态
 function checkSleepState(){
   if(!Current) return;
-  const a=document.getElementById('charAnim'), w=document.getElementById('charWrap');
-  // 先强制同步 DOM
-  if(Current.isSleeping){ if(a)a.classList.add('sleeping'); if(w)w.classList.add('sleeping'); }
-  else { if(a)a.classList.remove('sleeping'); if(w)w.classList.remove('sleeping'); }
-
   const was=Current.isSleeping, now=isNightTime();
+  const a=document.getElementById('charAnim'), w=document.getElementById('charWrap');
   if(now && !was){ Current.isSleeping=true; if(a)a.classList.add('sleeping'); if(w)w.classList.add('sleeping'); }
   else if(!now && was){ Current.isSleeping=false; if(a)a.classList.remove('sleeping'); if(w)w.classList.remove('sleeping'); }
 }
@@ -1053,8 +993,6 @@ function buildSystemPrompt(userInput){
   if(!Current) return '';
   const c=Current;
   const love = c.relationValue || 0;
-  const now = new Date();
-  const nowStr = now.toLocaleString('zh-CN', { hour12: false });
   const parts=[
     '========== 你的人设（最高优先级）==========',
     `你的名字：「${c.name}」`,
@@ -1079,15 +1017,10 @@ function buildSystemPrompt(userInput){
     '1. 不许反复问同一件事。2. 不许一句话反复说。3. 每轮回复先在心里过一遍：这句话我是不是刚说过？',
     '',
     '========== 默认风格 ==========',
-    `- 你必须只回复 1 句话，绝对不能超过 2 句话。这是硬性规定。`,
+    `- 默认回复 1~3 句。`,
     `- 默认语气：${love>=75?'温柔亲昵':love>=50?'亲近关心':love>=25?'轻松开玩笑':'平淡有点距离'}。`,
     `- 默认不用颜文字，偶尔可以。默认用口语。`,
     c.language ? `- 必须用${c.language}回复。不管你之前用什么语言，从这一句开始全部用${c.language}。` : '',
-    '',
-    '========== 当前时间与真实感 ==========',
-    `【当前时间】${nowStr}`,
-    `【时间规则】你是有真实时间概念的。不能出现“洗澡洗了 12 个小时”、“睡觉睡了 20 个小时”这种违背常识的情况。`,
-    `【话题结束规则】如果你上一次回复说“我去洗澡/睡觉/吃饭/出门”，而当前时间已经距离那件事超过了 2 小时，你必须默认那件事已经结束，开启新话题，不要再提洗澡/睡觉了。`,
     '',
     '========== 你现在的情况 ==========',
     `关系：${getRelationName(c.relationType)}（好感 ${Math.round(c.relationValue)}/100）`,
@@ -1119,22 +1052,15 @@ function buildSystemPrompt(userInput){
   const uniqueEmo = [...new Set(emoLabels)];
   parts.push(
     '',
-    '========== 绝对强制规则（违反即失效）==========',
-    `1. 你回复的对象是「${c.callYou}」，你只能针对对方发来的这最后一句话进行回应。`,
-    `2. 绝对禁止复述之前的回忆，绝对禁止自言自语，绝对禁止自问自答。`,
-    `3. 你的回复绝对不能超过 2 句话（上限 2 句，最好 1 句）。`,
-    `4. 如果你有长篇大论想说，必须憋住，只挑最核心的一句话回复。`,
-    `5. 如果对方没有问过去，你绝对不能说过去。`,
-    '',
-    '========== 输出格式（严格执行）==========',
+    '========== 输出格式 ==========',
     `1. 你就是这个人，不要提到自己是 AI、模型或程序。`,
     `2. 每次回复的最后，附上一个情绪标签，格式如 [开心]、[害羞]、[难过]、[生气]、[平静]、[惊讶]、[温柔]。可用：${uniqueEmo.join('、')}。`,
     `3. 情绪标签只能有一个，放在末尾。`,
     `4. 可附加 [背景色:#RRGGBB] 标签。`,
     `5. 颜文字单独放最后一行，格式：[颜文字]你的颜文字`,
     '',
-    '========== 防念稿规则 ==========',
-    '1. 不要复述系统提示里给你的任何内容。',
+    '========== 防念稿规则（最重要）==========',
+    '1. 绝对不要复述系统提示里给你的任何内容。',
     '2. 如果看到【场景】【系统触发】标签，那是系统给你的背景信息或提醒，不是对方说的话，不要复述。',
     '3. 不要提到"人设""规则""要求""设定""提示"这些词。',
     '4. 直接以角色身份说话，用口语。不要用括号（）写动作或情绪。',
@@ -1144,8 +1070,7 @@ function buildSystemPrompt(userInput){
 function buildMessages(userInput){
   if(!Current) return [];
   const msgs=[{role:'system',content:buildSystemPrompt(userInput)}];
-  // 🌟 记忆加长：3 条 → 10 条
-  Current.chatLog.slice(-10).forEach(m=>msgs.push({role:m.role,content:m.text}));
+  Current.chatLog.slice(-40).forEach(m=>msgs.push({role:m.role,content:m.text}));
   msgs.push({role:'user',content:userInput});
   return msgs;
 }
@@ -1153,29 +1078,23 @@ function buildMessages(userInput){
 /* ============ 解析 ============ */
 const EMO_MAP={'开心':'happy','高兴':'happy','笑':'happy','害羞':'shy','脸红':'shy','难过':'sad','伤心':'sad','失落':'sad','生气':'angry','不满':'angry','哼':'angry','惊讶':'surprise','吃惊':'surprise','温柔':'tender','平静':'calm'};
 function parseEmotion(text){
-  if (text === null || text === undefined) return {clean:'', emo:'calm', label:null};
-  let str = String(text);
-  const m=str.match(/\[([^\]]+)\]\s*$/);
-  if(!m)return{clean:str,emo:'calm',label:null};
+  const m=text.match(/\[([^\]]+)\]\s*$/);
+  if(!m)return{clean:text,emo:'calm',label:null};
   const label=m[1].trim();
-  const clean=str.replace(/\[[^\]]+\]\s*$/,'').trim();
+  const clean=text.replace(/\[[^\]]+\]\s*$/,'').trim();
   let emo='calm';
   for(const k in EMO_MAP){if(label.includes(k)){emo=EMO_MAP[k];break;}}
   return{clean,emo,label};
 }
 function parseBgColor(text){
-  if (text === null || text === undefined) return {clean:'', color:null};
-  let str = String(text);
-  const m=str.match(/\[背景色[:：]\s*(#[0-9a-fA-F]{3,8})\s*\]/);
-  if(!m)return{clean:str,color:null};
-  return{clean:str.replace(m[0],'').trim(),color:m[1]};
+  const m=text.match(/\[背景色[:：]\s*(#[0-9a-fA-F]{3,8})\s*\]/);
+  if(!m)return{clean:text,color:null};
+  return{clean:text.replace(m[0],'').trim(),color:m[1]};
 }
 function parseKaomoji(text){
-  if (text === null || text === undefined) return {clean:'', kaomoji:null};
-  let str = String(text);
-  const m=str.match(/\[颜文字\]\s*([\s\S]+?)\s*$/);
-  if(!m)return{clean:str,kaomoji:null};
-  return{clean:str.replace(m[0],'').trim(),kaomoji:m[1].trim()};
+  const m=text.match(/\[颜文字\]\s*([\s\S]+?)\s*$/);
+  if(!m)return{clean:text,kaomoji:null};
+  return{clean:text.replace(m[0],'').trim(),kaomoji:m[1].trim()};
 }
 function findEmotionImage(label,emo){
   if(!Current) return null;
@@ -1249,8 +1168,7 @@ function repositionAllBubbles(){
     const top = Math.max(4, userTopY - 8 - fromBottom * BUBBLE_LINE_HEIGHT - h);
     el.style.left = left + 'px'; el.style.top = top + 'px';
   });
-
-  // 🌟 新增：tip / err 类气泡也要定位，否则永远卡在 -9999px 看不见
+  // 🌟 新增：tip / err 气泡也要定位，否则永远卡在屏幕外
   const sysBubbles = Array.from(box.children).filter(c =>
     c.classList.contains('tip') || c.classList.contains('err')
   );
@@ -1269,19 +1187,11 @@ function repositionAllBubblesDebounced(){
   bubbleTimer = setTimeout(()=>{ repositionAllBubbles(); }, 80);
 }
 function say(text,who='them',opts={}){
-  if (text === null || text === undefined) return;
   const box=document.getElementById('bubbles'), stage=document.getElementById('stage');
   if(!box||!stage)return;
-
-  // 🌟 你说的话原样保留（不剥方括号）；AI 的话才剥掉情绪/背景等标签
-  let cleanText = (who === 'you')
-    ? String(text).trim()
-    : String(text).replace(/\[[^\]]+\]/g, '').trim();
-  if(!cleanText && !opts.kaomoji) return;
-
   const div=document.createElement('div');
   div.className='bubble '+who;
-  const body=document.createElement('div'); body.textContent=cleanText; div.appendChild(body);
+  const body=document.createElement('div'); body.textContent=text; div.appendChild(body);
   if(opts.kaomoji){ const k=document.createElement('div'); k.className='kaomoji'; k.textContent=opts.kaomoji; div.appendChild(k); }
   div.style.left = '-9999px'; div.style.top = '-9999px';
   box.appendChild(div);
@@ -1531,7 +1441,7 @@ function bindCharTouch(wrap){
   function onDown(e){
     if(e.target.closest('#charPlaceholder'))return;
     if(Current && (Current.isAway || Current.focusMode))return;
-    e.stopPropagation();
+    e.preventDefault();
     charPressed = true;
     const rect = wrap.getBoundingClientRect();
     charDownY = (e.clientY - rect.top) / rect.height;
@@ -1622,12 +1532,10 @@ async function triggerTouchAction(action){
       ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
       {role:'user',content:'【系统触发】'},
     ]);
-    if(reply && typeof reply === 'string'){
-      // 🌟 顺序：背景色 → 颜文字 → 情绪
-      let str = reply;
-      const bg = parseBgColor(str);   str = bg.clean;
-      const km = parseKaomoji(str);   str = km.clean;
-      const {clean, emo, label} = parseEmotion(str);
+    if(reply){
+      let{clean,emo,label}=parseEmotion(reply);
+      const bg=parseBgColor(clean); clean=bg.clean;
+      const km=parseKaomoji(clean); clean=km.clean;
       if(bg.color)applyBgColor(bg.color);
       say(clean,'them',{kaomoji:km.kaomoji});
       applyEmotion(emo,label);
@@ -1781,12 +1689,10 @@ async function petAIReply(scene){
       ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
       {role:'user',content:'【系统触发】'},
     ]);
-    if(reply && typeof reply === 'string'){
-      // 🌟 顺序：背景色 → 颜文字 → 情绪
-      let str = reply;
-      const bg = parseBgColor(str);   str = bg.clean;
-      const km = parseKaomoji(str);   str = km.clean;
-      const {clean, emo, label} = parseEmotion(str);
+    if(reply){
+      let{clean,emo,label}=parseEmotion(reply);
+      const bg=parseBgColor(clean); clean=bg.clean;
+      const km=parseKaomoji(clean); clean=km.clean;
       if(bg.color)applyBgColor(bg.color);
       say(clean,'them',{kaomoji:km.kaomoji});
       applyEmotion(emo,label);
@@ -1860,66 +1766,54 @@ function tryWork(){
   updateTrackBar();
   say('“我出门一趟。”','them');
   saveGame();
+  setTimeout(()=>{
+    if(!Current) return;
+    Current.isAway=false; Current.awayUntil=null;
+    updateTrackBar();
+    const earn = Math.floor((10 + Math.random()*21) * (0.7 + Current.stats.mood/200));
+    Current.coin += earn;
+    const gotGift = Math.random() < 0.5;
+    if(gotGift){
+      const gifts = ['flower','tea','cake','book','food'];
+      const gid = gifts[Math.floor(Math.random()*gifts.length)];
+      Current.inventory[gid] = (Current.inventory[gid]||0) + 1;
+    }
+    addRelationValue(2);
+    const msg = gotGift ? `“回来啦，赚了 ${earn} 金币，路上还看到这个，顺手带回来了。”` : `“回来了，赚了 ${earn} 金币。”`;
+    say(msg,'them');
+    showInAppNotif(msg.replace(/[“”]/g,''));
+    if(Current.awayNote){
+      const note = Current.awayNote;
+      Current.awayNote = null;
+      setTimeout(()=>{
+        if(API.ready){
+          const sys = buildSystemPrompt('') + '\n\n【场景】你刚回家，看到对方留在桌上的一张纸条，内容是：' + note + '\n【要求】请直接以你的身份回应这张纸条，1~2句。不要复述【场景】，不要提到"设定""规则"，不要用括号写动作。';
+          callAI([
+            {role:'system',content:sys},
+            ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
+            {role:'user',content:'【系统触发】'},
+          ]).then(reply=>{
+            if(reply){
+              let{clean,emo,label}=parseEmotion(reply);
+              const bg=parseBgColor(clean); clean=bg.clean;
+              const km=parseKaomoji(clean); clean=km.clean;
+              if(bg.color)applyBgColor(bg.color);
+              say(clean,'them',{kaomoji:km.kaomoji});
+              applyEmotion(emo,label);
+              Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
+              showInAppNotif(clean);
+              saveGameDebounced();
+            }
+          }).catch(()=>{});
+        }
+      }, 1500);
+    }
+    walkTo(0.5);
+    updateStats();saveGame();
+    if(API.ready) proactiveTalk('idle').catch(()=>{});
+  }, awayMinutes*60000);
 }
 setInterval(tryWork,5*60000);
-
-function checkReturnHome(){
-  if(!Current || !Current.isAway) return;
-  if(!Current.awayUntil) return;
-  if(Date.now() < Current.awayUntil) return;
-
-  Current.isAway = false;
-  Current.awayUntil = null;
-  updateTrackBar();
-
-  const earn = Math.floor((50 + Math.random()*101) * (0.7 + Current.stats.mood/200));
-  Current.coin += earn;
-  const gotGift = Math.random() < 0.5;
-  if(gotGift){
-    const gifts = ['flower','tea','cake','book','food'];
-    const gid = gifts[Math.floor(Math.random()*gifts.length)];
-    Current.inventory[gid] = (Current.inventory[gid]||0) + 1;
-  }
-  addRelationValue(2);
-  const msg = gotGift ? `“回来啦，赚了 ${earn} 金币，路上还看到这个，顺手带回来了。”` : `“回来了，赚了 ${earn} 金币。”`;
-  say(msg,'them');
-  showInAppNotif(msg.replace(/[“”]/g,''));
-
-  if(Current.awayNote){
-    const note = Current.awayNote;
-    Current.awayNote = null;
-    setTimeout(()=>{
-      if(API.ready){
-        const sys = buildSystemPrompt('') + '\n\n【场景】你刚回家，看到对方留在桌上的一张纸条，内容是：' + note + '\n【要求】请直接以你的身份回应这张纸条，1~2句。不要复述【场景】，不要提到"设定""规则"，不要用括号写动作。';
-        callAI([
-          {role:'system',content:sys},
-          ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
-          {role:'user',content:'【系统触发】'},
-        ]).then(reply=>{
-          if(reply && typeof reply === 'string'){
-            // 🌟 顺序：背景色 → 颜文字 → 情绪
-            let str = reply;
-            const bg = parseBgColor(str);   str = bg.clean;
-            const km = parseKaomoji(str);   str = km.clean;
-            const {clean, emo, label} = parseEmotion(str);
-            if(bg.color)applyBgColor(bg.color);
-            say(clean,'them',{kaomoji:km.kaomoji});
-            applyEmotion(emo,label);
-            Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
-            showInAppNotif(clean);
-            saveGameDebounced();
-          }
-        }).catch(()=>{});
-      }
-    }, 1500);
-  }
-
-  walkTo(0.5);
-  updateStats();
-  saveGame();
-  if(API.ready) proactiveTalk('idle').catch(()=>{});
-}
-setInterval(checkReturnHome, 60000);
 
 /* ============ 番茄钟催学习 ============ */
 function getTodayPomoMin(){
@@ -1947,12 +1841,10 @@ function nudgeStudy(){
     ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
     {role:'user',content:'【系统触发】'},
   ]).then(reply=>{
-    if(reply && typeof reply === 'string'){
-      // 🌟 顺序：背景色 → 颜文字 → 情绪
-      let str = reply;
-      const bg = parseBgColor(str);   str = bg.clean;
-      const km = parseKaomoji(str);   str = km.clean;
-      const {clean, emo, label} = parseEmotion(str);
+    if(reply){
+      let{clean,emo,label}=parseEmotion(reply);
+      const bg=parseBgColor(clean); clean=bg.clean;
+      const km=parseKaomoji(clean); clean=km.clean;
       if(bg.color)applyBgColor(bg.color);
       say(clean,'them',{kaomoji:km.kaomoji});
       applyEmotion(emo,label);
@@ -1994,12 +1886,10 @@ function checkFestival(){
       ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
       {role:'user',content:'【系统触发】'},
     ]).then(reply=>{
-      if(reply && typeof reply === 'string'){
-        // 🌟 顺序：背景色 → 颜文字 → 情绪
-        let str = reply;
-        const bg = parseBgColor(str);   str = bg.clean;
-        const km = parseKaomoji(str);   str = km.clean;
-        const {clean, emo, label} = parseEmotion(str);
+      if(reply){
+        let{clean,emo,label}=parseEmotion(reply);
+        const bg=parseBgColor(clean); clean=bg.clean;
+        const km=parseKaomoji(clean); clean=km.clean;
         if(bg.color)applyBgColor(bg.color);
         say(clean,'them',{kaomoji:km.kaomoji});
         applyEmotion(emo,label);
@@ -2038,7 +1928,7 @@ function checkSelfDiary(){
       {role:'system',content:sys},
       {role:'user',content:'【系统触发】'},
     ]).then(reply=>{
-      if(reply && typeof reply === 'string'){
+      if(reply){
         const clean = parseEmotion(reply).clean;
         Current.diary.his.push({date:y, text:clean, selfWritten:true});
         saveGameDebounced();
@@ -2066,7 +1956,7 @@ function tryBackgroundAINotification(){
     ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
     {role:'user',content:'【系统触发】'},
   ]).then(reply=>{
-    if(reply && typeof reply === 'string'){
+    if(reply){
       let{clean,emo,label}=parseEmotion(reply);
       clean = clean.trim();
       if(clean){
@@ -2219,26 +2109,17 @@ function openGift(){
 function needApiTip(){ say('先去「设置」里填 API，我才能说话。', 'tip'); }
 async function chat(userText){
   if(!Current) return;
-
-  // 🌟 先把你说的话显示出来，再做其它判断（避免"发出去没反应"的错觉）
-  say(userText,'you');
-
   if(Current.isAway){ say('他现在在外面，等他回来吧。','tip'); return; }
   if(Current.focusMode){ say('专注中，先专心。','tip'); return; }
   if(!API.ready){ needApiTip(); return; }
-
+  say(userText,'you');
   Current.chatLog.push({role:'user',text:userText,time:Date.now()});
   try {
     const reply=await callAI(buildMessages(userText));
-    if (reply === null || reply === undefined || String(reply).trim() === '') {
-      say('（他好像走神了，没说出话来，你再说一次？）','tip');
-      return;
-    }
-    // 🌟 顺序：背景色 → 颜文字 → 情绪
-    let str = String(reply);
-    const bg = parseBgColor(str);   str = bg.clean;
-    const km = parseKaomoji(str);   str = km.clean;
-    const {clean, emo, label} = parseEmotion(str);
+    if(!reply){ say('（他没回应，可能模型返回了空内容。）','err'); return; }
+    let{clean,emo,label}=parseEmotion(reply);
+    const bg=parseBgColor(clean); clean=bg.clean;
+    const km=parseKaomoji(clean); clean=km.clean;
     if(bg.color)applyBgColor(bg.color);
     say(clean,'them',{kaomoji:km.kaomoji});
     applyEmotion(emo,label);
@@ -2247,9 +2128,7 @@ async function chat(userText){
     saveGameDebounced();
     Current.lastInteract=Date.now();
     Current.lastChatDate=todayStr();
-  } catch(e) {
-    say(`（网络卡住了：${e.message}）`, 'err');
-  }
+  } catch(e) { say(`API报错：${e.message}`, 'err'); }
 }
 async function proactiveTalk(type='idle'){
   if(!API.ready||!Current)return;
@@ -2273,12 +2152,10 @@ async function proactiveTalk(type='idle'){
       ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
       {role:'user',content:'【系统触发】'},
     ]);
-    if(reply && typeof reply === 'string'){
-      // 🌟 顺序：背景色 → 颜文字 → 情绪
-      let str = reply;
-      const bg = parseBgColor(str);   str = bg.clean;
-      const km = parseKaomoji(str);   str = km.clean;
-      const {clean, emo, label} = parseEmotion(str);
+    if(reply){
+      let{clean,emo,label}=parseEmotion(reply);
+      const bg=parseBgColor(clean); clean=bg.clean;
+      const km=parseKaomoji(clean); clean=km.clean;
       if(bg.color)applyBgColor(bg.color);
       say(clean,'them',{kaomoji:km.kaomoji});
       applyEmotion(emo,label);
@@ -2351,12 +2228,10 @@ async function doTouch(type){
       ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
       {role:'user',content:'【系统触发】'},
     ]);
-    if(reply && typeof reply === 'string'){
-      // 🌟 顺序：背景色 → 颜文字 → 情绪
-      let str = reply;
-      const bg = parseBgColor(str);   str = bg.clean;
-      const km = parseKaomoji(str);   str = km.clean;
-      const {clean, emo, label} = parseEmotion(str);
+    if(reply){
+      let{clean,emo,label}=parseEmotion(reply);
+      const bg=parseBgColor(clean); clean=bg.clean;
+      const km=parseKaomoji(clean); clean=km.clean;
       if(bg.color)applyBgColor(bg.color);
       say(clean,'them',{kaomoji:km.kaomoji});
       applyEmotion(emo,label);
@@ -2402,7 +2277,7 @@ async function saveDiary(){
       {role:'system',content:sys},
       {role:'user',content:'【系统触发】'},
     ]);
-    if(reply && typeof reply === 'string'){
+    if(reply){
       const clean = parseEmotion(reply).clean;
       Current.diary.his.push({date:today,text:clean,replied:true});
       say('他也在日记里写了一段话。','them');
@@ -2491,12 +2366,10 @@ function togglePomo(){
           ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
           {role:'user',content:'【系统触发】'},
         ]).then(reply=>{
-          if(reply && typeof reply === 'string'){
-            // 🌟 顺序：背景色 → 颜文字 → 情绪
-            let str = reply;
-            const bg = parseBgColor(str);   str = bg.clean;
-            const km = parseKaomoji(str);   str = km.clean;
-            const {clean, emo, label} = parseEmotion(str);
+          if(reply){
+            let{clean,emo,label}=parseEmotion(reply);
+            const bg=parseBgColor(clean); clean=bg.clean;
+            const km=parseKaomoji(clean); clean=km.clean;
             if(bg.color)applyBgColor(bg.color);
             say(clean,'them',{kaomoji:km.kaomoji});
             applyEmotion(emo,label);
@@ -2553,7 +2426,7 @@ async function startSleep(){
         {role:'system',content:buildSystemPrompt('')+'\n\n【场景】对方要睡了。\n【要求】轻声说一句晚安，1句，温柔一点。不要用括号写动作。'},
         {role:'user',content:'【系统触发】'},
       ]);
-      if(reply && typeof reply === 'string')text.textContent=parseEmotion(reply).clean;
+      if(reply)text.textContent=parseEmotion(reply).clean;
     } catch(e) {}
   }
   const anim=document.getElementById('charAnim'), wrap=document.getElementById('charWrap');
@@ -2583,7 +2456,7 @@ async function tellSleepStory(){
       {role:'system',content:buildSystemPrompt('')+'\n\n【场景】对方想听你讲一个晚安故事。\n【要求】用 3~5 句话讲一个温柔的、安静的、适合睡前听的小故事。不要加情绪标签，不要用括号写动作。'},
       {role:'user',content:'【系统触发】'},
     ]);
-    if(reply && typeof reply === 'string') text.textContent = parseEmotion(reply).clean;
+    if(reply) text.textContent = parseEmotion(reply).clean;
   } catch(e){ text.textContent = '（故事讲不出来，网络有点卡。）'; }
 }
 function endSleep(){
@@ -2604,12 +2477,10 @@ function endSleep(){
         ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
         {role:'user',content:'【系统触发】'},
       ]).then(reply=>{
-        if(reply && typeof reply === 'string'){
-          // 🌟 顺序：背景色 → 颜文字 → 情绪
-          let str = reply;
-          const bg = parseBgColor(str);   str = bg.clean;
-          const km = parseKaomoji(str);   str = km.clean;
-          const {clean, emo, label} = parseEmotion(str);
+        if(reply){
+          let{clean,emo,label}=parseEmotion(reply);
+          const bg=parseBgColor(clean); clean=bg.clean;
+          const km=parseKaomoji(clean); clean=km.clean;
           if(bg.color)applyBgColor(bg.color);
           say(clean,'them',{kaomoji:km.kaomoji});
           applyEmotion(emo,label);
@@ -2717,403 +2588,6 @@ function openLog(){
   openModal();
 }
 
-/* ============ 学习 / 背单词 / 阅读 ============ */
-function openStudyMenu(){
-  const modal=document.getElementById('modalContent');
-  modal.innerHTML=`
-    <h2>学习 <span class="close" onclick="closeModal()">×</span></h2>
-    <div class="game-item" onclick="closeModal();openTimer()"><div><div class="g-name">⏱️ 番茄钟</div><div class="g-desc">专注一段时间，让角色陪你学习</div></div><div class="g-arrow">›</div></div>
-    <div class="game-item" onclick="closeModal();openWordBook()"><div><div class="g-name">📖 背单词</div><div class="g-desc">选课本，学单词，答对就换下一个</div></div><div class="g-arrow">›</div></div>
-    <div class="game-item" onclick="closeModal();openEnglishReading()"><div><div class="g-name">📄 英语阅读</div><div class="g-desc">读一段短文，也算作专注时间</div></div><div class="g-arrow">›</div></div>
-    <div class="game-item" onclick="closeModal();openSubjectPractice()"><div><div class="g-name">✏️ 其他学科</div><div class="g-desc">高中及以上难度的数学/物理/历史等</div></div><div class="g-arrow">›</div></div>
-  `;
-  openModal();
-}
-function openWordBook(){
-  if(!Current) return;
-  const modal=document.getElementById('modalContent');
-  modal.innerHTML=`
-    <h2>背单词 <span class="close" onclick="closeModal()">×</span></h2>
-    <div class="field"><label>选择课本</label>
-      <select id="wordBookSelect">
-        <option value="CET4">四级核心词汇</option>
-        <option value="CET6">六级核心词汇</option>
-        <option value="IELTS">雅思核心词汇</option>
-        <option value="High School 3500">高中英语3500词</option>
-      </select>
-    </div>
-    <div class="field"><label>模式选择</label>
-      <select id="wordModeSelect">
-        <option value="en2zh">看英文，填中文</option>
-        <option value="zh2en">看中文，填英文</option>
-      </select>
-    </div>
-    <button class="btn" onclick="startWordGame()">开始学习</button>
-    <button class="btn ghost" onclick="openWrongWords()" style="margin-top:10px;">📕 查看错题本 (${(Current.wrongWords||[]).length})</button>
-  `;
-  openModal();
-}
-
-let wordGameState = { book:null, mode:'en2zh', currentWord:null, count:0, correctCount:0 };
-async function startWordGame() {
-  if(!API.ready) { needApiTip(); return; }
-  wordGameState.book = document.getElementById('wordBookSelect').value;
-  wordGameState.mode = document.getElementById('wordModeSelect').value;
-  wordGameState.count = 0;
-  wordGameState.correctCount = 0;
-  await nextWord();
-}
-
-async function nextWord() {
-  const modal = document.getElementById('modalContent');
-  const isEn2Zh = wordGameState.mode === 'en2zh';
-  modal.innerHTML = `
-    <h2>背单词 <span class="close" onclick="closeModal()">×</span></h2>
-    <div class="game-panel">
-      <div class="g-status">正在生成单词…</div>
-      <div class="g-content" id="wordPrompt"></div>
-      <div class="g-input-row"><input id="wordInput" placeholder="${isEn2Zh ? '输入中文意思…' : '输入英文单词…'}"><button onclick="checkWordAnswer()">提交</button></div>
-      <div class="g-log" id="wordLog">已背 ${wordGameState.count} 个</div>
-    </div>
-  `;
-  try {
-    const reply = await callAI([
-      {role:'system', content:'你是英语单词老师。你只能输出纯 JSON，绝对不能包含任何其他文字、标点或 Markdown 代码块。'},
-      {role:'user', content:`请从「${wordGameState.book}」词库中随机选一个英语单词，给出它的中文释义、音标。
-【极其重要的强制要求】：绝对不能出“apple”、“cat”、“dog”这类极为常见的词汇。必须符合该词库的难度。
-【输出格式】：只输出 JSON，格式如下，不要有任何多余的换行或空格：
-{"en":"单词","zh":"中文意思","phonetic":"音标"}
-示例：{"en":"abandon","zh":"放弃","phonetic":"/əˈbæn.dən/"}`}
-    ], {maxTokens: 400, temperature: 1.2});
-    
-    let wordData = {en: 'apple', zh: '苹果', phonetic: '/ˈæp.əl/'};
-    if(reply && typeof reply === 'string'){
-      try { wordData = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); } catch(e){}
-    }
-    wordGameState.currentWord = wordData;
-    
-    if (isEn2Zh) {
-      document.getElementById('wordPrompt').innerHTML = `<b style="font-size:24px;">${wordData.en}</b><br><span style="color:var(--text-soft);font-size:12px;">${wordData.phonetic||''}</span><br><span style="color:var(--text-soft);font-size:12px;">请输入中文意思</span>`;
-    } else {
-      document.getElementById('wordPrompt').innerHTML = `<b style="font-size:20px;">${wordData.zh}</b><br><span style="color:var(--text-soft);font-size:12px;">请输入英文单词</span>`;
-    }
-    document.getElementById('wordInput').focus();
-  } catch(e) {
-    document.getElementById('wordPrompt').textContent = '生成失败：' + e.message;
-  }
-}
-
-async function checkWordAnswer() {
-  const input = document.getElementById('wordInput');
-  const userAnswer = input.value.trim();
-  if (!userAnswer || !wordGameState.currentWord) return;
-  
-  const isEn2Zh = wordGameState.mode === 'en2zh';
-  const correct = isEn2Zh ? wordGameState.currentWord.zh : wordGameState.currentWord.en;
-  const userAnsLower = userAnswer.toLowerCase();
-  const correctLower = correct.toLowerCase();
-
-  const isCorrect = userAnsLower === correctLower || correctLower.includes(userAnsLower) || userAnsLower.includes(correctLower);
-
-  if (isCorrect) {
-    wordGameState.correctCount++;
-    wordGameState.count++;
-    document.getElementById('wordLog').textContent = `✅ 答对了！已背 ${wordGameState.count} 个`;
-    input.value = '';
-    
-    if (wordGameState.count % 10 === 0) {
-      say('（他看你背完了 10 个单词，凑过来说：）', 'action');
-      const sys = buildSystemPrompt('') + `\n【场景】对方已经连续背完了 10 个单词，并全部答对。请以你的身份，夸奖他一句，1 句话。`;
-      callAI([{role:'system', content: sys}]).then(reply => {
-        if (reply && typeof reply === 'string') { let {clean} = parseEmotion(reply); say(clean, 'them'); }
-      });
-    }
-    setTimeout(() => nextWord(), 500);
-  } else {
-    if (!Current.wrongWords) Current.wrongWords = [];
-    const isDuplicate = Current.wrongWords.some(w => w.en === wordGameState.currentWord.en);
-    if (!isDuplicate) {
-      Current.wrongWords.push(wordGameState.currentWord);
-      saveGame();
-    }
-    
-    document.getElementById('wordLog').textContent = `❌ 答错了，正确答案是：${correct}。已记录进错题本。`;
-    input.value = '';
-    setTimeout(() => nextWord(), 2000);
-  }
-}
-
-function openWrongWords() {
-  if(!Current) return;
-  if(!Current.wrongWords) Current.wrongWords = [];
-  const modal = document.getElementById('modalContent');
-  
-  if (Current.wrongWords.length === 0) {
-    modal.innerHTML = `
-      <h2>错题本 <span class="close" onclick="closeModal()">×</span></h2>
-      <p style="color:var(--text-soft); font-size:14px; text-align:center; padding:20px 0;">还没有错题，继续保持！</p>
-      <button class="btn ghost" onclick="closeModal();openWordBook()">返回背单词</button>
-    `;
-    openModal();
-    return;
-  }
-
-  modal.innerHTML = `
-    <h2>错题本 <span class="close" onclick="closeModal()">×</span></h2>
-    <p style="font-size:12px; color:var(--text-soft); margin-bottom:12px;">共 ${Current.wrongWords.length} 个错词，点击可查看详细释义。</p>
-    <div style="max-height: 400px; overflow-y: auto;">
-      ${Current.wrongWords.map((w, i) => `
-        <div class="shop-item" style="cursor:default;">
-          <div class="info">
-            <b style="font-size:15px; color:var(--main-dark);">${w.en}</b>
-            <small>${w.phonetic||''} ${w.zh}</small>
-          </div>
-          <button style="background:#e08a8a;" onclick="removeWrongWord(${i})">删除</button>
-        </div>
-      `).join('')}
-    </div>
-    <button class="btn" onclick="reviewWrongWords()" style="margin-top:16px;">🔁 复习错题</button>
-    <button class="btn ghost" onclick="closeModal();openWordBook()">返回背单词</button>
-  `;
-  openModal();
-}
-
-function removeWrongWord(index) {
-  if(!Current || !Current.wrongWords) return;
-  Current.wrongWords.splice(index, 1);
-  saveGame();
-  openWrongWords();
-}
-
-function reviewWrongWords() {
-  if (!Current || !Current.wrongWords || Current.wrongWords.length === 0) return;
-  const shuffled = [...Current.wrongWords].sort(() => Math.random() - 0.5);
-  wordGameState.isReviewing = true;
-  wordGameState.reviewQueue = shuffled;
-  wordGameState.reviewIndex = 0;
-  wordGameState.correctCount = 0;
-  
-  Current.wrongWords = []; 
-  saveGame();
-  
-  showReviewWord();
-}
-
-function showReviewWord() {
-  if (!wordGameState.isReviewing || wordGameState.reviewIndex >= wordGameState.reviewQueue.length) {
-    const modal = document.getElementById('modalContent');
-    modal.innerHTML = `
-      <h2>复习完成 <span class="close" onclick="closeModal()">×</span></h2>
-      <p style="color:var(--text-soft); font-size:14px; text-align:center; padding:20px 0;">你完成了 ${wordGameState.reviewQueue.length} 个错词的复习。</p>
-      <button class="btn ghost" onclick="closeModal();openWordBook()">返回背单词</button>
-    `;
-    openModal();
-    return;
-  }
-
-  const word = wordGameState.reviewQueue[wordGameState.reviewIndex];
-  const modal = document.getElementById('modalContent');
-  modal.innerHTML = `
-    <h2>复习错题 <span class="close" onclick="closeModal()">×</span></h2>
-    <div class="game-panel">
-      <div class="g-status">正在复习第 ${wordGameState.reviewIndex + 1} / ${wordGameState.reviewQueue.length} 个</div>
-      <div class="g-content" id="wordPrompt"></div>
-      <div class="g-input-row"><input id="wordInput" placeholder="输入中文意思…"><button onclick="checkReviewAnswer()">提交</button></div>
-      <div class="g-log" id="wordLog">已复习 ${wordGameState.reviewIndex} 个</div>
-    </div>
-  `;
-  document.getElementById('wordPrompt').innerHTML = `<b style="font-size:24px;">${word.en}</b><br><span style="color:var(--text-soft);font-size:12px;">${word.phonetic||''}</span><br><span style="color:var(--text-soft);font-size:12px;">请输入中文意思</span>`;
-  document.getElementById('wordInput').focus();
-  openModal();
-}
-
-function checkReviewAnswer() {
-  const input = document.getElementById('wordInput');
-  const userAnswer = input.value.trim();
-  const word = wordGameState.reviewQueue[wordGameState.reviewIndex];
-  if (!word) return;
-  
-  const correct = word.zh;
-  const isCorrect = userAnswer === correct || correct.includes(userAnswer) || userAnswer.includes(correct);
-  
-  if (isCorrect) {
-    document.getElementById('wordLog').textContent = `✅ 答对了！`;
-    wordGameState.reviewIndex++;
-    setTimeout(() => showReviewWord(), 800);
-  } else {
-    document.getElementById('wordLog').textContent = `❌ 答错了，正确答案是：${correct}`;
-    input.value = '';
-    Current.wrongWords.push(word);
-    saveGame();
-    wordGameState.reviewIndex++;
-    setTimeout(() => showReviewWord(), 2000);
-  }
-}
-
-function openEnglishReading() {
-  const modal = document.getElementById('modalContent');
-  modal.innerHTML = `
-    <h2>英语阅读 <span class="close" onclick="closeModal()">×</span></h2>
-    <div class="game-panel">
-      <div class="g-status">正在生成文章…</div>
-      <div class="g-content" id="readingText" style="min-height:100px;">请稍候…</div>
-      <div class="g-input-row"><button onclick="finishReading()">阅读完成</button><button onclick="closeModal()">退出</button></div>
-    </div>
-  `;
-  openModal();
-  
-  callAI([
-    {role:'system', content:'你是一位高中英语老师。请写一篇完整的英语短文，只输出英文正文，不要任何中文解释、不要Markdown代码块。文章必须有头有尾，字数在150词左右。'},
-    {role:'user', content:'请生成一篇 150 字左右的高中难度英语短文，主题可以是人与自然、科技发展或日常生活。文章必须完整，包含开头、中间和结尾。'}
-  ], {maxTokens: 1000, temperature: 0.8, timeout: 90000}).then(reply => {
-    document.getElementById('readingText').textContent = (reply && typeof reply === 'string') ? reply : '生成失败，请重试。';
-  }).catch(e => {
-    document.getElementById('readingText').textContent = '生成失败：' + e.message;
-  });
-}
-function finishReading() {
-  closeModal();
-  if (Current) {
-    Current.pomoHistory.push({ date: todayStr(), min: 15, time: Date.now() });
-    saveGame();
-    say('（你读完了这篇文章，他朝你笑了笑。）', 'action');
-    addRelationValue(3);
-    if (API.ready) {
-      const sys = buildSystemPrompt('') + '\n【场景】对方刚读完一篇英语文章。请以你的身份夸奖一句。';
-      callAI([{role:'system', content: sys}]).then(reply => {
-        if (reply && typeof reply === 'string') say(parseEmotion(reply).clean, 'them');
-      });
-    }
-  }
-}
-function openSubjectPractice() {
-  const modal = document.getElementById('modalContent');
-  modal.innerHTML = `
-    <h2>其他学科 <span class="close" onclick="closeModal()">×</span></h2>
-    <div class="field"><label>选择学科</label>
-      <select id="subjectSelect">
-        <option value="数学">数学（高中数学及以上难度）</option>
-        <option value="物理">物理（高中物理及以上难度）</option>
-        <option value="化学">化学（高中化学及以上难度）</option>
-        <option value="历史">历史（高中历史及以上难度）</option>
-        <option value="地理">地理（高中地理及以上难度）</option>
-        <option value="生物">生物（高中生物及以上难度）</option>
-      </select>
-    </div>
-    <button class="btn" onclick="startSubjectPractice()">开始练习</button>
-  `;
-  openModal();
-}
-async function startSubjectPractice() {
-  if(!API.ready) { needApiTip(); return; }
-  const subject = document.getElementById('subjectSelect').value;
-  const modal = document.getElementById('modalContent');
-  modal.innerHTML = `
-    <h2>${subject}练习 <span class="close" onclick="closeModal()">×</span></h2>
-    <div class="game-panel">
-      <div class="g-status">正在生成题目…</div>
-      <div class="g-content" id="subjectPrompt">请稍候…</div>
-      <div class="g-input-row"><input id="subjectInput" placeholder="输入答案…"><button id="subjectSubmitBtn" onclick="checkSubjectAnswer()">提交</button></div>
-    </div>
-  `;
-  openModal();
-
-  try {
-    const reply = await callAI([
-      {role:'system', content:'你是一个中国高中老师。你必须用纯中文出题。你只能输出纯 JSON 格式，绝对不能包含任何其他文字、标点、Markdown 代码块。'},
-      {role:'user', content:`请出一道【${subject}】的题目。难度要求：必须是高中及以上难度。
-【极其重要的强制要求】：
-1. 题目必须完全使用中文书写，绝对不能出现任何英文（除了数学公式和字母）。
-2. 题目必须是完整的选择题或填空题，包含题干和选项。
-3. 只输出 JSON 格式，不要有任何废话。
-【JSON 格式】：
-{"q":"题目内容（包含选项 A、B、C、D，用\\n换行）","a":"正确答案（比如 A 或 具体数值）"}
-【示例】：
-{"q":"已知函数 f(x) = x^2 + 2x + 1，求 f(1) 的值。\\nA. 1\\nB. 2\\nC. 4\\nD. 5","a":"C"}`}
-    ], {maxTokens: 800, temperature: 0.5, timeout: 90000});
-    
-    if (!reply || typeof reply !== 'string') {
-      document.getElementById('subjectPrompt').innerHTML = '生成失败：AI 没有返回任何内容，请点击“开始练习”重试。';
-      return;
-    }
-
-    let data = {q:'题目加载失败，请重试。', a:'未知'};
-    try { 
-      const match = reply.match(/\{[\s\S]*\}/);
-      if (match) {
-        data = JSON.parse(match[0]); 
-      } else {
-        data.q = reply;
-        data.a = '未知';
-      }
-    } catch(e){
-      data.q = reply;
-      data.a = '未知';
-    }
-    
-    if (!data.q) {
-      document.getElementById('subjectPrompt').innerHTML = '生成失败：题目内容为空，请重试。';
-      return;
-    }
-    
-    Current.subjectAnswer = data.a;
-    document.getElementById('subjectPrompt').innerHTML = String(data.q).replace(/\n/g, '<br>');
-    document.getElementById('subjectInput').focus();
-  } catch(e) {
-    document.getElementById('subjectPrompt').textContent = '生成失败：' + e.message;
-  }
-}
-async function checkSubjectAnswer() {
-  const input = document.getElementById('subjectInput');
-  const btn = document.getElementById('subjectSubmitBtn');
-  const ans = input.value.trim();
-  if (!ans || !Current.subjectAnswer || !btn) return;
-
-  btn.textContent = '批改中…';
-  btn.disabled = true;
-
-  const correct = String(Current.subjectAnswer).trim().toLowerCase();
-  const userAns = ans.trim().toLowerCase();
-  const isCorrect = (userAns === correct) || (correct.length === 1 && userAns === correct);
-
-  if (isCorrect) {
-    setTimeout(() => {
-      say('答对了！你真棒。', 'tip');
-      addRelationValue(2);
-      closeModal();
-    }, 500);
-    return;
-  }
-
-  say(`答错了哦，正确答案是：${Current.subjectAnswer}`, 'tip');
-  input.value = '';
-  btn.textContent = '再试一次';
-  btn.disabled = false;
-
-  if (!API.ready) return;
-  const currentQuestion = document.getElementById('subjectPrompt').innerText;
-  const subjectName = document.getElementById('subjectSelect')?.value || '这道题';
-
-  const sysPrompt = `【系统强制指令】用户刚刚在做【${subjectName}】题，答错了。
-【题目】：${currentQuestion}
-【用户的答案】：${ans}
-【正确答案】：${Current.subjectAnswer}
-请你立刻扮演一个老师，用 2~3 句话，简练地讲解这道题为什么是这个答案，以及正确的解题思路。禁止写“好的”“我来讲讲”这种废话，必须直接开始讲知识点。`;
-
-  try {
-    const reply = await callAI([
-      {role:'system', content: buildSystemPrompt('') + '\n\n' + sysPrompt},
-      {role:'user', content:'【系统触发】'}
-    ]);
-    if (reply && typeof reply === 'string') {
-      let {clean} = parseEmotion(reply);
-      say(clean, 'them');
-    }
-  } catch(e) {
-    say('（老师开小差了，没能讲出来。）', 'tip');
-  }
-}
-
 /* ============ 小游戏 ============ */
 function openGameMenu(){
   const modal=document.getElementById('modalContent');
@@ -3123,10 +2597,6 @@ function openGameMenu(){
     <div class="game-item" onclick="startGame('bomb')"><div><div class="g-name">💣 数字炸弹</div><div class="g-desc">1-100 里有个雷，轮流猜</div></div><div class="g-arrow">›</div></div>
     <div class="game-item" onclick="startGame('twenty')"><div><div class="g-name">❓ 20 问</div><div class="g-desc">他想了样东西，你问 20 个问题猜</div></div><div class="g-arrow">›</div></div>
     <div class="game-item" onclick="startGame('story')"><div><div class="g-name">📖 接龙编故事</div><div class="g-desc">你一句他一句，一起编故事</div></div><div class="g-arrow">›</div></div>
-    <div class="game-item" onclick="startRPS()"><div><div class="g-name">✊ 石头剪刀布</div><div class="g-desc">赢了让 AI 真心话大冒险</div></div><div class="g-arrow">›</div></div>
-    <div class="game-item" onclick="startSudoku()"><div><div class="g-name">🧩 数独</div><div class="g-desc">经典 9x9，考验逻辑的时候到了</div></div><div class="g-arrow">›</div></div>
-    <div class="game-item" onclick="startMaze()"><div><div class="g-name">🏃 走迷宫</div><div class="g-desc">用按钮移动，找到出口</div></div><div class="g-arrow">›</div></div>
-    <div class="game-item" onclick="startSorting()"><div><div class="g-name">📦 归纳整理</div><div class="g-desc">把散落的物品放回正确的位置</div></div><div class="g-arrow">›</div></div>
   `;
   openModal();
 }
@@ -3167,12 +2637,9 @@ async function initTurtleGame(){
     const reply = await callAI([
       {role:'system',content:'你是一个海龟汤游戏主持人。只输出JSON，不要别的文字。'},
       {role:'user',content:'请生成一个海龟汤谜题。要求：故事必须原创，不要用"酒吧点水"、"一个人走进酒吧"、"电梯里的女人"这类常见例子。要有点新意。输出 JSON：{"story":"故事开头（1-2句，诡异但不恐怖，适合情侣玩）","answer":"真相（1-2句）"}。' + hint}
-    ], {maxTokens:300, temperature:1.0, timeout: 90000});
+    ], {maxTokens:300, temperature:1.0});
     let story='', answer='';
-    if(reply && typeof reply === 'string'){
-      try{ const j = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); story=j.story||''; answer=j.answer||''; }catch(e){}
-    }
-    if(!story){ story='一个人走进酒吧，点了一杯水，酒保却拔出了一把枪。'; answer='他打嗝，酒保用枪吓他。'; }
+    try{ const j = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); story=j.story||'一个人走进酒吧，点了一杯水，酒保却拔出了一把枪。'; answer=j.answer||'他打嗝，酒保用枪吓他。'; }catch(e){ story='一个人走进酒吧，点了一杯水，酒保却拔出了一把枪。'; answer='他打嗝，酒保用枪吓他。'; }
     rememberGame(story.slice(0,30));
     Current.game.subState.story = story; Current.game.subState.answer = answer; Current.game.subState.log = [];
     document.getElementById('turtleStory').textContent = story;
@@ -3191,8 +2658,8 @@ async function turtleAsk(){
     const reply = await callAI([
       {role:'system',content:`你是海龟汤主持人。谜题：${s.story}。真相：${s.answer}。玩家会问是/不是问题，你只能回答"是"、"不是"、"无关"三者之一，不要多说。`},
       {role:'user',content:q}
-    ], {maxTokens:20, temperature:0.1, timeout: 60000});
-    s.log.push('他：'+((reply && typeof reply === 'string') ? reply.trim() : '无关'));
+    ], {maxTokens:20, temperature:0.1});
+    s.log.push('他：'+(reply||'无关').trim());
     document.getElementById('turtleLog').textContent = s.log.join('\n');
   }catch(e){ s.log.push('他：（网络出错）'); document.getElementById('turtleLog').textContent = s.log.join('\n'); }
 }
@@ -3270,11 +2737,9 @@ async function initTwentyGame(){
     const reply = await callAI([
       {role:'system',content:'你是一个 20 问游戏主持人。只输出 JSON。'},
       {role:'user',content:'请想一个常见的物品。要求：不要用"苹果"、"手机"、"书"这类烂大街的，换点有新意的日常物品。输出 JSON：{"item":"物品名"}。' + hint}
-    ], {maxTokens:50, temperature:1.1, timeout: 60000});
+    ], {maxTokens:50, temperature:1.1});
     let item='苹果';
-    if(reply && typeof reply === 'string'){
-      try{ const j = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); item = j.item || '苹果'; }catch(e){}
-    }
+    try{ const j = JSON.parse(reply.match(/\{[\s\S]*\}/)[0]); item = j.item || '苹果'; }catch(e){}
     rememberGame(item);
     Current.game.subState.item = item;
     document.getElementById('twentyStatus').textContent = '他已经想好了。开始问吧（还剩 20 个问题）';
@@ -3294,8 +2759,8 @@ async function twentyAsk(){
     const reply = await callAI([
       {role:'system',content:`你想的东西是：${s.item}。玩家会问是/不是问题，你只能回答"是"、"不是"、"无关"。不要多说。`},
       {role:'user',content:q}
-    ], {maxTokens:15, temperature:0.1, timeout: 60000});
-    s.log.push('他答：'+((reply && typeof reply === 'string') ? reply.trim() : '无关'));
+    ], {maxTokens:15, temperature:0.1});
+    s.log.push('他答：'+(reply||'无关').trim());
     document.getElementById('twentyLog').textContent = s.log.join('\n');
   }catch(e){ s.log.push('他答：（网络出错）'); document.getElementById('twentyLog').textContent = s.log.join('\n'); }
   document.getElementById('twentyStatus').textContent = `还剩 ${s.max - s.questions} 个问题`;
@@ -3340,8 +2805,8 @@ async function storySend(){
     const reply = await callAI([
       {role:'system',content:'你们在玩接龙编故事。根据前面的内容，接一句（1-2句），延续故事，别结束太快。只输出你要接的话。'},
       {role:'user',content:'当前故事：\n'+history+'\n\n请接一句。'}
-    ], {maxTokens:120, temperature:0.9, timeout: 60000});
-    if(reply && typeof reply === 'string'){ s.turns.push('他：'+reply.trim()); document.getElementById('storyLog').textContent = s.turns.join('\n'); }
+    ], {maxTokens:120, temperature:0.9});
+    if(reply){ s.turns.push('他：'+reply.trim()); document.getElementById('storyLog').textContent = s.turns.join('\n'); }
   }catch(e){ s.turns.push('他：（网络出错）'); document.getElementById('storyLog').textContent = s.turns.join('\n'); }
 }
 function storyEnd(){
@@ -3353,448 +2818,57 @@ function closeGame(){
   closeModal();
 }
 
-/* ============ 归纳整理小游戏 ============ */
-let sortingState = { items: [], categories: [], currentItem: null, score: 0, total: 0 };
-
-function startSorting() {
-  const pool = [
-    { cat: '水果', items: ['苹果', '香蕉', '橘子', '葡萄', '草莓'] },
-    { cat: '动物', items: ['猫', '狗', '兔子', '老虎', '大象'] },
-    { cat: '文具', items: ['铅笔', '橡皮', '尺子', '笔记本', '书包'] },
-    { cat: '交通工具', items: ['汽车', '火车', '飞机', '轮船', '自行车'] },
-    { cat: '颜色', items: ['红色', '蓝色', '绿色', '黄色', '紫色'] },
-  ];
-
-  const shuffled = pool.sort(() => Math.random() - 0.5).slice(0, 4);
-  sortingState.categories = shuffled.map(p => p.cat);
-  sortingState.items = [];
-  shuffled.forEach(p => {
-    p.items.sort(() => Math.random() - 0.5).slice(0, 2).forEach(item => {
-      sortingState.items.push({ name: item, cat: p.cat });
-    });
-  });
-  sortingState.items.sort(() => Math.random() - 0.5);
-  sortingState.score = 0;
-  sortingState.total = sortingState.items.length;
-  sortingState.currentIndex = 0;
-
-  renderSorting();
-}
-
-function renderSorting() {
-  const modal = document.getElementById('modalContent');
-  
-  if (sortingState.currentIndex >= sortingState.items.length) {
-    modal.innerHTML = `
-      <h2>📦 归纳整理 <span class="close" onclick="closeModal()">×</span></h2>
-      <div style="text-align:center; padding:20px 0;">
-        <div style="font-size:48px; margin-bottom:12px;">🎉</div>
-        <p style="font-size:16px; color:var(--text);">恭喜完成整理！</p>
-        <p style="font-size:14px; color:var(--text-soft); margin-top:8px;">你一共整理了 ${sortingState.total} 件物品</p>
-        <p style="font-size:24px; color:var(--main); font-weight:600; margin-top:16px;">得分：${sortingState.score} / ${sortingState.total}</p>
-      </div>
-      <button class="btn" onclick="startSorting()">再玩一次</button>
-      <button class="btn ghost" onclick="closeModal()">退出</button>
-    `;
-    openModal();
-    addRelationValue(2);
-    saveGame();
-    return;
-  }
-
-  const item = sortingState.items[sortingState.currentIndex];
-  modal.innerHTML = `
-    <h2>📦 归纳整理 <span class="close" onclick="closeModal()">×</span></h2>
-    <div class="game-panel" style="text-align:center;">
-      <div class="g-status">第 ${sortingState.currentIndex + 1} / ${sortingState.total} 件物品</div>
-      <div style="font-size:40px; margin:16px 0;">📦</div>
-      <div style="font-size:24px; font-weight:600; color:var(--main-dark); margin-bottom:20px;">「${item.name}」</div>
-      <p style="font-size:13px; color:var(--text-soft); margin-bottom:16px;">它属于下面哪一类？</p>
-      <div style="display:flex; flex-direction:column; gap:10px;">
-        ${sortingState.categories.map(cat => `
-          <button class="btn" onclick="checkSorting('${cat}')">${cat}</button>
-        `).join('')}
-      </div>
-    </div>
+/* ============ 角色切换 ============ */
+function openCharSwitch(){
+  const modal=document.getElementById('modalContent');
+  modal.innerHTML=`
+    <h2>切换角色 <span class="close" onclick="closeModal()">×</span></h2>
+    ${GlobalState.characters.map(c=>{
+      const isActive = c.id === GlobalState.currentCharId;
+      const img = (c.outfits&&c.outfits[c.currentOutfitIndex]) ? c.outfits[c.currentOutfitIndex].img : c.image;
+      return `<div class="char-list-item ${isActive?'active':''}" onclick="switchCharacter('${c.id}')">
+        ${img ? `<img src="${img}">` : `<div class="avatar-placeholder">🧑</div>`}
+        <div class="info"><div class="n">${c.name}${isActive?' （当前）':''}</div><div class="d">${getRelationName(c.relationType)} · 好感 ${Math.round(c.relationValue)}</div></div>
+        ${GlobalState.characters.length>1 ? `<button class="del-btn" onclick="event.stopPropagation();deleteCharacter('${c.id}')">删除</button>` : ''}
+      </div>`;
+    }).join('')}
+    <button class="btn" onclick="createCharacter()">+ 新建角色</button>
   `;
   openModal();
 }
-
-function checkSorting(selectedCat) {
-  const item = sortingState.items[sortingState.currentIndex];
-  if (selectedCat === item.cat) {
-    sortingState.score++;
-    say(`✅ 正确！「${item.name}」属于「${item.cat}」`, 'tip');
-  } else {
-    say(`❌ 不对哦，「${item.name}」属于「${item.cat}」`, 'tip');
-  }
-  sortingState.currentIndex++;
-  setTimeout(() => renderSorting(), 800);
-}
-
-/* ============ 真心话大冒险 / 猜拳 ============ */
-function startRPS() {
-  const modal = document.getElementById('modalContent');
-  modal.innerHTML = `
-    <h2>✊ 石头剪刀布 <span class="close" onclick="closeModal()">×</span></h2>
-    <div class="game-panel" style="text-align:center;">
-      <p style="margin-bottom:20px;">出拳吧！赢了可以让他真心话大冒险，输了你要接受惩罚哦。</p>
-      <div style="display:flex; justify-content:space-around; margin-bottom:20px;">
-        <button class="btn" style="width:30%; font-size:30px; padding:20px;" onclick="playRPS('石头')">✊</button>
-        <button class="btn" style="width:30%; font-size:30px; padding:20px;" onclick="playRPS('剪刀')">✌️</button>
-        <button class="btn" style="width:30%; font-size:30px; padding:20px;" onclick="playRPS('布')">✋</button>
-      </div>
-      <div id="rpsResult" style="font-size:16px; font-weight:bold; margin-bottom:20px; min-height:40px;"></div>
-      <button class="btn ghost" onclick="closeModal()">退出</button>
-    </div>
-  `;
-  openModal();
-}
-function playRPS(userChoice) {
-  const choices = ['石头', '剪刀', '布'];
-  const aiChoice = choices[Math.floor(Math.random() * 3)];
-  let result = '';
-  if (userChoice === aiChoice) result = '平局';
-  else if (
-    (userChoice === '石头' && aiChoice === '剪刀') ||
-    (userChoice === '剪刀' && aiChoice === '布') ||
-    (userChoice === '布' && aiChoice === '石头')
-  ) result = '你赢了';
-  else result = '你输了';
-  const resEl = document.getElementById('rpsResult');
-  resEl.innerHTML = `你出了 <b>${userChoice}</b>，他出了 <b>${aiChoice}</b>。<br>🎉 <b>${result}</b>！`;
-  if (result === '你赢了') {
-    setTimeout(() => openTruthOrDare('ai'), 1000);
-  } else if (result === '你输了') {
-    setTimeout(() => openTruthOrDare('user'), 1000);
-  } else {
-    setTimeout(() => { resEl.innerHTML += '<br>再来一局！'; }, 1000);
-  }
-}
-function openTruthOrDare(target) {
-  const modal = document.getElementById('modalContent');
-  modal.innerHTML = `
-    <h2>${target === 'ai' ? '你赢了！指定他' : '他赢了！指定你'} <span class="close" onclick="closeModal()">×</span></h2>
-    <p style="font-size:14px; text-align:center; margin-bottom:20px;">
-      ${target === 'ai' ? '他必须完成你指定的任务' : '你必须完成他指定的任务'}
-    </p>
-    <button class="btn" onclick="doTruthOrDare('truth', '${target}')">💬 真心话</button>
-    <button class="btn ghost" onclick="doTruthOrDare('dare', '${target}')">🎯 大冒险</button>
-  `;
-  openModal();
-}
-async function doTruthOrDare(type, target) {
-  closeModal();
-  if (!API.ready) return;
-
-  let userCommand = '';
-  if (target === 'ai') {
-    userCommand = prompt(`你赢了！你想让他做什么？`, type === 'truth' ? '请问一个真心话问题' : '请完成一个大冒险任务');
-    if (!userCommand) return;
-  } else {
-    const question = await callAI([
-      {role:'system', content: buildSystemPrompt('') + `\n【系统强制指令】你们在玩真心话大冒险，你赢了。对方必须接受惩罚。请你立刻以裁判的身份，向对方提出一个【${type === 'truth' ? '真心话问题' : '大冒险任务'}】。只能提问，绝对不能写铺垫、夸奖或废话，直接抛出问题，1句话。`},
-      {role:'user', content:'【系统触发】'}
-    ]);
-    if (question && typeof question === 'string') {
-      say(parseEmotion(question).clean, 'them');
-      setTimeout(() => {
-        const answer = prompt('请回答他的问题：');
-        if (answer) {
-          say(`（你回答：${answer}）`, 'you');
-          callAI([
-            {role:'system', content: buildSystemPrompt('') + `\n【场景】你们在玩真心话大冒险，你刚刚问了对方问题，对方回答：「${answer}」。请以你的身份，对对方的回答做出简单的回应，1句话。不要提到"设定""规则"，不要用括号写动作。`},
-            {role:'user', content:'【系统触发】'}
-          ]).then(reply => {
-            if (reply && typeof reply === 'string') say(parseEmotion(reply).clean, 'them');
-          });
-        }
-      }, 800);
-    }
-    return;
-  }
-
-  const sysPrompt = `【系统强制指令】你们在玩真心话大冒险，你输了。对方要求你进行【${type === 'truth' ? '真心话' : '大冒险'}】。对方的具体命令是：「${userCommand}」。
-你必须立刻乖乖照做，只给出你执行命令的反应和回答，绝对禁止说“好的”“来吧”这种废话，1~2句话。
-如果是“大冒险”，且命令涉及外出、买东西、工作等动作，你必须同意并表现出准备出门或已经出门的样子。`;
-
-  const reply = await callAI([
-    {role:'system', content: buildSystemPrompt('') + '\n\n' + sysPrompt},
-    {role:'user', content:'【系统触发】'}
-  ]);
-  if (reply && typeof reply === 'string') {
-    let {clean, emo, label} = parseEmotion(reply);
-    say(clean, 'them');
-  }
-
-  if (type === 'dare' && target === 'ai') {
-    const lowerCmd = userCommand.toLowerCase();
-    if (lowerCmd.includes('打工') || lowerCmd.includes('上班') || lowerCmd.includes('出门') || lowerCmd.includes('买') || lowerCmd.includes('赚钱')) {
-      if (!Current.isAway && !Current.sick && Current.stats.energy >= 20) {
-        Current.isAway = true;
-        Current.stats.energy -= 15;
-        Current.awayUntil = Date.now() + 3 * 60000;
-        logTrack('外面', '大冒险·打工');
-        updateTrackBar();
-        say('（他答应了大冒险，出门去了。）', 'action');
-        saveGame();
-      } else {
-        say('（他现在不太方便出门，下次再让他去吧。）', 'tip');
-      }
-    }
-  }
-}
-
-/* ============ 记账模式 ============ */
-function openMoney() {
-  if(!Current) return;
-  if(!Current.money) Current.money = { budget: 3000, logs: [] };
-  if(!Current.money.logs) Current.money.logs = [];
-  const m = Current.money;
-  const totalSpent = m.logs.reduce((a,b) => a + (b.amount||0), 0);
-  const percent = Math.min(100, Math.round((totalSpent / m.budget) * 100)) || 0;
-  const modal = document.getElementById('modalContent');
-  modal.innerHTML = `
-    <h2>记账 <span class="close" onclick="closeModal()">×</span></h2>
-    <div class="field" style="background:var(--card); border-radius:12px; padding:12px; margin-bottom:12px;">
-      <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
-        <span>本月额度：🪙 ${m.budget}</span>
-        <span>已花费：🪙 ${totalSpent}</span>
-      </div>
-      <div class="bar" style="height:8px; background:var(--accent); border-radius:4px; overflow:hidden;">
-        <i style="display:block; height:100%; width:${percent}%; background:${percent > 80 ? '#e08a8a' : 'var(--main)'}; border-radius:4px; transition:width .3s;"></i>
-      </div>
-      <div style="font-size:11px; color:var(--text-soft); margin-top:4px; text-align:right;">剩余：🪙 ${m.budget - totalSpent}（${percent}%）</div>
-    </div>
-    <div class="field"><label>设置本月额度</label>
-      <input type="number" id="moneyBudget" value="${m.budget}" min="0">
-      <button class="btn ghost" onclick="saveMoneyBudget()">保存额度</button>
-    </div>
-    <div class="field"><label>记一笔账</label>
-      <input id="moneyAmount" type="number" placeholder="金额" style="margin-bottom:6px;">
-      <input id="moneyDesc" placeholder="买了什么？" style="margin-bottom:6px;">
-      <button class="btn" onclick="addMoneyLog()">记录</button>
-    </div>
-    <hr style="margin:16px 0; border:none; border-top:1px solid #00000011;">
-    <label style="display:block; font-size:13px; color:var(--text-soft); margin-bottom:8px;">最近记录</label>
-    ${m.logs.slice(-10).reverse().map(l => `<div class="log-item"><div class="who">${l.date}</div><div class="txt">${l.desc} - 🪙 ${l.amount}</div></div>`).join('') || '<p style="color:var(--text-soft); font-size:13px;">暂无记录。</p>'}
-  `;
-  openModal();
-}
-function saveMoneyBudget() {
-  if(!Current) return;
-  const b = parseFloat(document.getElementById('moneyBudget').value);
-  if (b < 0) { say('额度不能是负数哦', 'tip'); return; }
-  Current.money.budget = b;
+function switchCharacter(id){
+  if(id === GlobalState.currentCharId) { closeModal(); return; }
   saveGame();
-  openMoney();
-  say('本月额度已更新。', 'tip');
+  GlobalState.currentCharId = id;
+  Current = GlobalState.characters.find(c=>c.id===id);
+  if(!Current){ Current = newCharacterData(id); GlobalState.characters.push(Current); }
+  const box=document.getElementById('bubbles'); if(box) box.innerHTML='';
+  pickRandomOutfit();
+  renderCharacter(); renderPet(); updateStats(); updateRelationUI(); updateTrackBar();
+  saveGame(); closeModal();
+  say(`已切换到「${Current.name}」。`,'tip');
 }
-function addMoneyLog() {
-  if(!Current) return;
-  const amount = parseFloat(document.getElementById('moneyAmount').value);
-  const desc = document.getElementById('moneyDesc').value.trim();
-  if (!amount || amount <= 0 || !desc) { say('请填写有效的金额和描述', 'tip'); return; }
-  Current.money.logs.push({ date: todayStr(), amount, desc });
+function createCharacter(){
+  const id = 'c_' + Date.now();
+  const c = newCharacterData(id); c.name = '新角色';
+  GlobalState.characters.push(c); saveGame();
+  switchCharacter(id);
+}
+function deleteCharacter(id){
+  if(GlobalState.characters.length <= 1){ say('至少要保留一个角色。','tip'); return; }
+  if(!confirm('确定要删除这个角色吗？')) return;
+  GlobalState.characters = GlobalState.characters.filter(c=>c.id!==id);
+  if(GlobalState.currentCharId === id){
+    GlobalState.currentCharId = GlobalState.characters[0].id;
+    Current = GlobalState.characters[0];
+  }
   saveGame();
-  
-  const totalSpent = Current.money.logs.reduce((a,b) => a + (b.amount||0), 0);
-  const percent = totalSpent / Current.money.budget;
-  
-  if (percent > 0.8 && Current.lastMoneyNudgeDate !== todayStr()) {
-    Current.lastMoneyNudgeDate = todayStr();
-    const sys = buildSystemPrompt('') + `\n\n【场景】对方这个月已经花了 ${totalSpent} 金币，预算只有 ${Current.money.budget}（已花 ${Math.round(percent*100)}%）。请以你的身份，提醒他注意节制，语气可以稍微心疼或者无奈一点，1 句话。`;
-    callAI([{role:'system', content: sys}]).then(reply => {
-      if (reply && typeof reply === 'string') {
-        let {clean} = parseEmotion(reply);
-        say(clean, 'them');
-      }
-    });
-  }
-  
-  openMoney();
+  const box=document.getElementById('bubbles'); if(box) box.innerHTML='';
+  renderCharacter(); renderPet(); updateStats(); updateRelationUI(); updateTrackBar();
+  openCharSwitch();
 }
 
-/* ============ 数独 ============ */
-let sudokuState = { board: [], solution: [], selected: null, initial: [] };
-
-function startSudoku() {
-  function generateSolution() {
-    const base = 3;
-    const side = base * base;
-    const pattern = (r, c) => (base * (r % base) + Math.floor(r / base) + c) % side;
-    const shuffle = s => {
-      for (let i = s.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [s[i], s[j]] = [s[j], s[i]];
-      }
-      return s;
-    };
-    const rBase = [0, 1, 2].map(x => x * 3);
-    const rows = shuffle([...rBase]).flatMap(r => shuffle([...rBase]).map(x => r + x));
-    const cols = shuffle([...rBase]).flatMap(c => shuffle([...rBase]).map(x => c + x));
-    const nums = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-    const board = rows.map(r => cols.map(c => nums[pattern(r, c)]));
-    return board;
-  }
-
-  const sol = generateSolution();
-  const puzzle = JSON.parse(JSON.stringify(sol));
-  let holes = 40;
-  while (holes > 0) {
-    const r = Math.floor(Math.random() * 9);
-    const c = Math.floor(Math.random() * 9);
-    if (puzzle[r][c] !== 0) { puzzle[r][c] = 0; holes--; }
-  }
-
-  sudokuState.board = puzzle;
-  sudokuState.solution = sol;
-  sudokuState.initial = puzzle.map(row => [...row]);
-  sudokuState.selected = null;
-
-  renderSudoku();
-}
-
-function renderSudoku() {
-  const modal = document.getElementById('modalContent');
-  let html = `<h2>🧩 数独 <span class="close" onclick="closeModal()">×</span></h2>`;
-  html += `<div style="text-align:center; margin-bottom:10px; font-size:12px; color:var(--text-soft);">点击空格，再点下方数字填入</div>`;
-  html += `<div style="display:grid; grid-template-columns:repeat(9,1fr); gap:2px; background:var(--text-soft); padding:2px; border-radius:8px; max-width:360px; margin:0 auto;">`;
-  for (let r = 0; r < 9; r++) {
-    for (let c = 0; c < 9; c++) {
-      const val = sudokuState.board[r][c];
-      const isFixed = sudokuState.initial[r][c] !== 0;
-      const isSel = sudokuState.selected && sudokuState.selected.r === r && sudokuState.selected.c === c;
-      const borderTop = (r % 3 === 0 && r !== 0) ? '2px solid var(--main-dark)' : '1px solid var(--accent)';
-      const borderLeft = (c % 3 === 0 && c !== 0) ? '2px solid var(--main-dark)' : '1px solid var(--accent)';
-      const bg = isSel ? 'var(--accent)' : (isFixed ? 'var(--bg2)' : 'var(--card)');
-      const color = isFixed ? 'var(--text)' : 'var(--main-dark)';
-      html += `<div onclick="selectSudokuCell(${r},${c})" style="
-        aspect-ratio:1; display:flex; align-items:center; justify-content:center;
-        background:${bg}; color:${color}; font-size:18px; font-weight:600; cursor:pointer;
-        border-top:${borderTop}; border-left:${borderLeft}; border-radius:4px;
-      ">${val === 0 ? '' : val}</div>`;
-    }
-  }
-  html += `</div>`;
-  html += `<div style="display:flex; justify-content:center; gap:8px; margin-top:16px; flex-wrap:wrap;">`;
-  for (let n = 1; n <= 9; n++) {
-    html += `<button onclick="setSudokuNumber(${n})" style="width:36px; height:36px; border-radius:8px; border:none; background:var(--card); color:var(--text); font-size:16px; font-weight:600; cursor:pointer;">${n}</button>`;
-  }
-  html += `</div>`;
-  html += `<div style="display:flex; justify-content:center; gap:8px; margin-top:10px;">`;
-  html += `<button class="btn ghost" onclick="setSudokuNumber(0)">擦除</button>`;
-  html += `<button class="btn ghost" onclick="startSudoku()">重开</button>`;
-  html += `</div>`;
-  modal.innerHTML = html;
-  openModal();
-}
-
-function selectSudokuCell(r, c) {
-  if (sudokuState.initial[r][c] !== 0) return;
-  sudokuState.selected = { r, c };
-  renderSudoku();
-}
-
-function setSudokuNumber(n) {
-  if (!sudokuState.selected) return;
-  const { r, c } = sudokuState.selected;
-  sudokuState.board[r][c] = n;
-  renderSudoku();
-
-  let full = true, correct = true;
-  for (let i = 0; i < 9; i++) {
-    for (let j = 0; j < 9; j++) {
-      if (sudokuState.board[i][j] === 0) full = false;
-      if (sudokuState.board[i][j] !== sudokuState.solution[i][j]) correct = false;
-    }
-  }
-  if (full && correct) {
-    setTimeout(() => {
-      say('🎉 数独完成，你真棒！', 'tip');
-      addRelationValue(3);
-      closeModal();
-    }, 300);
-  }
-}
-
-/* ============ 走迷宫 ============ */
-let mazeState = { grid: [], player: {x:1, y:1}, size: 15 };
-
-function startMaze() {
-  const size = 15;
-  const grid = Array.from({length: size}, () => Array(size).fill(1));
-  function carve(x, y) {
-    grid[y][x] = 0;
-    const dirs = [[0,2],[2,0],[0,-2],[-2,0]].sort(() => Math.random() - 0.5);
-    for (let [dx, dy] of dirs) {
-      const nx = x + dx, ny = y + dy;
-      if (nx > 0 && nx < size - 1 && ny > 0 && ny < size - 1 && grid[ny][nx] === 1) {
-        grid[y + dy/2][x + dx/2] = 0;
-        carve(nx, ny);
-      }
-    }
-  }
-  carve(1, 1);
-  grid[size - 2][size - 2] = 0;
-  mazeState.grid = grid;
-  mazeState.player = {x:1, y:1};
-  mazeState.size = size;
-  renderMaze();
-}
-
-function renderMaze() {
-  const modal = document.getElementById('modalContent');
-  const g = mazeState.grid;
-  const p = mazeState.player;
-  let html = `<h2>🏃 走迷宫 <span class="close" onclick="closeModal()">×</span></h2>`;
-  html += `<div style="text-align:center; margin-bottom:10px; font-size:12px; color:var(--text-soft);">走到右下角出口，用下方按钮移动</div>`;
-  
-  html += `<div style="display:inline-block; background:var(--bg2); padding:4px; border-radius:8px; margin:0 auto; display:block; width:fit-content;">`;
-  for (let y = 0; y < mazeState.size; y++) {
-    let row = '';
-    for (let x = 0; x < mazeState.size; x++) {
-      let cell = '';
-      if (p.x === x && p.y === y) cell = '🧍';
-      else if (x === mazeState.size - 2 && y === mazeState.size - 2) cell = '🏁';
-      const bg = g[y][x] === 1 ? 'var(--text-soft)' : 'var(--card)';
-      row += `<div style="width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; background:${bg}; font-size:12px;">${cell}</div>`;
-    }
-    html += `<div style="display:flex;">${row}</div>`;
-  }
-  html += `</div>`;
-  
-  html += `<div style="display:flex; flex-direction:column; align-items:center; margin-top:12px; gap:6px;">`;
-  html += `<button class="btn ghost" style="width:60px;" onclick="moveMaze(0,-1)">↑</button>`;
-  html += `<div style="display:flex; gap:6px;">`;
-  html += `<button class="btn ghost" style="width:60px;" onclick="moveMaze(-1,0)">←</button>`;
-  html += `<button class="btn ghost" style="width:60px;" onclick="moveMaze(0,1)">↓</button>`;
-  html += `<button class="btn ghost" style="width:60px;" onclick="moveMaze(1,0)">→</button>`;
-  html += `</div>`;
-  html += `</div>`;
-  html += `<button class="btn ghost" onclick="startMaze()" style="margin-top:10px;">重开</button>`;
-  
-  modal.innerHTML = html;
-  openModal();
-}
-
-function moveMaze(dx, dy) {
-  const p = mazeState.player;
-  const nx = p.x + dx, ny = p.y + dy;
-  if (nx < 0 || nx >= mazeState.size || ny < 0 || ny >= mazeState.size) return;
-  if (mazeState.grid[ny][nx] === 1) return;
-  p.x = nx; p.y = ny;
-  renderMaze();
-  if (nx === mazeState.size - 2 && ny === mazeState.size - 2) {
-    setTimeout(() => {
-      say('🎉 走出迷宫了，真厉害！', 'tip');
-      addRelationValue(3);
-      closeModal();
-    }, 300);
-  }
-}
-
-/* ============ 设置 / 其他辅助功能 ============ */
+/* ============ 设置 ============ */
 function openSettings(){
   if(!Current) return;
   if(!settingsDraft) initSettingsDraft();
@@ -3941,7 +3015,6 @@ function saveSettings(){
   Current.currentOutfitIndex = d.currentOutfitIndex;
   Current.pet = d.pet; Current.lorebook = d.lorebook;
   Current.pomoGoalMin = d.pomoGoalMin || 120;
-  Current.money.budget = d.moneyBudget || 3000;
   GlobalState.background = d.background_img;
   GlobalState.userImage = d.userImage; GlobalState.userShow = d.userShow;
   GlobalState.userBubblePos = d.userBubblePos || 'center';
@@ -4069,16 +3142,15 @@ function bindToolbar(){
       if(p==='gift')openGift();
       else if(p==='touch')openTouch();
       else if(p==='outfit')openOutfitPicker();
-      else if(p==='study')openStudyMenu();
       else if(p==='game')openGameMenu();
       else if(p==='shop')openShop();
-      else if(p==='money')openMoney();
+      else if(p==='settings')openSettings();
       else if(p==='diary')openDiary();
+      else if(p==='timer')openTimer();
       else if(p==='sleep')openSleep();
       else if(p==='period')openPeriod();
       else if(p==='anniv')openAnniv();
       else if(p==='log')openLog();
-      else if(p==='settings')openSettings();
     };
   });
 }
@@ -4089,35 +3161,11 @@ function bindChat(){
   const btn=document.getElementById('sendBtn');
   const send=()=>{
     const t=input.value.trim(); if(!t)return;
-    // 🌟 不在外面提前 return，交给 chat() 内部处理（保证你说的话一定能显示）
-    input.value='';
-    chat(t);
+    if(!API.ready){ needApiTip(); return; }
+    input.value=''; chat(t);
   };
   btn.onclick=send;
   input.addEventListener('keydown',e=>{ if(e.key==='Enter')send(); });
-  document.getElementById('newTopicBtn').onclick = () => {
-    if (!API.ready) { needApiTip(); return; }
-    if (!Current) return;
-    const sys = buildSystemPrompt('') + '\n\n【场景】请主动开启一个全新的、有意思的话题，不要再提之前聊过的内容了。1~2 句话即可。\n【要求】直接以你的身份说 1~2 句话。不要复述【场景】，不要提到"设定""规则"，不要用括号写动作。';
-    callAI([
-      {role:'system',content: sys},
-      ...Current.chatLog.slice(-10).map(m=>({role:m.role,content:m.text})),
-      {role:'user',content:'【系统触发】'},
-    ]).then(reply => {
-      if (reply && typeof reply === 'string') {
-        // 🌟 顺序：背景色 → 颜文字 → 情绪
-        let str = reply;
-        const bg = parseBgColor(str);   str = bg.clean;
-        const km = parseKaomoji(str);   str = km.clean;
-        const {clean, emo, label} = parseEmotion(str);
-        if (bg.color) applyBgColor(bg.color);
-        say(clean, 'them', {kaomoji: km.kaomoji});
-        applyEmotion(emo, label);
-        Current.chatLog.push({role:'assistant', text:clean, time:Date.now()});
-        saveGameDebounced();
-      }
-    });
-  };
 }
 const QUICK_TOPICS=['今天过得怎么样？','我有点累','想你了','在做什么？','陪我聊聊天','今天发生了一件小事'];
 function renderQuick(){
@@ -4178,7 +3226,7 @@ function applySaveObject(d){
     if(!c.pet.nextWalkAt) c.pet.nextWalkAt = 0;
     if(!c.stats || typeof c.stats !== 'object') c.stats = { mood:80, food:80, energy:80 };
     if(typeof c.stats.energy !== 'number') c.stats.energy = 80;
-    ['images','outfits','lorebook','track','anniversaries','customShopItems','recentTopics','pomoHistory','recentGames','wrongWords'].forEach(k=>{ if(!Array.isArray(c[k])) c[k] = []; });
+    ['images','outfits','lorebook','track','anniversaries','customShopItems','recentTopics','pomoHistory','recentGames'].forEach(k=>{ if(!Array.isArray(c[k])) c[k] = []; });
     if(!c.inventory || typeof c.inventory !== 'object') c.inventory = {};
     if(!c.diary || typeof c.diary !== 'object') c.diary = { yours:[], his:[] };
     if(!c.period || typeof c.period !== 'object') c.period = { lastStart:null, cycle:28, duration:5, manualOn:false };
@@ -4189,10 +3237,6 @@ function applySaveObject(d){
     if(!c.lastSelfDiaryDate) c.lastSelfDiaryDate = null;
     if(!c.lastFestivalDate) c.lastFestivalDate = null;
     if(typeof c.lastBackgroundNotifAt !== 'number') c.lastBackgroundNotifAt = 0;
-    if(!c.money || typeof c.money !== 'object') c.money = { budget: 3000, logs: [] };
-    if(!Array.isArray(c.money.logs)) c.money.logs = [];
-    if(typeof c.lastMoneyNudgeDate === 'undefined') c.lastMoneyNudgeDate = null;
-    if(!c.wordBook || typeof c.wordBook !== 'object') c.wordBook = { currentBook: null, learnedCount: 0 };
     return c;
   });
   if(!GlobalState.characters.length){
@@ -4379,14 +3423,6 @@ async function boot(){
     GlobalState.currentCharId = GlobalState.characters[0].id;
   }
   Current = GlobalState.characters.find(c=>c.id===GlobalState.currentCharId);
-
-  // 重启后检查他是不是卡在外面了
-  if (Current.isAway && (!Current.awayUntil || Date.now() > Current.awayUntil)) {
-    Current.isAway = false;
-    Current.awayUntil = null;
-    updateTrackBar();
-  }
-
   applyMainColor(GlobalState.mainColor || '#ff8fab');
   pickRandomOutfit();
   if(Current && Current.pet && Current.pet.has && !Current.pet.nextWalkAt){
