@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>云栖阁</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 <style>
 :root{
   --bg:#fff2f6;--bg2:#ffe0ea;--main:#ff8fab;--main-dark:#e56b8c;
@@ -305,14 +308,11 @@ body{
     <div class="tool" data-panel="game"><span class="ico">🎮</span>小游戏</div>
     <div class="tool" data-panel="shop"><span class="ico">🛒</span>商城</div>
     <div class="tool" data-panel="diary"><span class="ico">📔</span>日记</div>
-    <div class="tool" data-panel="timer"><span class="ico">⏱️</span>番茄钟</div>
+    <div class="tool" data-panel="study"><span class="ico">📚</span>学习</div>
     <div class="tool" data-panel="sleep"><span class="ico">🌙</span>陪睡</div>
     <div class="tool" data-panel="period"><span class="ico">🩸</span>生理期</div>
     <div class="tool" data-panel="anniv"><span class="ico">💍</span>纪念日</div>
     <div class="tool" data-panel="log"><span class="ico">📜</span>记录</div>
-    <div class="tool" data-panel="study"><span class="ico">📚</span>学习</div>
-    <div class="tool" data-panel="word"><span class="ico">📖</span>单词</div>
-    <div class="tool" data-panel="quiz"><span class="ico">📝</span>刷题</div>
     <div class="tool" data-panel="money"><span class="ico">💰</span>记账</div>
     <div class="tool" data-panel="settings"><span class="ico">⚙️</span>设置</div>
   </div>
@@ -326,8 +326,6 @@ body{
   <div class="story-btn" id="sleepStoryBtn" onclick="tellSleepStory()">📖 讲个晚安故事</div>
   <div class="exit" id="sleepExit">轻触结束陪睡</div>
 </div>
-
-<script>
   /* ============ 农历节日对照表（2026-2036） ============ */
 const LUNAR_FESTIVALS = {
   2026: { chunjie:'2026-02-17', yuanxiao:'2026-03-03', qixi:'2026-08-19', zhongqiu:'2026-09-25' },
@@ -1150,13 +1148,15 @@ function buildMessages(userInput){
 /* ============ 解析 ============ */
 const EMO_MAP={'开心':'happy','高兴':'happy','笑':'happy','害羞':'shy','脸红':'shy','难过':'sad','伤心':'sad','失落':'sad','生气':'angry','不满':'angry','哼':'angry','惊讶':'surprise','吃惊':'surprise','温柔':'tender','平静':'calm'};
 function parseEmotion(text){
-  const m=text.match(/\[([^\]]+)\]\s*$/);
-  if(!m)return{clean:text,emo:'calm',label:null};
-  const label=m[1].trim();
-  const clean=text.replace(/\[[^\]]+\]\s*$/,'').trim();
+  if(!text) return {clean:text, emo:'calm', label:null};
+  const m = text.match(/\[([^\[\]]+)\]\s*$/);
+  if(!m) return {clean:text.trim(), emo:'calm', label:null};
+  const label = m[1].trim();
+  if(/^背景色|^颜文字/.test(label)) return {clean:text, emo:'calm', label:null};
+  const clean = text.replace(/\[[^\[\]]+\]\s*$/,'').trim();
   let emo='calm';
-  for(const k in EMO_MAP){if(label.includes(k)){emo=EMO_MAP[k];break;}}
-  return{clean,emo,label};
+  for(const k in EMO_MAP){ if(label.includes(k)){ emo=EMO_MAP[k]; break; } }
+  return {clean, emo, label};
 }
 function parseBgColor(text){
   const m=text.match(/\[背景色[:：]\s*(#[0-9a-fA-F]{3,8})\s*\]/);
@@ -1681,8 +1681,8 @@ function bindStage(){
   });
   document.getElementById('charPlaceholder').addEventListener('click',e=>{ e.stopPropagation();openSettings(); });
 }
-
-/* ============ 宠物 ============ */
+<script>
+  /* ============ 宠物面板 ============ */
 function openPetPanel(){
   if(!Current || !Current.pet.has) return;
   const p = Current.pet;
@@ -1826,7 +1826,6 @@ function tryWork(){
   updateTrackBar();
   say('“我出门一趟。”','them');
 
-  // 角色留纸条
   Current.charAwayNote = null;
   if(API.ready){
     const noteSys = buildSystemPrompt('') +
@@ -2380,40 +2379,6 @@ async function saveDiary(){
 
 /* ============ 番茄钟 ============ */
 let pomo={timer:null,remain:25*60,running:false,total:25*60,min:25};
-function openTimer(){
-  const modal=document.getElementById('modalContent');
-  const hist = (Current && Current.pomoHistory) ? Current.pomoHistory.slice(-7).reverse() : [];
-  const todayCount = hist.filter(h => h.date === todayStr()).length;
-  const todayMin = hist.filter(h => h.date === todayStr()).reduce((a,b)=>a+b.min,0);
-  const goal = Current ? (Current.pomoGoalMin || 120) : 120;
-  modal.innerHTML=`
-    <h2>番茄钟 <span class="close" onclick="closeModal()">×</span></h2>
-    <div class="timer-display" id="pomoDisplay">25:00</div>
-    <div class="field"><label>时长</label>
-      <select id="pomoMinSelect" onchange="document.getElementById('pomoMin').value=this.value">
-        <option value="15">15 分钟</option>
-        <option value="25" selected>25 分钟</option>
-        <option value="45">45 分钟</option>
-        <option value="60">60 分钟</option>
-        <option value="custom">自定义</option>
-      </select>
-      <input type="number" id="pomoMin" value="25" min="1" max="180" style="margin-top:6px;">
-    </div>
-    <div class="field"><label>今日目标（分钟）</label>
-      <input type="number" id="pomoGoalInput" value="${goal}" min="0" max="600">
-    </div>
-    <p style="font-size:12px;color:var(--text-soft);margin-bottom:12px;">今天已完成 ${todayCount} 次 · 累计 ${todayMin} / ${goal} 分钟</p>
-    <div class="field"><label>白噪音</label>
-      <div id="noiseBox" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
-      <input type="range" min="0" max="100" value="50" oninput="setNoiseVolume(this.value/100)" style="width:100%;margin-top:8px;">
-    </div>
-    <button class="btn" id="pomoBtn" onclick="togglePomo()">开始专注</button>
-    <button class="btn ghost" onclick="savePomoGoal()">保存目标</button>
-    <button class="btn ghost" onclick="openPomoCalendar()">📅 学习打卡</button>
-    ${hist.length?'<hr style="margin:16px 0;border:none;border-top:1px solid #00000011;"><label style="font-size:13px;color:var(--text-soft);">最近专注</label>'+hist.map(h=>`<div class="log-item"><div class="who">${h.date}</div><div class="txt">${h.min} 分钟</div></div>`).join(''):''}
-  `;
-  openModal();updatePomoDisplay();renderNoiseUI();
-}
 function savePomoGoal(){
   if(!Current) return;
   const v = parseInt(document.getElementById('pomoGoalInput').value)||0;
@@ -2923,7 +2888,7 @@ function storyEnd(){
   alert('你们一起编的故事：\n\n' + Current.game.subState.turns.join('\n'));
 }
 
-/* ---- 猜拳·真心话大冒险 ---- */
+/* ---- 猜拳 ---- */
 function initRpsGame(){
   Current.game.subState = { score:{user:0,ai:0}, log:[] };
   renderRpsUI();
@@ -2974,6 +2939,9 @@ function rpsChallenge(winner){
     modal.innerHTML=`
       <h2>你赢了！ <span class="close" onclick="closeGame()">×</span></h2>
       <p style="font-size:13px;color:var(--text-soft);margin-bottom:12px;">你让他做什么？</p>
+      <div class="field"><label>指定内容（留空则让他自己想）</label>
+        <input id="rpsCmdInput" placeholder="例：唱首歌 / 说一句真心话">
+      </div>
       <button class="btn" onclick="rpsAsk('真心话','ai')">让他真心话</button>
       <button class="btn ghost" onclick="rpsAsk('大冒险','ai')">让他大冒险</button>
       <button class="btn ghost" onclick="renderRpsUI()">再来一局</button>`;
@@ -2995,8 +2963,15 @@ async function rpsAsk(type, target){
 
   if(target === 'user'){
     modal.innerHTML=`<h2>${type} <span class="close" onclick="closeGame()">×</span></h2>
-      <div class="game-panel"><div class="g-content" id="rpsQ">他正在想…</div>
-      <div class="g-btn-row"><button onclick="renderRpsUI()">再来一局</button><button onclick="closeGame()">结束</button></div></div>`;
+      <div class="game-panel">
+        <div class="g-content" id="rpsQ">他正在想…</div>
+        <div class="field" style="margin-top:10px;"><label>你的回答</label>
+          <textarea id="rpsAnswer" style="min-height:80px;" placeholder="写下你的回答…"></textarea>
+        </div>
+        <div class="g-btn-row"><button onclick="rpsSubmitAnswer()">提交</button>
+        <button onclick="renderRpsUI()">再来一局</button><button onclick="closeGame()">结束</button></div>
+        <div id="rpsReply" style="margin-top:10px;"></div>
+      </div>`;
     openModal();
     try{
       const reply = await callAI([
@@ -3006,19 +2981,51 @@ async function rpsAsk(type, target){
       if(reply) document.getElementById('rpsQ').textContent = parseEmotion(reply).clean;
     }catch(e){ document.getElementById('rpsQ').textContent='（网络出错）'; }
   } else {
+    const cmdInput = document.getElementById('rpsCmdInput');
+    const userCmd = cmdInput ? cmdInput.value.trim() : '';
     modal.innerHTML=`<h2>${type} <span class="close" onclick="closeGame()">×</span></h2>
-      <div class="game-panel"><div class="g-content" id="rpsA">他正在回答…</div>
-      <div class="g-btn-row"><button onclick="renderRpsUI()">再来一局</button><button onclick="closeGame()">结束</button></div></div>`;
+      <div class="game-panel">
+        <div class="g-content" id="rpsA">他正在做…</div>
+        <div class="g-btn-row"><button onclick="renderRpsUI()">再来一局</button><button onclick="closeGame()">结束</button></div>
+      </div>`;
     openModal();
     try{
       const tip = type==='真心话' ? '回答一个真诚的、关于你自己的心里话' : '描述一个有趣的小冒险动作';
+      const cmdLine = userCmd ? `对方让你做：${userCmd}。请照做。` : `对方让你做${type}。`;
       const reply = await callAI([
-        {role:'system',content:buildSystemPrompt('')+`\n\n【场景】你和对方玩猜拳，你输了，对方让你做${type}。\n【要求】用你的身份，${tip}，1~2句。不要用括号。`},
+        {role:'system',content:buildSystemPrompt('')+`\n\n【场景】你和对方玩猜拳，你输了。${cmdLine}\n【要求】用你的身份，${tip}，1~2句。不要用括号。`},
         {role:'user',content:'【系统触发】'},
       ]);
       if(reply) document.getElementById('rpsA').textContent = parseEmotion(reply).clean;
     }catch(e){ document.getElementById('rpsA').textContent='（网络出错）'; }
   }
+}
+async function rpsSubmitAnswer(){
+  const ans = document.getElementById('rpsAnswer').value.trim();
+  if(!ans){ say('写点什么吧','tip'); return; }
+  const q = document.getElementById('rpsQ').textContent;
+  const replyBox = document.getElementById('rpsReply');
+  replyBox.innerHTML = '<div class="test-result">他在听…</div>';
+  try{
+    const sys = buildSystemPrompt('') + `\n\n【场景】你们在玩真心话/大冒险。他问你的问题是：「${q}」，你回答：「${ans}」。\n\n【要求】根据你的性格，对你的回答做 1~2 句回应。可以点评、调侃、继续追问。\n- 不要复述问题\n- 不要提到"规则""设定"\n- 不要用括号写动作`;
+    const reply = await callAI([
+      {role:'system',content:sys},
+      ...Current.chatLog.slice(-6).map(m=>({role:m.role,content:m.text})),
+      {role:'user',content:'【系统触发】'},
+    ], {maxTokens:150, temperature:0.9});
+    if(reply){
+      let {clean,emo,label} = parseEmotion(reply);
+      const bg = parseBgColor(clean); clean = bg.clean;
+      const km = parseKaomoji(clean); clean = km.clean;
+      if(bg.color) applyBgColor(bg.color);
+      applyEmotion(emo, label);
+      replyBox.innerHTML = `<div class="notice-body" style="font-size:13px;">${escapeHtml(clean)}</div>`;
+      say(clean, 'them', {kaomoji: km.kaomoji});
+      showInAppNotif(clean);
+      Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
+      saveGameDebounced();
+    }
+  }catch(e){ replyBox.innerHTML = `<div class="test-result fail">${escapeHtml(e.message)}</div>`; }
 }
 
 /* ---- 数独 ---- */
@@ -3111,7 +3118,7 @@ function sudokuFill(n){
 }
 function sudokuNew(){ initSudokuGame(); }
 
-/* ---- 走迷宫 ---- */
+/* ---- 迷宫 ---- */
 function initMazeGame(){
   const size = 8;
   const W = size*2+1;
@@ -3520,17 +3527,14 @@ function bindToolbar(){
       else if(p==='outfit')openOutfitPicker();
       else if(p==='game')openGameMenu();
       else if(p==='shop')openShop();
-      else if(p==='settings')openSettings();
       else if(p==='diary')openDiary();
-      else if(p==='timer')openTimer();
+      else if(p==='study')openStudy();
       else if(p==='sleep')openSleep();
       else if(p==='period')openPeriod();
       else if(p==='anniv')openAnniv();
       else if(p==='log')openLog();
-      else if(p==='study')openStudy();
-      else if(p==='word')openWord();
-      else if(p==='quiz')openQuiz();
       else if(p==='money')openMoney();
+      else if(p==='settings')openSettings();
     };
   });
 }
@@ -3556,7 +3560,8 @@ function quickSend(t){
   document.getElementById('chatInput').value=t;
   chat(t); document.getElementById('chatInput').value='';
 }
-  /* ============ 存档 ============ */
+
+/* ============ 存档 ============ */
 function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
 function buildSaveObject(){
   return {
@@ -3791,154 +3796,204 @@ function importSave(e){
 }
 
 /* ============================================================
-   以下是新增模块：学习素材 / 背单词 / 刷题 / 记账 / 打卡 / 白噪音
+   学习总入口 + 4 个 Tab
    ============================================================ */
-
-/* ---------- 通用 ---------- */
 function escapeHtml(s){
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
-
-/* ============ 学习打卡日历 ============ */
-function getPomoByDate(){
-  const map = {};
-  if(!Current || !Current.pomoHistory) return map;
-  Current.pomoHistory.forEach(h=>{
-    map[h.date] = (map[h.date]||0) + (h.min||0);
-  });
-  return map;
-}
-function openPomoCalendar(){
-  if(!Current) return;
-  const modal = document.getElementById('modalContent');
-  const map = getPomoByDate();
-  const goal = Current.pomoGoalMin || 120;
-  const now = new Date();
-  let viewYear = now.getFullYear();
-  let viewMonth = now.getMonth();
-  const today = todayStr();
-
-  function render(){
-    const first = new Date(viewYear, viewMonth, 1);
-    const startWeek = first.getDay();
-    const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
-    const cells = [];
-    ['日','一','二','三','四','五','六'].forEach(d=>{
-      cells.push(`<div style="text-align:center;font-size:11px;color:var(--text-soft);padding:4px 0;">${d}</div>`);
+function renderMath(text){
+  if(!text) return '';
+  const escaped = escapeHtml(text);
+  if(!window.renderMathInElement) return escaped;
+  const div = document.createElement('div');
+  div.innerHTML = escaped;
+  try{
+    renderMathInElement(div, {
+      delimiters: [
+        {left:'$$', right:'$$', display:true},
+        {left:'$', right:'$', display:false},
+      ],
+      throwOnError: false,
     });
-    for(let i=0;i<startWeek;i++) cells.push('<div></div>');
-    for(let d=1; d<=daysInMonth; d++){
-      const ds = `${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-      const min = map[ds]||0;
-      let bg = 'transparent', color = 'var(--text)';
-      if(min > 0){
-        const ratio = Math.min(1, min/goal);
-        bg = `rgba(255,143,171,${0.25 + ratio*0.65})`;
-        if(ratio >= 1) color = '#fff';
-      }
-      if(ds === today) color = 'var(--main-dark)';
-      cells.push(`
-        <div style="text-align:center;padding:6px 0;border-radius:8px;background:${bg};
-          font-size:12px;color:${color};font-weight:${ds===today?'700':'400'};"
-          ${min?`onclick="say('${ds} 专注了 ${min} 分钟','tip')"`:''}>
-          ${d}${min?`<div style="font-size:9px;opacity:.8;">${min}分</div>`:''}
-        </div>`);
-    }
-    return cells.join('');
-  }
-
-  modal.innerHTML = `
-    <h2>📅 学习打卡 <span class="close" onclick="closeModal()">×</span></h2>
-    <div class="game-panel">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-        <button class="btn ghost" style="width:auto;padding:6px 14px;" onclick="pomoCalPrev()">‹ 上月</button>
-        <div style="font-size:15px;font-weight:600;" id="calTitle">${viewYear} 年 ${viewMonth+1} 月</div>
-        <button class="btn ghost" style="width:auto;padding:6px 14px;" onclick="pomoCalNext()">下月 ›</button>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;" id="calGrid">${render()}</div>
-      <p style="font-size:11px;color:var(--text-soft);margin-top:12px;text-align:center;">
-        颜色越深，当天专注时间越长。目标 ${goal} 分钟。
-      </p>
-    </div>`;
-  openModal();
-
-  window.pomoCalPrev = ()=>{
-    viewMonth--; if(viewMonth<0){ viewMonth=11; viewYear--; }
-    document.getElementById('calTitle').textContent = `${viewYear} 年 ${viewMonth+1} 月`;
-    document.getElementById('calGrid').innerHTML = render();
-  };
-  window.pomoCalNext = ()=>{
-    viewMonth++; if(viewMonth>11){ viewMonth=0; viewYear++; }
-    document.getElementById('calTitle').textContent = `${viewYear} 年 ${viewMonth+1} 月`;
-    document.getElementById('calGrid').innerHTML = render();
-  };
+  }catch(e){}
+  return div.innerHTML;
 }
 
-/* ============ 白噪音 ============ */
-const WHITE_NOISE_LIST = [
-  { id:'rain',   name:'🌧️ 雨声',   url:'audio/rain.mp3' },
-  { id:'cafe',   name:'☕ 咖啡馆', url:'audio/cafe.mp3' },
-  { id:'forest', name:'🌲 森林',   url:'audio/forest.mp3' },
-  { id:'fire',   name:'🔥 篝火',   url:'audio/fire.mp3' },
-];
-let noiseAudio = null;
-let currentNoiseId = null;
-
-function playNoise(id){
-  const item = WHITE_NOISE_LIST.find(x=>x.id===id);
-  if(!item) return;
-  if(noiseAudio){ noiseAudio.pause(); noiseAudio = null; }
-  noiseAudio = new Audio(item.url);
-  noiseAudio.loop = true;
-  noiseAudio.volume = 0.5;
-  noiseAudio.play().catch(e=>{
-    say('音频播放失败：' + e.message,'err');
-  });
-  currentNoiseId = id;
-  renderNoiseUI();
-}
-function stopNoise(){
-  if(noiseAudio){ noiseAudio.pause(); noiseAudio = null; }
-  currentNoiseId = null;
-  renderNoiseUI();
-}
-function setNoiseVolume(v){
-  if(noiseAudio) noiseAudio.volume = Math.max(0, Math.min(1, v));
-}
-function renderNoiseUI(){
-  const box = document.getElementById('noiseBox');
-  if(!box) return;
-  box.innerHTML = WHITE_NOISE_LIST.map(n=>`
-    <button class="btn ${currentNoiseId===n.id?'':'ghost'}" style="width:auto;padding:8px 14px;font-size:13px;"
-      onclick="${currentNoiseId===n.id?'stopNoise()':`playNoise('${n.id}')`}">
-      ${n.name}${currentNoiseId===n.id?' ⏸':''}
-    </button>`).join('');
-}
-
-/* ============ 学习素材 ============ */
 function openStudy(){
   if(!Current) return;
   if(!Current.study) Current.study = { materials:[], wrong:[] };
+  if(!Current.word) Current.word = { books:[], currentBookId:null, dailyGoal:20, dir:'en2zh', learned:{}, history:[], wrong:[] };
+  if(!Current.quiz) Current.quiz = { history:[], wrong:[], cache:[] };
   const modal = document.getElementById('modalContent');
   modal.innerHTML = `
-    <h2>📚 学习素材 <span class="close" onclick="closeModal()">×</span></h2>
-    <div style="display:flex;gap:6px;margin-bottom:14px;">
-      <button class="btn" style="flex:1;" onclick="studyTab('gen')">✨ AI 生成</button>
-      <button class="btn ghost" style="flex:1;" onclick="studyTab('paste')">📄 粘贴文章</button>
-      <button class="btn ghost" style="flex:1;" onclick="studyTab('list')">📁 素材库</button>
+    <h2>📚 学习 <span class="close" onclick="closeModal()">×</span></h2>
+    <div style="display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;">
+      <button class="btn" style="flex:1;min-width:80px;" onclick="studyMainTab('timer')">⏱️ 番茄钟</button>
+      <button class="btn ghost" style="flex:1;min-width:80px;" onclick="studyMainTab('word')">📖 背单词</button>
+      <button class="btn ghost" style="flex:1;min-width:80px;" onclick="studyMainTab('quiz')">📝 刷题</button>
+      <button class="btn ghost" style="flex:1;min-width:80px;" onclick="studyMainTab('material')">📚 素材</button>
     </div>
-    <div id="studyBody"></div>
+    <div id="studyMainBody"></div>
   `;
   openModal();
-  studyTab('gen');
+  studyMainTab('timer');
 }
-function studyTab(tab){
-  const box = document.getElementById('studyBody');
+function studyMainTab(tab){
+  const box = document.getElementById('studyMainBody');
+  if(!box) return;
+  if(tab === 'timer') box.innerHTML = renderStudyTimer();
+  else if(tab === 'word') box.innerHTML = renderStudyWord();
+  else if(tab === 'quiz') box.innerHTML = renderStudyQuiz();
+  else if(tab === 'material') box.innerHTML = renderStudyMaterial();
+  if(tab === 'timer'){ setTimeout(updatePomoDisplay, 0); setTimeout(renderNoiseUI, 0); }
+  if(tab === 'word') setTimeout(loadNextWord, 0);
+}
+
+/* ---------- Tab 1：番茄钟 ---------- */
+function renderStudyTimer(){
+  const hist = (Current && Current.pomoHistory) ? Current.pomoHistory.slice(-7).reverse() : [];
+  const todayCount = hist.filter(h => h.date === todayStr()).length;
+  const todayMin = hist.filter(h => h.date === todayStr()).reduce((a,b)=>a+b.min,0);
+  const goal = Current ? (Current.pomoGoalMin || 120) : 120;
+  return `
+    <div class="timer-display" id="pomoDisplay">25:00</div>
+    <div class="field"><label>时长</label>
+      <select id="pomoMinSelect" onchange="document.getElementById('pomoMin').value=this.value">
+        <option value="15">15 分钟</option>
+        <option value="25" selected>25 分钟</option>
+        <option value="45">45 分钟</option>
+        <option value="60">60 分钟</option>
+        <option value="custom">自定义</option>
+      </select>
+      <input type="number" id="pomoMin" value="25" min="1" max="180" style="margin-top:6px;">
+    </div>
+    <div class="field"><label>今日目标（分钟）</label>
+      <input type="number" id="pomoGoalInput" value="${goal}" min="0" max="600">
+    </div>
+    <p style="font-size:12px;color:var(--text-soft);margin-bottom:12px;">今天已完成 ${todayCount} 次 · 累计 ${todayMin} / ${goal} 分钟</p>
+    <div class="field"><label>白噪音</label>
+      <div id="noiseBox" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+      <input type="range" min="0" max="100" value="50" oninput="setNoiseVolume(this.value/100)" style="width:100%;margin-top:8px;">
+    </div>
+    <button class="btn" id="pomoBtn" onclick="togglePomo()">开始专注</button>
+    <button class="btn ghost" onclick="savePomoGoal()">保存目标</button>
+    <button class="btn ghost" onclick="openPomoCalendar()">📅 学习打卡</button>
+    ${hist.length?'<hr style="margin:16px 0;border:none;border-top:1px solid #00000011;"><label style="font-size:13px;color:var(--text-soft);">最近专注</label>'+hist.map(h=>`<div class="log-item"><div class="who">${h.date}</div><div class="txt">${h.min} 分钟</div></div>`).join(''):''}
+  `;
+}
+
+/* ---------- Tab 2：背单词 ---------- */
+function renderStudyWord(){
+  return `
+    <div style="display:flex;gap:6px;margin-bottom:12px;">
+      <button class="btn" style="flex:1;" onclick="studyWordTab('study')">开始背</button>
+      <button class="btn ghost" style="flex:1;" onclick="studyWordTab('books')">词书</button>
+      <button class="btn ghost" style="flex:1;" onclick="studyWordTab('import')">导入</button>
+      <button class="btn ghost" style="flex:1;" onclick="studyWordTab('wrong')">错词</button>
+    </div>
+    <div id="studyWordBody"></div>
+  `;
+}
+function studyWordTab(tab){
+  const box = document.getElementById('studyWordBody');
+  if(!box) return;
+  if(tab === 'study') box.innerHTML = renderWordStudy();
+  else if(tab === 'books') box.innerHTML = renderWordBooks();
+  else if(tab === 'import') box.innerHTML = renderWordImport();
+  else if(tab === 'wrong') box.innerHTML = renderWordWrong();
+  if(tab === 'study') setTimeout(loadNextWord, 0);
+}
+
+/* ---------- Tab 3：刷题 ---------- */
+function renderStudyQuiz(){
+  const q = Current.quiz;
+  const today = todayStr();
+  const todayList = q.history.filter(h=>h.date===today);
+  const todayTotal = todayList.reduce((a,b)=>a+b.total,0);
+  const todayCorrect = todayList.reduce((a,b)=>a+b.correct,0);
+  const rate = todayTotal ? Math.round(todayCorrect/todayTotal*100) : 0;
+  return `
+    <div class="field"><label>学科</label>
+      <select id="quizSubject">
+        <option value="english">英语</option>
+        <option value="chinese">语文</option>
+        <option value="history">历史</option>
+        <option value="politics">政治</option>
+        <option value="geography">地理</option>
+        <option value="biology">生物</option>
+        <option value="math">数学</option>
+        <option value="physics">物理</option>
+        <option value="chemistry">化学</option>
+      </select>
+    </div>
+    <div class="field"><label>难度</label>
+      <select id="quizLevel">
+        <option value="高三" selected>高三</option>
+        <option value="高考冲刺">高考冲刺</option>
+        <option value="四级">四级</option>
+        <option value="六级">六级</option>
+        <option value="考研">考研</option>
+        <option value="雅思">雅思</option>
+        <option value="托福">托福</option>
+      </select>
+    </div>
+    <div class="field"><label>题型</label>
+      <select id="quizType">
+        <option value="single">单选</option>
+        <option value="multi">多选</option>
+        <option value="judge">判断</option>
+        <option value="fill">填空</option>
+      </select>
+    </div>
+    <div class="field"><label>数量</label>
+      <select id="quizCount">
+        <option value="3">3</option>
+        <option value="5" selected>5</option>
+        <option value="10">10</option>
+      </select>
+    </div>
+    <div class="field"><label>知识点（可留空）</label>
+      <input id="quizTopic" placeholder="例：时态、非谓语、虚拟语气">
+    </div>
+    <button class="btn" onclick="quizGenerate()">开始出题</button>
+    <div style="display:flex;gap:6px;margin-top:10px;">
+      <button class="btn ghost" style="flex:1;" onclick="studyQuizTab('wrong')">错题本</button>
+      <button class="btn ghost" style="flex:1;" onclick="studyQuizTab('stat')">统计</button>
+    </div>
+    <p style="font-size:12px;color:var(--text-soft);margin-top:12px;text-align:center;">
+      📊 今日已刷 ${todayTotal} 题 · 正确率 ${rate}%
+    </p>
+    <div id="quizLoading"></div>
+  `;
+}
+function studyQuizTab(tab){
+  const box = document.getElementById('studyMainBody');
+  if(!box) return;
+  const back = `<button class="btn ghost" style="margin-bottom:10px;" onclick="studyMainTab('quiz')">← 返回出题</button>`;
+  if(tab === 'wrong') box.innerHTML = back + '<label style="font-size:13px;color:var(--text-soft);">错题本</label>' + renderQuizWrong();
+  else if(tab === 'stat') box.innerHTML = back + renderQuizStat();
+}
+
+/* ---------- Tab 4：学习素材 ---------- */
+function renderStudyMaterial(){
+  return `
+    <div style="display:flex;gap:6px;margin-bottom:12px;">
+      <button class="btn" style="flex:1;" onclick="studyMatTab('gen')">✨ AI 生成</button>
+      <button class="btn ghost" style="flex:1;" onclick="studyMatTab('paste')">📄 粘贴文章</button>
+      <button class="btn ghost" style="flex:1;" onclick="studyMatTab('list')">📁 素材库</button>
+    </div>
+    <div id="studyMatBody"></div>
+  `;
+}
+function studyMatTab(tab){
+  const box = document.getElementById('studyMatBody');
   if(!box) return;
   if(tab === 'gen') box.innerHTML = renderStudyGen();
   else if(tab === 'paste') box.innerHTML = renderStudyPaste();
   else if(tab === 'list') box.innerHTML = renderStudyList();
 }
+
+/* ---------- 学习素材子功能 ---------- */
 function renderStudyGen(){
   return `
     <div class="field"><label>类型</label>
@@ -4015,14 +4070,14 @@ function studyView(idx){
     <h2>${escapeHtml(m.title||'素材')} <span class="close" onclick="closeModal()">×</span></h2>
     <div class="notice-body" style="font-size:13px;max-height:60vh;overflow-y:auto;">${escapeHtml(m.content)}</div>
     <button class="btn" onclick="studyDelete(${idx})">删除</button>
-    <button class="btn ghost" onclick="openStudy()">返回</button>
+    <button class="btn ghost" onclick="studyMainTab('material')">返回</button>
   `;
   openModal();
 }
 function studyDelete(idx){
   if(!Current.study) return;
   Current.study.materials.splice(idx,1);
-  saveGame(); openStudy();
+  saveGame(); studyMatTab('list');
 }
 async function studyGenerate(){
   if(!API.ready){ needApiTip(); return; }
@@ -4108,36 +4163,10 @@ function studySave(type, title){
   if(Current.study.materials.length > 100) Current.study.materials = Current.study.materials.slice(-100);
   saveGame();
   say('已保存到素材库。','tip');
-  studyTab('list');
+  studyMatTab('list');
 }
 
-/* ============ 背单词 ============ */
-function openWord(){
-  if(!Current) return;
-  if(!Current.word) Current.word = { books:[], currentBookId:null, dailyGoal:20, dir:'en2zh', learned:{}, history:[], wrong:[] };
-  const modal = document.getElementById('modalContent');
-  modal.innerHTML = `
-    <h2>📖 背单词 <span class="close" onclick="closeModal()">×</span></h2>
-    <div style="display:flex;gap:6px;margin-bottom:14px;">
-      <button class="btn" style="flex:1;" onclick="wordTab('study')">开始背</button>
-      <button class="btn ghost" style="flex:1;" onclick="wordTab('books')">词书</button>
-      <button class="btn ghost" style="flex:1;" onclick="wordTab('import')">导入</button>
-      <button class="btn ghost" style="flex:1;" onclick="wordTab('wrong')">错词</button>
-    </div>
-    <div id="wordBody"></div>
-  `;
-  openModal();
-  wordTab('study');
-}
-function wordTab(tab){
-  const box = document.getElementById('wordBody');
-  if(!box) return;
-  if(tab === 'study') box.innerHTML = renderWordStudy();
-  else if(tab === 'books') box.innerHTML = renderWordBooks();
-  else if(tab === 'import') box.innerHTML = renderWordImport();
-  else if(tab === 'wrong') box.innerHTML = renderWordWrong();
-  if(tab === 'study') setTimeout(loadNextWord, 0);
-}
+/* ============ 背单词核心 ============ */
 function renderWordImport(){
   return `
     <div class="field"><label>词书名称</label>
@@ -4213,10 +4242,21 @@ function wordImportFile(e){
   const file = e.target.files[0]; if(!file) return;
   const reader = new FileReader();
   reader.onload = ev => {
-    document.getElementById('wordImportText').value = ev.target.result;
+    let text = ev.target.result;
+    const badCount = (text.match(/\ufffd/g) || []).length;
+    if(badCount > 3){
+      const reader2 = new FileReader();
+      reader2.onload = ev2 => {
+        document.getElementById('wordImportText').value = ev2.target.result;
+        say('文件已读入（GBK），点「导入」保存。','tip');
+      };
+      reader2.readAsText(file, 'GBK');
+      return;
+    }
+    document.getElementById('wordImportText').value = text;
     say('文件已读入，点「导入」保存。','tip');
   };
-  reader.readAsText(file);
+  reader.readAsText(file, 'UTF-8');
 }
 function addWordBook(name, words){
   if(!Current) return;
@@ -4226,7 +4266,7 @@ function addWordBook(name, words){
   Current.word.currentBookId = book.id;
   saveGame();
   say(`已导入「${name}」，共 ${words.length} 个单词。`,'tip');
-  wordTab('books');
+  studyWordTab('books');
 }
 function wordDeleteBook(id){
   if(!Current) return;
@@ -4235,12 +4275,12 @@ function wordDeleteBook(id){
   if(Current.word.currentBookId === id){
     Current.word.currentBookId = Current.word.books[0]?.id || null;
   }
-  saveGame(); wordTab('books');
+  saveGame(); studyWordTab('books');
 }
 function wordSelectBook(id){
   if(!Current) return;
   Current.word.currentBookId = id;
-  saveGame(); wordTab('study');
+  saveGame(); studyWordTab('study');
 }
 function renderWordBooks(){
   const books = Current.word.books || [];
@@ -4360,7 +4400,7 @@ function wordSetGoal(){
   const n = parseInt(v);
   if(!n || n<1) return;
   Current.word.dailyGoal = n;
-  saveGame(); wordTab('study');
+  saveGame(); studyWordTab('study');
 }
 function wordCycleDir(){
   if(!Current) return;
@@ -4368,7 +4408,7 @@ function wordCycleDir(){
   const cur = Current.word.dir || 'en2zh';
   const idx = order.indexOf(cur);
   Current.word.dir = order[(idx+1) % order.length];
-  saveGame(); wordTab('study');
+  saveGame(); studyWordTab('study');
 }
 function renderWordWrong(){
   const list = Current.word.wrong || [];
@@ -4386,7 +4426,7 @@ function renderWordWrong(){
 }
 function wordRemoveWrong(i){
   Current.word.wrong.splice(i,1);
-  saveGame(); wordTab('wrong');
+  saveGame(); studyWordTab('wrong');
 }
 async function wordAutoPhonetic(limit=0){
   if(!Current || !Current.word) return;
@@ -4410,87 +4450,10 @@ async function wordAutoPhonetic(limit=0){
   }
   saveGame();
   say(`补完音标：${ok} / ${list.length}`,'tip');
-  wordTab('books');
+  studyWordTab('books');
 }
 
-/* ============ 刷题 ============ */
-function openQuiz(){
-  if(!Current) return;
-  if(!Current.quiz) Current.quiz = { history:[], wrong:[], cache:[] };
-  const modal = document.getElementById('modalContent');
-  modal.innerHTML = `
-    <h2>📝 刷题 <span class="close" onclick="closeModal()">×</span></h2>
-    <div style="display:flex;gap:6px;margin-bottom:14px;">
-      <button class="btn" style="flex:1;" onclick="quizTab('new')">出题</button>
-      <button class="btn ghost" style="flex:1;" onclick="quizTab('wrong')">错题本</button>
-      <button class="btn ghost" style="flex:1;" onclick="quizTab('stat')">统计</button>
-    </div>
-    <div id="quizBody"></div>
-  `;
-  openModal();
-  quizTab('new');
-}
-function quizTab(tab){
-  const box = document.getElementById('quizBody');
-  if(!box) return;
-  if(tab === 'new') box.innerHTML = renderQuizSetup();
-  else if(tab === 'wrong') box.innerHTML = renderQuizWrong();
-  else if(tab === 'stat') box.innerHTML = renderQuizStat();
-}
-function renderQuizSetup(){
-  const q = Current.quiz;
-  const today = todayStr();
-  const todayList = q.history.filter(h=>h.date===today);
-  const todayTotal = todayList.reduce((a,b)=>a+b.total,0);
-  const todayCorrect = todayList.reduce((a,b)=>a+b.correct,0);
-  const rate = todayTotal ? Math.round(todayCorrect/todayTotal*100) : 0;
-  return `
-    <div class="field"><label>学科</label>
-      <select id="quizSubject">
-        <option value="english">英语</option>
-        <option value="chinese">语文</option>
-        <option value="history">历史</option>
-        <option value="politics">政治</option>
-        <option value="geography">地理</option>
-        <option value="biology">生物</option>
-      </select>
-    </div>
-    <div class="field"><label>难度</label>
-      <select id="quizLevel">
-        <option value="高三" selected>高三</option>
-        <option value="高考冲刺">高考冲刺</option>
-        <option value="四级">四级</option>
-        <option value="六级">六级</option>
-        <option value="考研">考研</option>
-        <option value="雅思">雅思</option>
-        <option value="托福">托福</option>
-      </select>
-    </div>
-    <div class="field"><label>题型</label>
-      <select id="quizType">
-        <option value="single">单选</option>
-        <option value="multi">多选</option>
-        <option value="judge">判断</option>
-        <option value="fill">填空</option>
-      </select>
-    </div>
-    <div class="field"><label>数量</label>
-      <select id="quizCount">
-        <option value="3">3</option>
-        <option value="5" selected>5</option>
-        <option value="10">10</option>
-      </select>
-    </div>
-    <div class="field"><label>知识点（可留空）</label>
-      <input id="quizTopic" placeholder="例：时态、非谓语、虚拟语气">
-    </div>
-    <button class="btn" onclick="quizGenerate()">开始出题</button>
-    <p style="font-size:12px;color:var(--text-soft);margin-top:12px;text-align:center;">
-      📊 今日已刷 ${todayTotal} 题 · 正确率 ${rate}%
-    </p>
-    <div id="quizLoading"></div>
-  `;
-}
+/* ============ 刷题核心 ============ */
 async function quizGenerate(){
   if(!API.ready){ needApiTip(); return; }
   const subject = document.getElementById('quizSubject').value;
@@ -4502,7 +4465,11 @@ async function quizGenerate(){
   const box = document.getElementById('quizLoading');
   box.innerHTML = '<div class="test-result">⏳ 正在出题…</div>';
 
-  const subjMap = { english:'英语', chinese:'语文', history:'历史', politics:'政治', geography:'地理', biology:'生物' };
+  const subjMap = {
+    english:'英语', chinese:'语文', history:'历史',
+    politics:'政治', geography:'地理', biology:'生物',
+    math:'数学', physics:'物理', chemistry:'化学',
+  };
   const typeMap = { single:'单选题', multi:'多选题', judge:'判断题', fill:'填空题' };
   const levelDesc = {
     '高三':'高三水平，难度接近高考',
@@ -4513,6 +4480,8 @@ async function quizGenerate(){
     '雅思':'IELTS 6.5+',
     '托福':'TOEFL 90+',
   };
+
+  const isSci = ['math','physics','chemistry'].includes(subject);
 
   let format = '';
   if(type === 'single'){
@@ -4525,7 +4494,43 @@ async function quizGenerate(){
     format = `{"q":"题干（用 ___ 表示空）","answer":"答案","explain":"解析"}`;
   }
 
-  const prompt = `请出 ${count} 道${subjMap[subject]}${typeMap[type]}，难度：${levelDesc[level]}。
+  let prompt = '';
+
+  if(isSci){
+    prompt = `请出 ${count} 道${subjMap[subject]}${typeMap[type]}，难度：${levelDesc[level]}。
+${topic ? '知识点：' + topic + '。' : ''}
+
+【重要：出题范围】
+${subjMap[subject]}只出以下类型的题，不要出压轴题：
+- 概念理解题（定义、性质、适用条件）
+- 公式记忆题（公式、定理、定律）
+- 判断题（命题真假）
+- 简单计算题（一步或两步能算出来的）
+- 单位/物理量判断（物理、化学）
+- 图像识别题（简单函数图像、v-t 图等）
+- 元素周期表 / 化学式（化学）
+
+【禁止出】
+- 多步计算题
+- 证明题
+- 复杂综合题
+- 压轴题
+
+【答案要求】
+- 答案必须唯一且正确
+- ${type==='single'||type==='multi' ? '4 个选项不能重复' : ''}
+- 必须给出完整解题步骤或依据
+- 最后自己验算一遍，验算不通过就换一道
+- 数学公式用 LaTeX 表示，行内用 $...$，独立用 $$...$$
+
+输出严格 JSON，不要其他文字：
+{
+  "questions": [
+    ${format}
+  ]
+}`;
+  } else {
+    prompt = `请出 ${count} 道${subjMap[subject]}${typeMap[type]}，难度：${levelDesc[level]}。
 ${topic ? '知识点：' + topic + '。' : ''}
 
 要求：
@@ -4541,17 +4546,48 @@ ${topic ? '知识点：' + topic + '。' : ''}
     ${format}
   ]
 }`;
+  }
 
   try{
     const reply = await callAI([
       {role:'system',content:'你是出题老师，只输出 JSON。'},
       {role:'user',content:prompt},
-    ], {maxTokens:2000, temperature:0.8});
+    ], {maxTokens:2000, temperature:isSci ? 0.5 : 0.8});
 
     const m = reply.match(/\{[\s\S]*\}/);
     if(!m) throw new Error('AI 返回格式不对');
     const data = JSON.parse(m[0]);
     if(!data.questions || !data.questions.length) throw new Error('没有题目');
+
+    if(isSci){
+      box.innerHTML = '<div class="test-result">⏳ 正在验算…</div>';
+      try{
+        const checkPrompt = `请检查下面这些${subjMap[subject]}题的答案是否正确：
+
+${JSON.stringify(data.questions, null, 2)}
+
+要求：
+- 重新计算每一道题
+- 检查答案、选项、解析是否一致
+- 如果答案错误，修正后输出
+- 如果题目本身有问题，换一道同类型的题
+- 输出格式和输入完全一样，严格 JSON，不要其他文字
+
+输出：
+{
+  "questions": [...]
+}`;
+        const check = await callAI([
+          {role:'system',content:'你是数学/物理/化学老师，负责验算。只输出 JSON。'},
+          {role:'user',content:checkPrompt},
+        ], {maxTokens:2000, temperature:0.2});
+        const m2 = check.match(/\{[\s\S]*\}/);
+        if(m2){
+          const data2 = JSON.parse(m2[0]);
+          if(data2.questions && data2.questions.length) data.questions = data2.questions;
+        }
+      }catch(e){ console.warn('验算失败，用原始题', e); }
+    }
 
     Current.quiz.current = {
       subject, level, type, topic,
@@ -4580,7 +4616,7 @@ function renderQuizQuestion(){
       const letter = String.fromCharCode(65+i);
       const selected = s.userAnswers[idx] === letter;
       return `<div class="shop-item" style="cursor:pointer;${selected?'outline:2px solid var(--main);':''}" onclick="quizSelect('${letter}')">
-        <div class="info">${escapeHtml(opt)}</div>
+        <div class="info">${renderMath(opt)}</div>
       </div>`;
     }).join('');
   } else if(type === 'multi'){
@@ -4589,7 +4625,7 @@ function renderQuizQuestion(){
       const arr = s.userAnswers[idx] || [];
       const selected = arr.includes(letter);
       return `<div class="shop-item" style="cursor:pointer;${selected?'outline:2px solid var(--main);':''}" onclick="quizToggle('${letter}')">
-        <div class="info">${selected?'☑':'☐'} ${escapeHtml(opt)}</div>
+        <div class="info">${selected?'☑':'☐'} ${renderMath(opt)}</div>
       </div>`;
     }).join('');
   } else if(type === 'judge'){
@@ -4607,7 +4643,7 @@ function renderQuizQuestion(){
     <h2>刷题 · 第 ${idx+1}/${total} <span class="close" onclick="closeModal()">×</span></h2>
     <div class="game-panel">
       <div class="g-status">${s.subject} · ${s.level} · ${s.type}</div>
-      <div class="g-content" style="font-size:15px;line-height:1.7;margin:12px 0;">${escapeHtml(q.q)}</div>
+      <div class="g-content" style="font-size:15px;line-height:1.7;margin:12px 0;">${renderMath(q.q)}</div>
       ${body}
       <div class="g-btn-row" style="margin-top:14px;">
         ${idx > 0 ? `<button onclick="quizPrev()">← 上一题</button>` : ''}
@@ -4700,7 +4736,7 @@ async function quizSubmit(){
         `).join('')}
       </div>
       <div class="g-btn-row" style="margin-top:16px;">
-        <button onclick="openQuiz()">再来一组</button>
+        <button onclick="studyMainTab('quiz')">再来一组</button>
         <button onclick="closeModal()">退出</button>
       </div>
       <div id="quizReactionBox"></div>
@@ -4773,7 +4809,7 @@ function renderQuizWrong(){
 }
 function quizRemoveWrong(i){
   Current.quiz.wrong.splice(i,1);
-  saveGame(); quizTab('wrong');
+  saveGame(); studyQuizTab('wrong');
 }
 function renderQuizStat(){
   const h = Current.quiz.history || [];
@@ -4985,6 +5021,121 @@ function moneySaveBudget(){
   moneyTab('stat');
 }
 
+/* ============ 打卡日历 ============ */
+function getPomoByDate(){
+  const map = {};
+  if(!Current || !Current.pomoHistory) return map;
+  Current.pomoHistory.forEach(h=>{
+    map[h.date] = (map[h.date]||0) + (h.min||0);
+  });
+  return map;
+}
+function openPomoCalendar(){
+  if(!Current) return;
+  const modal = document.getElementById('modalContent');
+  const map = getPomoByDate();
+  const goal = Current.pomoGoalMin || 120;
+  const now = new Date();
+  let viewYear = now.getFullYear();
+  let viewMonth = now.getMonth();
+  const today = todayStr();
+
+  function render(){
+    const first = new Date(viewYear, viewMonth, 1);
+    const startWeek = first.getDay();
+    const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
+    const cells = [];
+    ['日','一','二','三','四','五','六'].forEach(d=>{
+      cells.push(`<div style="text-align:center;font-size:11px;color:var(--text-soft);padding:4px 0;">${d}</div>`);
+    });
+    for(let i=0;i<startWeek;i++) cells.push('<div></div>');
+    for(let d=1; d<=daysInMonth; d++){
+      const ds = `${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const min = map[ds]||0;
+      let bg = 'transparent', color = 'var(--text)';
+      if(min > 0){
+        const ratio = Math.min(1, min/goal);
+        bg = `rgba(255,143,171,${0.25 + ratio*0.65})`;
+        if(ratio >= 1) color = '#fff';
+      }
+      if(ds === today) color = 'var(--main-dark)';
+      cells.push(`
+        <div style="text-align:center;padding:6px 0;border-radius:8px;background:${bg};
+          font-size:12px;color:${color};font-weight:${ds===today?'700':'400'};"
+          ${min?`onclick="say('${ds} 专注了 ${min} 分钟','tip')"`:''}>
+          ${d}${min?`<div style="font-size:9px;opacity:.8;">${min}分</div>`:''}
+        </div>`);
+    }
+    return cells.join('');
+  }
+
+  modal.innerHTML = `
+    <h2>📅 学习打卡 <span class="close" onclick="closeModal()">×</span></h2>
+    <div class="game-panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <button class="btn ghost" style="width:auto;padding:6px 14px;" onclick="pomoCalPrev()">‹ 上月</button>
+        <div style="font-size:15px;font-weight:600;" id="calTitle">${viewYear} 年 ${viewMonth+1} 月</div>
+        <button class="btn ghost" style="width:auto;padding:6px 14px;" onclick="pomoCalNext()">下月 ›</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;" id="calGrid">${render()}</div>
+      <p style="font-size:11px;color:var(--text-soft);margin-top:12px;text-align:center;">
+        颜色越深，当天专注时间越长。目标 ${goal} 分钟。
+      </p>
+    </div>`;
+  openModal();
+
+  window.pomoCalPrev = ()=>{
+    viewMonth--; if(viewMonth<0){ viewMonth=11; viewYear--; }
+    document.getElementById('calTitle').textContent = `${viewYear} 年 ${viewMonth+1} 月`;
+    document.getElementById('calGrid').innerHTML = render();
+  };
+  window.pomoCalNext = ()=>{
+    viewMonth++; if(viewMonth>11){ viewMonth=0; viewYear++; }
+    document.getElementById('calTitle').textContent = `${viewYear} 年 ${viewMonth+1} 月`;
+    document.getElementById('calGrid').innerHTML = render();
+  };
+}
+
+/* ============ 白噪音 ============ */
+const WHITE_NOISE_LIST = [
+  { id:'rain',   name:'🌧️ 雨声',   url:'audio/rain.mp3' },
+  { id:'cafe',   name:'☕ 咖啡馆', url:'audio/cafe.mp3' },
+  { id:'forest', name:'🌲 森林',   url:'audio/forest.mp3' },
+  { id:'fire',   name:'🔥 篝火',   url:'audio/fire.mp3' },
+];
+let noiseAudio = null;
+let currentNoiseId = null;
+function playNoise(id){
+  const item = WHITE_NOISE_LIST.find(x=>x.id===id);
+  if(!item) return;
+  if(noiseAudio){ noiseAudio.pause(); noiseAudio = null; }
+  noiseAudio = new Audio(item.url);
+  noiseAudio.loop = true;
+  noiseAudio.volume = 0.5;
+  noiseAudio.play().catch(e=>{
+    say('音频播放失败：' + e.message,'err');
+  });
+  currentNoiseId = id;
+  renderNoiseUI();
+}
+function stopNoise(){
+  if(noiseAudio){ noiseAudio.pause(); noiseAudio = null; }
+  currentNoiseId = null;
+  renderNoiseUI();
+}
+function setNoiseVolume(v){
+  if(noiseAudio) noiseAudio.volume = Math.max(0, Math.min(1, v));
+}
+function renderNoiseUI(){
+  const box = document.getElementById('noiseBox');
+  if(!box) return;
+  box.innerHTML = WHITE_NOISE_LIST.map(n=>`
+    <button class="btn ${currentNoiseId===n.id?'':'ghost'}" style="width:auto;padding:8px 14px;font-size:13px;"
+      onclick="${currentNoiseId===n.id?'stopNoise()':`playNoise('${n.id}')`}">
+      ${n.name}${currentNoiseId===n.id?' ⏸':''}
+    </button>`).join('');
+}
+
 /* ============================================================
    初始化
    ============================================================ */
@@ -5038,7 +5189,6 @@ async function boot(){
     setTimeout(()=>{ if(Current.sick)say(`${Current.name}还病着，需要照顾。`,'them'); else timeGreeting(); },1000);
   }
 }
-
 document.addEventListener('visibilitychange', ()=>{
   if(document.hidden){
     GlobalState.lastBackgroundAt = Date.now();
@@ -5054,7 +5204,6 @@ window.addEventListener('blur', ()=>{
   GlobalState.lastBackgroundAt = Date.now();
   setTimeout(()=>{ tryBackgroundAINotification(); }, 3000);
 });
-
 function startIdleWalk(){
   setInterval(()=>{
     const wrap=document.getElementById('charWrap');
