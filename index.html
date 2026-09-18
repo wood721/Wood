@@ -412,6 +412,7 @@ function newCharacterData(id){
     pomoHistory:[], focusMode:false, focusUntil:null,
     pomoGoalMin: 120,
     lastPomoNudge: 0,
+    lastPomoNudgeDate: null,
     recentGames: [],
     lastSelfDiaryDate: null,
     lastFestivalDate: null,
@@ -946,7 +947,7 @@ function moodHint(){
   if(m>=80) return '他很开心'; if(m>=60) return '他心情不错'; if(m>=40) return '他还好'; if(m>=20) return '他有点低落';
   return '他很难过';
 }
-function isTooSoonToTalk(){ if(!Current) return true; return (Date.now() - Current.lastProactiveAt) < 5 * 60 * 1000; }
+function isTooSoonToTalk(){ if(!Current) return true; return (Date.now() - Current.lastProactiveAt) < 30 * 60 * 1000; }
 function rememberProactive(text){
   if(!Current) return;
   Current.lastProactiveAt = Date.now();
@@ -1755,11 +1756,11 @@ setInterval(tickPet, 60000);
 function checkPetInteract(){
   if(!API.ready || !Current || !Current.pet.has) return;
   if(Current.isAway || Current.isSleeping || Current.focusMode) return;
-  if(Math.random() > 0.12) return;
+  if(Math.random() > 0.03) return;
   var lines = ['你摸了摸宠物，跟它说了句话。','你把宠物抱起来又放下。','你看了一眼宠物，笑了笑。','你逗了下宠物。'];
   petAIReply(lines[Math.floor(Math.random()*lines.length)]);
 }
-setInterval(checkPetInteract, 30*60*1000);
+setInterval(checkPetInteract, 60*60*1000);
 var DECAY_PER_HOUR={food:6,energy:4,mood:3};
 var lastTick=Date.now();
 function tickStats(){
@@ -1890,7 +1891,10 @@ function nudgeStudy(){
   var done = getTodayPomoMin();
   if(done >= goal) return;
   var h = new Date().getHours();
-  if(h >= 22) return;
+  if(h >= 22 || h < 8) return;
+  var today = todayStr();
+  if(Current.lastPomoNudgeDate === today) return;
+  Current.lastPomoNudgeDate = today;
   var remain = goal - done;
   var remainTxt = remain >= 60 ? (Math.floor(remain/60) + ' 小时 ' + (remain%60) + ' 分钟') : (remain + ' 分钟');
   var promptMap = h < 12 ? '现在是早上，提醒对方今天的学习目标还没完成。' : h < 18 ? '现在是下午，提醒对方今天的学习目标还有一部分没完成。' : '现在是晚上，提醒对方今天的学习目标快接近尾声了。';
@@ -1913,17 +1917,14 @@ function nudgeStudy(){
       if(ac.action) setTimeout(function(){ executeAction(ac.action); }, 800);
       Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
       showInAppNotif(clean);
-      Current.lastPomoNudge = Date.now();
       saveGameDebounced();
     }
   }).catch(function(){});
 }
 setInterval(function(){
   if(!Current) return;
-  if(Current.lastPomoNudge && Date.now() - Current.lastPomoNudge < 2*3600000) return;
-  if(Current.lastProactiveAt && Date.now() - Current.lastProactiveAt < 30*60*1000) return;
   nudgeStudy();
-}, 10*60*1000);
+}, 30*60*1000);
 function checkFestival(){
   if(!API.ready || !Current) return;
   var today = todayStr();
@@ -1994,7 +1995,7 @@ function checkSelfDiary(){
 function tryBackgroundAINotification(){
   if(!API.ready || !Current) return;
   if(Current.isAway || Current.isSleeping || Current.focusMode) return;
-  if(Current.lastBackgroundNotifAt && Date.now() - Current.lastBackgroundNotifAt < 30*60*1000) return;
+  if(Current.lastBackgroundNotifAt && Date.now() - Current.lastBackgroundNotifAt < 2*3600000) return;
   var h = new Date().getHours();
   if(h >= 23 || h < 6) return;
   var promptMap;
@@ -2024,7 +2025,7 @@ function tryBackgroundAINotification(){
 function checkSurprise(){
   if(!Current) return;
   var today=todayStr();
-  if(Current.lastSurpriseDate===today || Math.random()>0.3) return;
+  if(Current.lastSurpriseDate===today || Math.random()>0.1) return;
   Current.lastSurpriseDate=today;
   var pool=[
     {text:'桌上多了一张小纸条，上面写着「今天也辛苦了」。',item:null},
@@ -2035,16 +2036,16 @@ function checkSurprise(){
   if(s.item) Current.inventory[s.item]=(Current.inventory[s.item]||0)+1;
   setTimeout(function(){ say(s.text,'them'); showInAppNotif(s.text); Current.stats.mood=Math.min(100,Current.stats.mood+5); updateStats();saveGameDebounced(); }, 3000);
 }
-setInterval(checkSurprise, 3600000);
+setInterval(checkSurprise, 4*3600000);
 function checkEmo(){
   if(!Current) return;
   var today=todayStr();
-  if(Current.__emoDate===today || Math.random()>0.2) return;
+  if(Current.__emoDate===today || Math.random()>0.05) return;
   Current.__emoDate=today;
   Current.emoUntil = Date.now() + 2*3600000;
   setTimeout(function(){ say('他今天好像有点安静。','them'); }, 3000);
 }
-setInterval(checkEmo, 600000);
+setInterval(checkEmo, 30*60*1000);
 var SHOP_ITEMS=[
   {id:'tea',name:'热茶',price:5,type:'food',effect:{food:15,mood:5,energy:8},desc:'暖暖的，喝了精神好'},
   {id:'cake',name:'小蛋糕',price:8,type:'food',effect:{food:25,mood:10,energy:10},desc:'甜甜的，他喜欢'},
@@ -2600,7 +2601,7 @@ function openLog(){
   modal.innerHTML='<h2>聊天记录 <span class="close" onclick="closeModal()">×</span></h2>' + html;
   openModal();
 }
-function openGameMenu(){
+  function openGameMenu(){
   var modal=document.getElementById('modalContent');
   modal.innerHTML='<h2>小游戏 <span class="close" onclick="closeModal()">×</span></h2>' +
     '<div class="game-item" onclick="startGame(\'turtle\')"><div><div class="g-name">🐢 海龟汤</div><div class="g-desc">他给一个诡异故事，你来猜真相</div></div><div class="g-arrow">›</div></div>' +
@@ -3479,6 +3480,7 @@ function applySaveObject(d){
     if(!c.lastSelfDiaryDate) c.lastSelfDiaryDate = null;
     if(!c.lastFestivalDate) c.lastFestivalDate = null;
     if(typeof c.lastBackgroundNotifAt !== 'number') c.lastBackgroundNotifAt = 0;
+    if(!c.lastPomoNudgeDate) c.lastPomoNudgeDate = null;
     if(!c.study || typeof c.study !== 'object') c.study = { materials:[], wrong:[] };
     ['materials','wrong'].forEach(function(k){ if(!Array.isArray(c.study[k])) c.study[k] = []; });
     if(!c.word || typeof c.word !== 'object') c.word = { books:[], currentBookId:null, dailyGoal:20, dir:'en2zh', learned:{}, history:[], wrong:[] };
@@ -3650,7 +3652,7 @@ function renderMath(text){
   }catch(e){}
   return div.innerHTML;
 }
-function openStudy(){
+  function openStudy(){
   if(!Current) return;
   if(!Current.study) Current.study = { materials:[], wrong:[] };
   if(!Current.word) Current.word = { books:[], currentBookId:null, dailyGoal:20, dir:'en2zh', learned:{}, history:[], wrong:[] };
@@ -4103,8 +4105,6 @@ async function wordReaction(userAnswer, correct, isCorrect){
       say(clean, 'them', {kaomoji: km.kaomoji});
       applyEmotion(emo, label);
       if(ac.action) setTimeout(function(){ executeAction(ac.action); }, 800);
-      Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
-      saveGameDebounced();
     }
   }catch(e){}
 }
@@ -4334,8 +4334,6 @@ async function quizRoundReaction(results, correctCount, total){
       say(clean, 'them', {kaomoji: km.kaomoji});
       showInAppNotif(clean);
       if(ac.action) setTimeout(function(){ executeAction(ac.action); }, 800);
-      Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
-      saveGameDebounced();
     }
   }catch(e){}
 }
@@ -4416,8 +4414,6 @@ function moneyAdd(){
         say(clean, 'them');
         applyEmotion(emo, label);
         if(ac.action) setTimeout(function(){ executeAction(ac.action); }, 800);
-        Current.chatLog.push({role:'assistant',text:clean,time:Date.now()});
-        saveGameDebounced();
       }
     }, 800);
   }
@@ -4576,14 +4572,16 @@ async function boot(){
   setInterval(function(){ updateWeatherReal(true); checkMeal(); checkSleepState(); updateTrackBar(); }, 3600000);
   setInterval(function(){ checkMeal(); checkSleepState(); updateTrackBar(); }, 60000);
   if(!isNoticeSeen()) setTimeout(function(){ openNotice(); }, 500);
-  setTimeout(function(){ nudgeStudy(); }, 3000);
   setTimeout(function(){ checkFestival(); }, 4000);
   setTimeout(function(){ checkSelfDiary(); }, 6000);
   if(!hasSave){
     setTimeout(function(){ if(API.ready) proactiveTalk('greet').catch(function(){}); else say('先去设置里填 API 和上传图片吧。','tip'); }, 1200);
     setTimeout(firstTimeSetup, 2500);
   } else {
-    setTimeout(function(){ if(Current.sick) say(Current.name + '还病着，需要照顾。','them'); else timeGreeting(); }, 1000);
+    setTimeout(function(){
+      if(Current.sick) say(Current.name + '还病着，需要照顾。','them');
+      else if(Math.random() < 0.2) timeGreeting();
+    }, 1000);
   }
 }
 document.addEventListener('visibilitychange', function(){
